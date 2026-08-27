@@ -31,6 +31,63 @@ client = OpenAI(
 def is_retryable_status(error: APIStatusError) -> bool:
     return error.status_code == 429 or error.status_code >= 500
 
+def open_chat_stream(messages: list[ChatMessage]):
+    conversation = [
+        {
+            "role": message.role,
+            "content": message.content,
+        }
+        for message in messages
+    ]
+
+    attempt = 0
+
+    while True:
+        try:
+            return client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": SYSTEM_PROMPT,
+                    },
+                    *conversation,
+                ],
+                stream=True,
+                extra_body={
+                    "thinking": {
+                        "type": "disabled",
+                    }
+                },
+            )
+
+        except APITimeoutError:
+            raise
+
+        except APIConnectionError:
+            if attempt >= LLM_APP_MAX_RETRIES:
+                raise
+
+        except APIStatusError as error:
+            if (
+                not is_retryable_status(error)
+                or attempt >= LLM_APP_MAX_RETRIES
+            ):
+                raise
+
+        attempt += 1
+        time.sleep(LLM_RETRY_DELAY_SECONDS)
+
+def iter_chat_content(stream) -> Iterator[str]:
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+
+        content = chunk.choices[0].delta.content
+
+        if content:
+            yield content
+
 def stream_chat(messages: list[ChatMessage]) -> Iterator[str]:
     conversation = [
         {
