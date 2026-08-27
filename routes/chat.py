@@ -2,14 +2,14 @@ import json
 
 from collections.abc import Iterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from openai import (
     APIConnectionError,
     APIStatusError,
     APITimeoutError,
 )
-
+from rate_limit import enforce_rate_limit
 from models import ChatRequest
 from services.llm import (
     iter_chat_content,
