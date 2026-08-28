@@ -59,9 +59,12 @@ def stream_events(stream) -> Iterator[str]:
         })
 
 @router.post("/api/chat-stream")
-def chat_stream(request: ChatRequest):
+def chat_stream(
+    payload: ChatRequest,
+    _: None = Depends(enforce_rate_limit),
+):
     try:
-        stream = open_chat_stream(request.messages)
+        stream = open_chat_stream(payload.messages)
 
     except APITimeoutError:
         raise HTTPException(
@@ -85,3 +88,10 @@ def chat_stream(request: ChatRequest):
         stream_events(stream),
         media_type="application/x-ndjson",
     )
+
+@router.get(
+    "/api/rate-limit-test",
+    dependencies=[Depends(enforce_rate_limit)],
+)
+def rate_limit_test():
+    return {"status": "ok"}
