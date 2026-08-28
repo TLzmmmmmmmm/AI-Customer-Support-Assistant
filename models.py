@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from config import (
     MAX_CONVERSATION_CHARACTERS,
@@ -16,6 +16,14 @@ class ChatMessage(BaseModel):
         min_length=1,
         max_length=MAX_MESSAGE_CHARACTERS,
     )
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def strip_content(cls, value):
+        if isinstance(value, str):
+            return value.strip()
+
+        return value
 
 
 class ChatRequest(BaseModel):
@@ -34,6 +42,29 @@ class ChatRequest(BaseModel):
         if total_characters > MAX_CONVERSATION_CHARACTERS:
             raise ValueError(
                 "Conversation is too long"
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_role_sequence(self):
+        if self.messages[0].role != "user":
+            raise ValueError(
+                "Conversation must start with a user message"
+            )
+
+        for previous, current in zip(
+            self.messages,
+            self.messages[1:],
+        ):
+            if previous.role == current.role:
+                raise ValueError(
+                    "Conversation roles must alternate"
+                )
+
+        if self.messages[-1].role != "user":
+            raise ValueError(
+                "Conversation must end with a user message"
             )
 
         return self
