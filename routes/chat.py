@@ -15,7 +15,10 @@ from services.llm import (
     iter_chat_content,
     open_chat_stream,
 )
-
+from concurrency import (
+    release_llm_slot,
+    try_acquire_llm_slot,
+)
 
 router = APIRouter()
 
@@ -58,40 +61,49 @@ def stream_events(stream) -> Iterator[str]:
             "message": "AI service returned an error",
         })
 
+def stream_events_with_slot(stream) -> Iterator[str]:
+    try:
+        yield from stream_events(stream)
+    finally:
+        release_llm_slot()
+
 @router.post("/api/chat-stream")
 def chat_stream(
     payload: ChatRequest,
     _: None = Depends(enforce_rate_limit),
 ):
+    if not try_acquire_llm_slot():
+        raise HTTPException(
+            status_code=503,
+            detail="AI service is busy",
+        )
+    
     try:
         stream = open_chat_stream(payload.messages)
 
     except APITimeoutError:
+        release_llm_slot()
         raise HTTPException(
             status_code=504,
             detail="AI service timed out",
         )
 
     except APIConnectionError:
+        release_llm_slot()
         raise HTTPException(
             status_code=503,
             detail="AI service is unavailable",
         )
 
     except APIStatusError:
+        release_llm_slot()
         raise HTTPException(
             status_code=502,
             detail="AI service returned an error",
         )
 
     return StreamingResponse(
-        stream_events(stream),
+        stream_events_with_slot(stream),
         media_type="application/x-ndjson",
     )
 
-@router.get(
-    "/api/rate-limit-test",
-    dependencies=[Depends(enforce_rate_limit)],
-)
-def rate_limit_test():
-    return {"status": "ok"}
