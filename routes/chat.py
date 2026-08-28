@@ -111,72 +111,55 @@ def chat_stream(
     request: Request,
     _: None = Depends(enforce_rate_limit),
 ):
-    started_at = time.monotonic()
+    started_at = request.state.started_at
     request_id = request.state.request_id
-    
-    if not try_acquire_llm_slot():
-        log_request(
-            request_id=request_id,
-            http_status=503,
-            outcome="concurrency_limit",
-            started_at=started_at,
-            error=None,
-        )
 
+    if not try_acquire_llm_slot():
         raise HTTPException(
             status_code=503,
-            detail="AI service is busy",
+            detail={
+                "code": "concurrency_limit",
+                "message": "当前咨询人数较多，请稍后再试。",
+            },
         )
     
     try:
         stream = open_chat_stream(payload.messages)
 
-    except APITimeoutError:
+    except APITimeoutError as error:
         release_llm_slot()
 
-        log_request(
-            request_id=request_id,
-            http_status=504,
-            outcome="timeout",
-            started_at=started_at,
-            error="APITimeoutError",
-        )
-        
         raise HTTPException(
             status_code=504,
-            detail="AI service timed out",
+            detail={
+                "code": "timeout",
+                "message": "服务响应超时，请重新尝试。",
+                "internal_error": type(error).__name__,
+            },
         )
 
-    except APIConnectionError:
+    except APIConnectionError as error:
         release_llm_slot()
-
-        log_request(
-            request_id=request_id,
-            http_status=503,
-            outcome="provider_unavailable",
-            started_at=started_at,
-            error="APIConnectionError",
-        )
 
         raise HTTPException(
             status_code=503,
-            detail="AI service is unavailable",
+            detail={
+                "code": "provider_unavailable",
+                "message": "服务暂时不可用，请稍后再试。",
+                "internal_error": type(error).__name__,
+            },
         )
 
     except APIStatusError as error:
         release_llm_slot()
 
-        log_request(
-            request_id=request_id,
-            http_status=502,
-            outcome="provider_error",
-            started_at=started_at,
-            error=type(error).__name__,
-        )
-
         raise HTTPException(
             status_code=502,
-            detail="AI service returned an error",
+            detail={
+                "code": "provider_error",
+                "message": "服务暂时出现异常，请稍后再试。",
+                "internal_error": type(error).__name__,
+            },
         )
 
     return StreamingResponse(

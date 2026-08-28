@@ -36,7 +36,10 @@ def enforce_rate_limit(request: Request) -> None:
 
             raise HTTPException(
                 status_code=429,
-                detail="Too many requests",
+                detail={
+                    "code": "rate_limit",
+                    "message": "请求过于频繁，请稍后再试。",
+                },
                 headers={
                     "Retry-After": str(retry_after),
                 },

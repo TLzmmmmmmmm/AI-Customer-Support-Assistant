@@ -1,11 +1,33 @@
 import uuid
-
+import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.exceptions import RequestValidationError
 from routes.chat import router as chat_router
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from error_handling import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 
 app = FastAPI()
+
+app.add_exception_handler(
+    RequestValidationError,
+    validation_exception_handler,
+)
+
+app.add_exception_handler(
+    StarletteHTTPException,
+    http_exception_handler,
+)
+
+app.add_exception_handler(
+    Exception,
+    unhandled_exception_handler,
+)
 
 app.include_router(chat_router)
 
@@ -27,6 +49,7 @@ async def add_request_id(
     request_id = uuid.uuid4().hex
 
     request.state.request_id = request_id
+    request.state.started_at = time.monotonic()
 
     response = await call_next(request)
 
