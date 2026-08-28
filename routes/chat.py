@@ -63,7 +63,8 @@ def stream_events(
         yield encode_event({
             "type": "error",
             "code": "timeout",
-            "message": "AI service timed out",
+            "message": "响应超时，请重新尝试。",
+            "request_id": request_id,
         })
 
     except APIConnectionError:
@@ -77,7 +78,8 @@ def stream_events(
         yield encode_event({
             "type": "error",
             "code": "connection_error",
-            "message": "AI service is unavailable",
+            "message": "服务暂时不可用，请稍后再试。",
+            "request_id": request_id,
         })
 
     except APIStatusError as error:
@@ -92,7 +94,8 @@ def stream_events(
         yield encode_event({
             "type": "error",
             "code": "upstream_error",
-            "message": "AI service returned an error",
+            "message": "服务暂时出现异常，请稍后再试。",
+            "request_id": request_id,
         })
 
 def stream_events_with_slot(
