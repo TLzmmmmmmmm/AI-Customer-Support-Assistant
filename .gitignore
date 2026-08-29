@@ -27,3 +27,6 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Deployment
+DEPLOYMENT.md
