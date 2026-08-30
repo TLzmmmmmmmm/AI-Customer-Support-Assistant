@@ -1,0 +1,57 @@
+{
+  "id": "xir-p6600i-ex",
+  "name": "摩托罗拉 XiR P6600i 防爆",
+  "slug": "xir-p6600i-ex",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "防爆机型",
+    "音质清晰",
+    "坚固耐用",
+    "空中编程"
+  ],
+  "product_features": "XiR P6600i 数字防爆对讲机沿用工业化设计，防水防尘等级：IP67，防爆等级：Ex ib IIB T4 Gb/Ex ibD 21 T130℃",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "UHF：403-527MHz；350-400MHz VHF：136-174MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2100mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "64"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "122x56x36mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃—60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "270g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/xir-p6600i-ex/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/xir-p6600i-ex.json"
+    }
+  ]
+}
+

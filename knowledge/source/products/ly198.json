@@ -1,0 +1,57 @@
+{
+  "id": "ly198",
+  "name": "润信达 LY198",
+  "slug": "ly198",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "一体天线",
+    "一键对频",
+    "小巧轻薄",
+    "电量提示"
+  ],
+  "product_features": "LY198是一款机身小巧轻便的模拟对讲机，具备一键对频功能，可实现不同品牌型号的模拟对讲机之间通话。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "400-480MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤2W"
+        },
+        {
+          "name": "电池容量",
+          "value": "1200mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "16"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "95*45*35mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-20℃- 55℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "95g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/ly198/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/ly198.json"
+    }
+  ]
+}
+

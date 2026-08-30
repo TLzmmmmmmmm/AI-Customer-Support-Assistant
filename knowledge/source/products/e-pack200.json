@@ -1,0 +1,52 @@
+{
+  "id": "e-pack200",
+  "name": "海能达 E-pack200",
+  "slug": "e-pack200",
+  "category_id": "mesh-network",
+  "key_features": [
+    "窄带自组网",
+    "快速部署",
+    "公专融合"
+  ],
+  "product_features": "E-pack200不需要依赖其他外部设备和通信网络，可在全天候、全地形状况下使用的便携式通信设备。采用背负式便携设计，携带方便，可迅速为应急现场提供安全可靠、易拆易建、即用即通的语音通信组网覆盖。可根据现场需要进行灵活的网络自由组建，链状、树状、网状组网均能灵活部署，实现随需而动，随欲而通的语音通信网络。",
+  "technical_parameters": [
+    {
+      "group": "特色功能",
+      "items": [
+        {
+          "name": "同频波段通信",
+          "value": "采用同频波段通信，实现“一呼百应”和指挥调度全覆盖"
+        },
+        {
+          "name": "背负式防辐射设计",
+          "value": "背负式防辐射设计，给予用户最大的健康保护"
+        },
+        {
+          "name": "多种组网方式",
+          "value": "采用31级链状组网、网状组网等多种组网方式，部署灵活"
+        },
+        {
+          "name": "大容量快充电池",
+          "value": "使用大容量、一体式、快充电池的设计；3小时充满电量，最大持续工作时间为10H、同时可满足市电、车载供电等用电需求"
+        },
+        {
+          "name": "PDT/DMR终端兼容",
+          "value": "完全兼容PDT/DMR手持终端，满足用户现有终端的使用，节省成本"
+        },
+        {
+          "name": "自动组网",
+          "value": "具有开机自动组网、即通即用等特点"
+        }
+      ]
+    }
+  ],
+  "source_path": "/mesh-network/e-pack200/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/mesh-network/e-pack200.json"
+    }
+  ]
+}
+

@@ -1,0 +1,71 @@
+{
+  "id": "band-pass-duplexer",
+  "name": "润信达 带通双工器",
+  "slug": "band-pass-duplexer",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "腔体设计",
+    "项目定制"
+  ],
+  "product_features": "双工器是多信道共用天线的主要器件，其作用是将发射和接收讯号相隔离，保证接收和发射都能同时正常工作。大功率带通双工器采用最新异形高Q腔体设计,以精密CNC加工，并进行特殊表面处理,指标优越、具有插损小、隔离高、承受功率大等优点",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "136～174MHz / 400～527MHz"
+        },
+        {
+          "name": "收/发频率间隔 (MHz)",
+          "value": "5.7 / 10"
+        },
+        {
+          "name": "通带带宽（MHz）",
+          "value": "≤2 / ≤4M"
+        },
+        {
+          "name": "L 端插入损耗 (dB)",
+          "value": "≤1.2 / ≤1.2"
+        },
+        {
+          "name": "H 端插入损耗 (dB)",
+          "value": "≤1.2 / ≤1.2"
+        },
+        {
+          "name": "Rx--Tx 隔离度 (dB)",
+          "value": "≥80 / ≥75"
+        },
+        {
+          "name": "各端口电压驻波比",
+          "value": "≤1.25 / ≤1.25"
+        },
+        {
+          "name": "最大输入功率(W)",
+          "value": "200 / 200"
+        },
+        {
+          "name": "端口规格",
+          "value": "L16（N） / L16（N）"
+        },
+        {
+          "name": "尺寸（mm）",
+          "value": "483×300×89（2U） / 483×300×89（2U）"
+        },
+        {
+          "name": "温度范围(℃)",
+          "value": "-25～85 / -25～85"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/band-pass-duplexer/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/band-pass-duplexer.json"
+    }
+  ]
+}
+

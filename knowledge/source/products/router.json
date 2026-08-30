@@ -1,0 +1,65 @@
+{
+  "id": "router",
+  "name": "路由器",
+  "slug": "router",
+  "category_id": "ict-integration",
+  "key_features": [
+    "AC管理",
+    "网络安全",
+    "配置管理",
+    "故障诊断"
+  ],
+  "product_features": "最新推出的高性能企业级Wi-Fi7无线路由器，采用全新硬件架构、具备丰富的软件功能、支持全面的安全策略。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "外形尺寸",
+          "value": "330mm X 173mm X 44mm"
+        },
+        {
+          "name": "工作频段",
+          "value": "802.11ax、802.11n、802.11b/g：2.4GHz；802.11ax、802.11ac、802.11a/n：5GHz"
+        },
+        {
+          "name": "天线",
+          "value": "外置4根5dBi增益全向天线"
+        },
+        {
+          "name": "发射功率",
+          "value": "22dBm"
+        },
+        {
+          "name": "电源",
+          "value": "100~240V"
+        },
+        {
+          "name": "风扇",
+          "value": "无风扇，自然散热"
+        },
+        {
+          "name": "工作温度/存储温度",
+          "value": "0ºC～40ºC/-40ºC～70ºC"
+        },
+        {
+          "name": "工作湿度/存储湿度",
+          "value": "5%~95%（非冷凝）"
+        },
+        {
+          "name": "整机功耗",
+          "value": "≤12W"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/router/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/router.json"
+    }
+  ]
+}
+

@@ -1,0 +1,56 @@
+{
+  "id": "server",
+  "name": "服务器",
+  "slug": "server",
+  "category_id": "ict-integration",
+  "key_features": [
+    "可定制",
+    "信创",
+    "自主可控"
+  ],
+  "product_features": "国产自主可控的服务器是算力的重要保障，相比于传统的X86服务器，自主可控的信创服务器主要集中在C86体系，能更好的保障我国企事业和机关单位的业务运行和安全可靠。",
+  "technical_parameters": [
+    {
+      "group": "技术规格要求",
+      "items": [
+        {
+          "name": "外形及构造",
+          "value": "机架式服务器"
+        },
+        {
+          "name": "处理器类型",
+          "value": "可定制"
+        },
+        {
+          "name": "内存",
+          "value": "可定制"
+        },
+        {
+          "name": "硬盘",
+          "value": "可定制"
+        },
+        {
+          "name": "RAID",
+          "value": "可定制"
+        },
+        {
+          "name": "系统",
+          "value": "可定制"
+        },
+        {
+          "name": "带外管理",
+          "value": "集成系统管理芯片，提供iKVM和KVM Over IP高级管理功能，本地固件更新、错误日志，提供系统状况的可视显示；配置独立的远程管理控制端口，支持远程监控图形界面，可实现与操作系统无关的远程对服务器的完全控制，包括远程的开机、关机、重启、虚拟设备挂载等操作，可实现监控服务器内部主要部件的状态，包括CPU利用率和温度、内存使用率、硬盘读写次数及读写速率等"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/server/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/server.json"
+    }
+  ]
+}
+

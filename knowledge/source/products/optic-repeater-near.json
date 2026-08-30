@@ -1,0 +1,51 @@
+{
+  "id": "optic-repeater-near",
+  "name": "润信达 光纤直放站近端机",
+  "slug": "optic-repeater-near",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "功率定制",
+    "支持多路"
+  ],
+  "product_features": "光信号传输由于速度快、衰耗小，可以灵活运用于隧道、山区、大面积楼宇等无线电波难以到达的地区，它将载频信号耦合到近端机，转换成光信号通过光缆传送到远端机，再转换成射频信号输出，在通讯系统中具有距离远、延时小，语音质量稳定等特点。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "136-174MHz；350-400MHz；400-470MHz"
+        },
+        {
+          "name": "天线接口",
+          "value": "N-K，50Ω"
+        },
+        {
+          "name": "工作温度",
+          "value": "-20℃～+50℃"
+        },
+        {
+          "name": "工作湿度",
+          "value": "0～90℃无水凝"
+        },
+        {
+          "name": "机箱尺寸",
+          "value": "19 英寸 2U 机箱"
+        },
+        {
+          "name": "机箱重量",
+          "value": "＜5kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/optic-repeater-near/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/optic-repeater-near.json"
+    }
+  ]
+}
+

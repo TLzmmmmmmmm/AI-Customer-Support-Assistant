@@ -1,0 +1,166 @@
+{
+  "id": "jomesh-bp2w",
+  "name": "久华信 JoMesh-BP2W",
+  "slug": "jomesh-bp2w",
+  "category_id": "mesh-network",
+  "key_features": [
+    "频率定制",
+    "无线图传"
+  ],
+  "product_features": "JoMesh-BP2W便携台是新一代宽带无线自组网便携式产品，具备集成度高、小巧便携、接口丰富等特点，采用先进算法，抗干扰能力强。",
+  "technical_parameters": [
+    {
+      "group": "系统参数",
+      "items": [
+        {
+          "name": "型号",
+          "value": "JoMesh-BP2W"
+        },
+        {
+          "name": "中心频率",
+          "value": "700Mhz-6GHz"
+        },
+        {
+          "name": "载波带宽",
+          "value": "2.5/5/10/20MHz"
+        },
+        {
+          "name": "传输体制",
+          "value": "COFDM"
+        },
+        {
+          "name": "传输模式",
+          "value": "2T2R分集/MIMO（可选）"
+        },
+        {
+          "name": "传输速率（无线环境）",
+          "value": "分集：峰值速率≥50Mbps；2*2MIMO：峰值速率≥90Mbps"
+        },
+        {
+          "name": "图像质量",
+          "value": "CIF/HD1/D1/720P/1080P，自适应调整"
+        },
+        {
+          "name": "接收灵敏度",
+          "value": "≤-100dBm"
+        },
+        {
+          "name": "发射功率",
+          "value": "2*2W，双通道"
+        },
+        {
+          "name": "冷启动时间",
+          "value": "＜35秒"
+        },
+        {
+          "name": "拓扑变化响应时间",
+          "value": "≤2秒"
+        },
+        {
+          "name": "单跳时延",
+          "value": "≤10ms"
+        },
+        {
+          "name": "链路自适应",
+          "value": "可根据信道传输质量自动调整载波调制方式，调整范围QPSK/16QAM/64QAM/256QAM"
+        },
+        {
+          "name": "抗干扰",
+          "value": "资源（时间或者频段）受干扰时保证正常通信"
+        },
+        {
+          "name": "跳频",
+          "value": "1000跳/秒"
+        },
+        {
+          "name": "加密方式",
+          "value": "DES/AES128/AES256/SM4"
+        }
+      ]
+    },
+    {
+      "group": "可选功能",
+      "items": [
+        {
+          "name": "扩展功能",
+          "value": "内置4G路由/内置北斗三号短报文"
+        },
+        {
+          "name": "智能选频",
+          "value": "系统自动选择最优的工作频率进行组网工作，可预设频点数不少于16个"
+        },
+        {
+          "name": "异频组网",
+          "value": "设置为智能选频模式，可工作在不同频点，以规避干扰信号"
+        }
+      ]
+    },
+    {
+      "group": "设备接口",
+      "items": [
+        {
+          "name": "天线接口",
+          "value": "N型*2"
+        },
+        {
+          "name": "WIFI、定位接口",
+          "value": "防水航插"
+        },
+        {
+          "name": "视频输入接口",
+          "value": "HDMI（可选内置编码）或IP视频输入"
+        },
+        {
+          "name": "业务接口",
+          "value": "以太网（航插）"
+        },
+        {
+          "name": "蓝牙",
+          "value": "支持"
+        },
+        {
+          "name": "电源接口",
+          "value": "防水航插"
+        }
+      ]
+    },
+    {
+      "group": "物理指标",
+      "items": [
+        {
+          "name": "设备尺寸",
+          "value": "185mm*205mm*63mm"
+        },
+        {
+          "name": "设备重量",
+          "value": "2.8kg（含电池）"
+        },
+        {
+          "name": "设备功耗",
+          "value": "≤30W"
+        },
+        {
+          "name": "工作温度",
+          "value": "-40℃～+65℃"
+        },
+        {
+          "name": "工作湿度",
+          "value": "5%RH~100%RH"
+        },
+        {
+          "name": "防护等级",
+          "value": "IP67"
+        }
+      ]
+    }
+  ],
+  "source_path": "/mesh-network/jomesh-bp2w/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/mesh-network/jomesh-bp2w.json"
+    }
+  ]
+}
+

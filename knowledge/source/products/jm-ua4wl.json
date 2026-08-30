@@ -1,0 +1,124 @@
+{
+  "id": "jm-ua4wl",
+  "name": "JM-UA4WL",
+  "slug": "jm-ua4wl",
+  "category_id": "mesh-network",
+  "key_features": [
+    "机载自组网"
+  ],
+  "product_features": "JM-UA4WL是一款安装在飞行器上跟地面设备完成自组网的机载设备，用于特定组网场景。",
+  "technical_parameters": [
+    {
+      "group": "系统参数",
+      "items": [
+        {
+          "name": "型号",
+          "value": "JM-UA4WL"
+        },
+        {
+          "name": "中心频率",
+          "value": "1350MHz~1450MHz"
+        },
+        {
+          "name": "载波带宽",
+          "value": "1.25/2.5/5/10/20MHz"
+        },
+        {
+          "name": "传输体制",
+          "value": "COFDM"
+        },
+        {
+          "name": "传输速率",
+          "value": "峰值速率47Mbps"
+        },
+        {
+          "name": "组网规模",
+          "value": "最大支持64节点"
+        },
+        {
+          "name": "接收灵敏度",
+          "value": "≤-100dBm"
+        },
+        {
+          "name": "发射功率",
+          "value": "4W/通道,双通道"
+        },
+        {
+          "name": "冷启动时间",
+          "value": "＜35秒"
+        },
+        {
+          "name": "拓扑变化响应时间",
+          "value": "≤2秒"
+        },
+        {
+          "name": "单跳时延",
+          "value": "≤10ms"
+        },
+        {
+          "name": "链路自适应",
+          "value": "可根据信道传输质量自动调整载波调制方式，调整范围QPSK/16QAM/64QAM/256QAM"
+        },
+        {
+          "name": "加密方式",
+          "value": "DES/AES128/AES256/SM4"
+        }
+      ]
+    },
+    {
+      "group": "设备接口",
+      "items": [
+        {
+          "name": "天线接口",
+          "value": "SMA-K型×2"
+        },
+        {
+          "name": "RS232串口",
+          "value": "PH2.0-6封装"
+        },
+        {
+          "name": "业务接口",
+          "value": "100M以太网，PH2.0-4封装×2"
+        },
+        {
+          "name": "供电方式",
+          "value": "DC 24V～27V"
+        },
+        {
+          "name": "电源接口",
+          "value": "XT30PW-M封装"
+        }
+      ]
+    },
+    {
+      "group": "物理指标",
+      "items": [
+        {
+          "name": "设备尺寸",
+          "value": "160mm×90.5mm×25.5mm"
+        },
+        {
+          "name": "设备重量",
+          "value": "≤350g(不含天线)"
+        },
+        {
+          "name": "工作温度",
+          "value": "-40℃～+65℃"
+        },
+        {
+          "name": "工作湿度",
+          "value": "5%RH~95%RH"
+        }
+      ]
+    }
+  ],
+  "source_path": "/mesh-network/jm-ua4wl/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/mesh-network/jm-ua4wl.json"
+    }
+  ]
+}
+

@@ -1,0 +1,57 @@
+{
+  "id": "hp500cqst",
+  "name": "海能达 HP500 CQST",
+  "slug": "hp500cqst",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "防爆机型",
+    "语音清晰",
+    "坚固耐用",
+    "Type-C充电"
+  ],
+  "product_features": "HP500 CQST具有安全可靠的本安设计、坚固耐用的机体和先进人体工程学设计，让用户可以享有清晰响亮的语音音质。其防爆等级为：Ex ib IIB T4 Gb; Ex ib IIIC T130℃ Db",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "VHF:136-174MHz; UHF1:400-470MHz;"
+        },
+        {
+          "name": "输出功率",
+          "value": "<3.5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2400mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "256"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "119*55*33.5mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃- 60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "316g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/hp500cqst/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/hp500cqst.json"
+    }
+  ]
+}
+

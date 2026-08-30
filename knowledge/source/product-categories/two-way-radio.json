@@ -1,0 +1,15 @@
+{
+  "id": "two-way-radio",
+  "name": "对讲机通信",
+  "slug": "two-way-radio",
+  "short_description": "专业可靠的即时通信设备，满足多场景协同需求。",
+  "source_path": "/two-way-radio/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/product-categories/two-way-radio.json"
+    }
+  ]
+}
+

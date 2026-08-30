@@ -1,0 +1,15 @@
+{
+  "id": "solution-design",
+  "name": "方案设计",
+  "summary": "预约客户交流，确认客户实际需求，提供客户认可的解决方案",
+  "body": "方案设计是通信网络功能与投资决策的重要参考，也是确保系统成功部署的重要前提。我公司在充分了解客户需求的基础上，结合新技术趋势、行业应用及专业通信实践，围绕覆盖范围、信号质量、系统容量和资源投入提供网络规划方案，满足高效、敏捷、易维护的通信网络建设需求。",
+  "source_path": "/support/#solution-design",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/data/support-services.ts"
+    }
+  ]
+}
+

@@ -1,0 +1,57 @@
+{
+  "id": "xir-gp338d-plus-ex",
+  "name": "摩托罗拉 GP338D+ 防爆",
+  "slug": "xir-gp338d-plus-ex",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "防爆机型",
+    "音质清晰",
+    "坚固耐用",
+    "倒地报警"
+  ],
+  "product_features": "XiR GP338D+数字防爆对讲机沿用工业化设计，防水防尘等级：IP68，防爆等级：Ex ib IIB T4 Gb/Ex ibD 21 T130℃",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "UHF：403-527MHz VHF：136-174MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2100mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "1000"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "130x55x36mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃—60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "325g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/xir-gp338d-plus-ex/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/xir-gp338d-plus-ex.json"
+    }
+  ]
+}
+

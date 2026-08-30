@@ -1,0 +1,57 @@
+{
+  "id": "hp780cqst",
+  "name": "海能达 HP780CQST",
+  "slug": "hp780cqst",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "防爆机型",
+    "机身轻薄",
+    "彩色屏幕",
+    "坚固耐用"
+  ],
+  "product_features": "HP780CQST支持数字集群（PDT集群）、数字常规（PDT常规及DMR常规）、模拟集群（MPT1327集群）、模拟常规五种工作模式。具备320*240像素，262000色，2.4英寸LCD屏，IP68防护等级。本机防爆等级：Ex ib IIB T4 Gb; Ex ib IIIC T130℃ Db",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "VHF:136-174MHz; UHF3:350-400MHz; UHF1:400-470MHz;"
+        },
+        {
+          "name": "输出功率",
+          "value": "＜3.5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2400mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "1024"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "132*55*29.5mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃- 60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "310g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/hp780cqst/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/hp780cqst.json"
+    }
+  ]
+}
+

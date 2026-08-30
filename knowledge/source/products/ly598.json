@@ -1,0 +1,57 @@
+{
+  "id": "ly598",
+  "name": "润信达 LY598",
+  "slug": "ly598",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "柔性天线",
+    "智能降噪",
+    "一键报警",
+    "电量播报"
+  ],
+  "product_features": "LY598是一款具有智能降噪功能的对讲机，能实现清晰的语音通话。本机自带的电量播报功能，能让客户了解对讲机的实时电量情况。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "400-470Mhz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2200mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "16"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "119*63*35mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-25℃-+55℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "256g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/ly598/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/ly598.json"
+    }
+  ]
+}
+

@@ -1,0 +1,43 @@
+{
+  "id": "sentry-h-6120",
+  "name": "柯顿 Sentry-H 6120",
+  "slug": "sentry-h-6120",
+  "category_id": "shortwave-radio",
+  "key_features": [
+    "固定短波",
+    "维和免检"
+  ],
+  "product_features": "Codan柯顿Sentry-H 6120车载/基地短波电台凭借150 W RF功率，可集成到车台和基站配置中。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "1.6MHz～30MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "150W"
+        },
+        {
+          "name": "外形尺寸",
+          "value": "220×190×66.5mm"
+        },
+        {
+          "name": "重量",
+          "value": "2.82kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/shortwave-radio/sentry-h-6120/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/shortwave-radio/sentry-h-6120.json"
+    }
+  ]
+}
+

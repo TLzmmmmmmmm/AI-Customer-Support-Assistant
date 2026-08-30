@@ -1,0 +1,67 @@
+{
+  "id": "switch",
+  "name": "交换机",
+  "slug": "switch",
+  "category_id": "ict-integration",
+  "key_features": [
+    "网管交换机",
+    "自主可控",
+    "信创",
+    "POE供电"
+  ],
+  "product_features": "国内自主开发的千兆/万兆以太网交换机产品，是为要求具备高性能、高端口密度且易于安装的网络环境而设计的智能型可网管交换机。",
+  "technical_parameters": [
+    {
+      "group": "POE",
+      "items": [
+        {
+          "name": "供电标准",
+          "value": "PWR与HPWR款型均支持802.3at/POE+供电标准，UPWR款型支持802.3bt/POE++供电标准"
+        }
+      ]
+    },
+    {
+      "group": "链路聚合",
+      "items": [
+        {
+          "name": "端口聚合",
+          "value": "支持GE/10GE端口聚合"
+        },
+        {
+          "name": "动态聚合",
+          "value": "支持动态聚合"
+        },
+        {
+          "name": "跨设备聚合",
+          "value": "支持跨设备聚合"
+        }
+      ]
+    },
+    {
+      "group": "绿色节能",
+      "items": [
+        {
+          "name": "EEE",
+          "value": "支持EEE(802.3az)"
+        },
+        {
+          "name": "Power down",
+          "value": "端口自动Power down功能"
+        },
+        {
+          "name": "Schedule job",
+          "value": "端口定时down功能（Schedule job）"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/switch/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/switch.json"
+    }
+  ]
+}
+

@@ -1,0 +1,15 @@
+{
+  "id": "shengborun",
+  "company_name": "北京盛博润通信设备有限公司",
+  "duty_phone": "13911733859",
+  "email": "lsk777@sina.com",
+  "source_path": "/about/#contact",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/pages/about.astro"
+    }
+  ]
+}
+

@@ -1,0 +1,15 @@
+{
+  "id": "shortwave-radio",
+  "name": "短波通信",
+  "slug": "shortwave-radio",
+  "short_description": "面向远距离与复杂环境的稳定通信系统。",
+  "source_path": "/shortwave-radio/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/product-categories/shortwave-radio.json"
+    }
+  ]
+}
+

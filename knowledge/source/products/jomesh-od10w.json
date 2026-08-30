@@ -1,0 +1,133 @@
+{
+  "id": "jomesh-od10w",
+  "name": "久华信 JoMesh-OD10W",
+  "slug": "jomesh-od10w",
+  "category_id": "mesh-network",
+  "key_features": [
+    "频率定制",
+    "无线图传"
+  ],
+  "product_features": "JoMesh-OD10W采用无线互联技术，抱杆/壁挂式安装设计，方便城市建设下的通信覆盖安装，并特别设计了自动防御系统，在设备故障、断电、遭袭等情况下，将发起设备告警，以提醒后台进行紧急维护，保障通信网络畅通",
+  "technical_parameters": [
+    {
+      "group": "系统参数",
+      "items": [
+        {
+          "name": "型号",
+          "value": "JoMesh-OD10W"
+        },
+        {
+          "name": "中心频率",
+          "value": "500MHz~650MHz（U段），1~1.5GHz（L段）"
+        },
+        {
+          "name": "载波带宽",
+          "value": "2.5/5/10/20MHz"
+        },
+        {
+          "name": "传输体制",
+          "value": "COFDM"
+        },
+        {
+          "name": "传输模式",
+          "value": "2T2R分集/MIMO（可选）"
+        },
+        {
+          "name": "传输速率（无线环境）",
+          "value": "分集：峰值速率≥50Mbps；2*2MIMO：峰值速率≥90Mbps"
+        },
+        {
+          "name": "图像质量",
+          "value": "CIF/HD1/D1/720P/1080P，自适应调整"
+        },
+        {
+          "name": "接收灵敏度",
+          "value": "≤-100dBm"
+        },
+        {
+          "name": "发射功率",
+          "value": "2*10W，双通道"
+        },
+        {
+          "name": "冷启动时间",
+          "value": "＜35秒"
+        },
+        {
+          "name": "拓扑变化响应时间",
+          "value": "≤2秒"
+        },
+        {
+          "name": "单跳时延",
+          "value": "≤10ms"
+        },
+        {
+          "name": "链路自适应",
+          "value": "可根据信道传输质量自动调整载波调制方式，调整范围QPSK/16QAM/64QAM/256QAM"
+        }
+      ]
+    },
+    {
+      "group": "设备接口",
+      "items": [
+        {
+          "name": "天线接口",
+          "value": "N型*2"
+        },
+        {
+          "name": "WIFI、定位接口",
+          "value": "防水航插：SMA-K"
+        },
+        {
+          "name": "业务接口",
+          "value": "以太网（航插）：WY20J4Z"
+        },
+        {
+          "name": "供电",
+          "value": "AC220V/DC+48V(交流/直流供电，二选一)"
+        },
+        {
+          "name": "电源接口",
+          "value": "AC220V防水航插：WY20J3Z(交流供电接口)；DC+48V防水航插：WY20J2Z(直流供电接口)"
+        }
+      ]
+    },
+    {
+      "group": "物理指标",
+      "items": [
+        {
+          "name": "设备尺寸",
+          "value": "321*248*138mm"
+        },
+        {
+          "name": "设备重量",
+          "value": "≤7.5kg"
+        },
+        {
+          "name": "设备功耗",
+          "value": "≤200W"
+        },
+        {
+          "name": "工作温度",
+          "value": "-40℃～+65℃"
+        },
+        {
+          "name": "工作湿度",
+          "value": "5%RH~100%RH"
+        },
+        {
+          "name": "防护等级",
+          "value": "IP67"
+        }
+      ]
+    }
+  ],
+  "source_path": "/mesh-network/jomesh-od10w/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/mesh-network/jomesh-od10w.json"
+    }
+  ]
+}
+

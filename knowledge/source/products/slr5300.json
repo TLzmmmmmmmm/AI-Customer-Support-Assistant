@@ -1,0 +1,57 @@
+{
+  "id": "slr5300",
+  "name": "摩托罗拉 SLR5300",
+  "slug": "slr5300",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "数模兼容",
+    "坚固耐用",
+    "满足军标",
+    "性能可靠"
+  ],
+  "product_features": "MOTOTRBO SLR 5300中继台提供了高性能和高可靠性的双向对讲机服务，带有您工作场所通信所需的一切特性。凭借技术上的巨大飞跃，它代表了下一代中继台。无论您需要传统单站点系统的简单性，还是Capacity Plus、Linked Capacity Plus、Connect Plus或者Capacity Max的强大集群功能，SLR 5300都能为您的员工提供出色的数字双向对讲机服务。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "VHF：136-174 MHz UHF：400-470 MHz 350 MHz：350-400 MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤50W"
+        },
+        {
+          "name": "电池容量",
+          "value": "直流：11-14V 交流：100-240V"
+        },
+        {
+          "name": "信道数量",
+          "value": "64"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "44×483×370mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃-60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "8.6Kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/slr5300/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/slr5300.json"
+    }
+  ]
+}
+

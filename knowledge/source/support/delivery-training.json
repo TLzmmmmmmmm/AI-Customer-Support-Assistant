@@ -1,0 +1,15 @@
+{
+  "id": "delivery-training",
+  "name": "交付培训",
+  "summary": "完成项目整体交付、使用培训、维护培训工作",
+  "body": "交付培训阶段，公司将项目软硬件及图纸、设计方案、产品说明书、产品合格证等资料完整交付给客户指定人员，并根据客户要求，对使用和维护人员开展系统使用、后期维护及扩容升级注意事项培训，完成项目收尾工作。",
+  "source_path": "/support/#delivery-training",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/data/support-services.ts"
+    }
+  ]
+}
+

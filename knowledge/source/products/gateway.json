@@ -1,0 +1,62 @@
+{
+  "id": "gateway",
+  "name": "网关",
+  "slug": "gateway",
+  "category_id": "ict-integration",
+  "key_features": [
+    "部署方便",
+    "病毒防护",
+    "黑白名单",
+    "数据分析"
+  ],
+  "product_features": "防病毒网关的部署应用，可将病毒威胁有效拦截在网络边界，提升内网安全，减轻内网安全防护压力。",
+  "technical_parameters": [
+    {
+      "group": "安全防护",
+      "items": [
+        {
+          "name": "部署模式",
+          "value": "串行防御、旁路监听、串并混合部署；透明接入、无需变更现有网络结构及配置；支持端口汇聚、VLAN、非对称路由等复杂网络环境。"
+        },
+        {
+          "name": "链路保障",
+          "value": "支持硬件BYPASS、软件自动BYPASS、端口连接状态传递。"
+        },
+        {
+          "name": "协议病毒过滤",
+          "value": "支持对HTTP、FTP、SMTP、IMAP、POP3、SMB协议双向病毒过滤。"
+        },
+        {
+          "name": "病毒文件处理",
+          "value": "支持对病毒文件的破坏、阻断、隔离、告警、放行操作。"
+        },
+        {
+          "name": "动态威胁防御",
+          "value": "支持蠕虫病毒攻击、勒索病毒攻击、木马通讯、僵尸网络通讯、邮件蠕虫等威胁的综合防御，同时对于上述威胁衍生的次危害如口令探测、暴力破解等行为做到有效抑制和阻断。"
+        }
+      ]
+    },
+    {
+      "group": "数据分析",
+      "items": [
+        {
+          "name": "风险分析",
+          "value": "支持对已有数据的风险分析功能，实现对病毒传播源头、失窃账户信息的呈现。"
+        },
+        {
+          "name": "安全报告",
+          "value": "支持对威胁事件的安全报告生成、导出，支持doc、pdf、mht格式。"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/gateway/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/gateway.json"
+    }
+  ]
+}
+

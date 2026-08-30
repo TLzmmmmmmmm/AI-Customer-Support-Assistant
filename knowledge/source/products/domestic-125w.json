@@ -1,0 +1,43 @@
+{
+  "id": "domestic-125w",
+  "name": "国产 125W短波电台",
+  "slug": "domestic-125w",
+  "category_id": "shortwave-radio",
+  "key_features": [
+    "国产短波",
+    "固定短波"
+  ],
+  "product_features": "该125W短波全数字化电台主要用于中、远距离通信。配15m斜天线，通信距离500公里以上；配44m双极天线，通信距离1000公里以上。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "1.6000MHz～29.9999MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "125W"
+        },
+        {
+          "name": "外形尺寸",
+          "value": "269mm×320mm×103mm"
+        },
+        {
+          "name": "重量",
+          "value": "8.5kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/shortwave-radio/domestic-125w/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/shortwave-radio/domestic-125w.json"
+    }
+  ]
+}
+

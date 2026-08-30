@@ -1,0 +1,53 @@
+{
+  "id": "ap",
+  "name": "无线 AP",
+  "slug": "ap",
+  "category_id": "ict-integration",
+  "key_features": [
+    "黑白名单",
+    "WIFI7",
+    "室内室外",
+    "POE供电"
+  ],
+  "product_features": "无线AP分为室内型和室外型，室内型支持吸顶安装，嵌入安装，放置安装形式，室外型可在室外壁挂安装，抱杆安装。用户可通过获取的入网授权连接笔记本、平板、智能手机等无线终端设备。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "固定端口",
+          "value": "1个10/100/1000Mbps自协商以太网口"
+        },
+        {
+          "name": "无线速率",
+          "value": "450 Mbps"
+        },
+        {
+          "name": "工作频段",
+          "value": "802.11n、802.11b/g：2.4GHz"
+        },
+        {
+          "name": "供电方式",
+          "value": "支持POE供电（支持802.3af/802.3at标准）"
+        },
+        {
+          "name": "整机功耗",
+          "value": "<17W"
+        },
+        {
+          "name": "外形尺寸",
+          "value": "200*200*25mm"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/ap/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/ap.json"
+    }
+  ]
+}
+

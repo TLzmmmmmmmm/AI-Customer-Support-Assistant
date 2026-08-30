@@ -1,0 +1,47 @@
+{
+  "id": "cavity-combiner",
+  "name": "润信达 腔体合路器",
+  "slug": "cavity-combiner",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "腔体设计",
+    "支持定制"
+  ],
+  "product_features": "发射机腔体合路器广泛应用于一般通信网中继站、各类专用及公用移动通信网中。发射机腔体合路器可将多台基地发射机接入一根发射天线上，这不仅节省了天线、馈线及塔台架设的工程费用，更重要的是：由于本产品采用了高Q腔体和环行隔离器等组件，就能更好的抑制发射机的带外噪声和高次谐波，提高了发射频谱的纯度，从根本上改善了多天线架设中难以解决的互调干扰问题。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "136~174MHz；350~390MHz；400~470MHz"
+        },
+        {
+          "name": "连续功率",
+          "value": "每信道不低于 50W"
+        },
+        {
+          "name": "温度范围",
+          "value": "-25～+65℃"
+        },
+        {
+          "name": "接口",
+          "value": "Ｎ型"
+        },
+        {
+          "name": "尺寸(mm)",
+          "value": "4U 高，19”英寸标准机柜"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/cavity-combiner/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/cavity-combiner.json"
+    }
+  ]
+}
+

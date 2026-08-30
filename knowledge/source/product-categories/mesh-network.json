@@ -1,0 +1,15 @@
+{
+  "id": "mesh-network",
+  "name": "自组网通信",
+  "slug": "mesh-network",
+  "short_description": "快速部署、多节点协同的无线组网设备。",
+  "source_path": "/mesh-network/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/product-categories/mesh-network.json"
+    }
+  ]
+}
+

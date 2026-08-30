@@ -1,0 +1,79 @@
+{
+  "id": "firewall",
+  "name": "防火墙",
+  "slug": "firewall",
+  "category_id": "ict-integration",
+  "key_features": [
+    "IPV6",
+    "负载均衡",
+    "病毒防护",
+    "安全日志"
+  ],
+  "product_features": "面向大型企业和运营商的新一代电信级防火墙设备采用业界的硬件平台和体系架构，能满足电信级应用的需求。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "最大功率",
+          "value": "38W"
+        },
+        {
+          "name": "工作温度",
+          "value": "0～45℃"
+        },
+        {
+          "name": "环境湿度",
+          "value": "10～95%（不结露）"
+        }
+      ]
+    },
+    {
+      "group": "负载均衡",
+      "items": [
+        {
+          "name": "调度算法",
+          "value": "轮转、加权轮转、最小连接、加权最小连接、随机、加权随机、源地址散列、源地址端口散列、目的地址散列"
+        },
+        {
+          "name": "健康性检测算法",
+          "value": "ICMP、TCP、HTTP、FTP"
+        },
+        {
+          "name": "持续性算法",
+          "value": "基于源IP、基于目的IP"
+        }
+      ]
+    },
+    {
+      "group": "高可靠性",
+      "items": [
+        {
+          "name": "双机状态热备",
+          "value": "Active/Active和Active/Passive两种工作模式，支持负载分担和业务备份"
+        },
+        {
+          "name": "关键部件冗余设计",
+          "value": "支持"
+        },
+        {
+          "name": "VRRP",
+          "value": "支持"
+        },
+        {
+          "name": "机箱温度自动检测",
+          "value": "支持"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/firewall/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/firewall.json"
+    }
+  ]
+}
+

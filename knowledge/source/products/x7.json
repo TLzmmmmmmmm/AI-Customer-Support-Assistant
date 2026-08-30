@@ -1,0 +1,57 @@
+{
+  "id": "x7",
+  "name": "雷曼克斯 X7",
+  "slug": "x7",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "尾音消除",
+    "声控功能",
+    "监听功能",
+    "电量提示"
+  ],
+  "product_features": "X7是一款模拟对讲机，该型对讲机具备VOX声控功能，可实现免提公话。本机自带的电量播报功能，能让客户了解对讲机的实时电量情况。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "400-480MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "1600mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "16"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "127*60*35mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-20℃- 55℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "219g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/x7/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/x7.json"
+    }
+  ]
+}
+

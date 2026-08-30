@@ -1,0 +1,137 @@
+{
+  "id": "jomesh-hs",
+  "name": "久华信 JoMesh-HS",
+  "slug": "jomesh-hs",
+  "category_id": "mesh-network",
+  "key_features": [
+    "频率定制",
+    "无线图传"
+  ],
+  "product_features": "JoMesh-HS是一款集语音、数据、视频以及智能业务为一体的全新宽带自组网终端。基于国产智能终端平台，灵活方便，支持多种移动应用。",
+  "technical_parameters": [
+    {
+      "group": "系统参数",
+      "items": [
+        {
+          "name": "型号",
+          "value": "JoMesh-HS"
+        },
+        {
+          "name": "中心频率",
+          "value": "520～650MHz（U段）；1.2～1.5GHz（L段）"
+        },
+        {
+          "name": "载波带宽",
+          "value": "2.5/5/10MHz"
+        },
+        {
+          "name": "传输体制",
+          "value": "COFDM"
+        },
+        {
+          "name": "传输速率",
+          "value": "28Mbps@10MHz；47Mbps@20MHz（带宽扩展）"
+        },
+        {
+          "name": "图像质量",
+          "value": "CIF/HD1/D1/720P/1080P，自适应调整"
+        },
+        {
+          "name": "接收灵敏度",
+          "value": "≤-100dBm"
+        },
+        {
+          "name": "发射功率",
+          "value": "0.5W，1T2R"
+        },
+        {
+          "name": "冷启动时间",
+          "value": "＜35秒"
+        },
+        {
+          "name": "拓扑变化响应时间",
+          "value": "≤2秒"
+        },
+        {
+          "name": "单跳时延",
+          "value": "≤7ms"
+        },
+        {
+          "name": "链路自适应",
+          "value": "可根据信道传输质量自动调整载波调制方式，调整范围：QPSK/16QAM/64QAM/256QAM"
+        },
+        {
+          "name": "加密方式",
+          "value": "DES/AES128/AES256/SM4"
+        }
+      ]
+    },
+    {
+      "group": "设备接口",
+      "items": [
+        {
+          "name": "天线接口",
+          "value": "SMA×2"
+        },
+        {
+          "name": "WiFi、定位",
+          "value": "支持"
+        },
+        {
+          "name": "视频输入接口",
+          "value": "IP视频输入/外置HDMI视频编码模块"
+        },
+        {
+          "name": "业务接口",
+          "value": "以太网（航插）"
+        },
+        {
+          "name": "设备供电",
+          "value": "锂电池，续航时间6小时"
+        },
+        {
+          "name": "充电方式",
+          "value": "座充"
+        }
+      ]
+    },
+    {
+      "group": "物理指标",
+      "items": [
+        {
+          "name": "设备尺寸",
+          "value": "155×65×32mm（包含锂电池，不含天线和背夹）"
+        },
+        {
+          "name": "设备重量",
+          "value": "430g（包含锂电池，不含天线和背夹）"
+        },
+        {
+          "name": "屏幕",
+          "value": "1.8寸，TFT LCD（320*240）"
+        },
+        {
+          "name": "工作温度",
+          "value": "-40℃～+65℃"
+        },
+        {
+          "name": "工作湿度",
+          "value": "5%RH~100%RH"
+        },
+        {
+          "name": "防护等级",
+          "value": "IP67"
+        }
+      ]
+    }
+  ],
+  "source_path": "/mesh-network/jomesh-hs/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/mesh-network/jomesh-hs.json"
+    }
+  ]
+}
+

@@ -1,0 +1,57 @@
+{
+  "id": "hp710ex",
+  "name": "海能达 HP710Ex",
+  "slug": "hp710ex",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "防爆机型",
+    "本安设计",
+    "彩色屏幕",
+    "坚固耐用"
+  ],
+  "product_features": "HP710Ex IIC支持数字集群（PDT集群）、数字常规（PDT常规及DMR常规）、模拟集群（MPT1327集群）、模拟常规五种工作模式。具备320*172像素，262000色，1.47英寸LCD屏，IP68防护等级。本机防爆等级：Ex ib IIC T4 Gb; Ex ib IIIC T120℃ Db",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "VHF:136-174MHz; UHF:350-400MHz; 400-470MHz;"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤2W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2150mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "1024"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "130*55*37mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-25℃- 60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "390g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/hp710ex/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/hp710ex.json"
+    }
+  ]
+}
+

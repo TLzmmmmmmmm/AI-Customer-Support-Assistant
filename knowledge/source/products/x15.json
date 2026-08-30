@@ -1,0 +1,57 @@
+{
+  "id": "x15",
+  "name": "雷曼克斯 X15",
+  "slug": "x15",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "三色背景",
+    "强光照明",
+    "FM收音",
+    "多种充电"
+  ],
+  "product_features": "X15对讲机具备红绿橙三种液晶背景，本机具备强光照明功能便于夜间使用，本机还提供了FM收音机功能，支持座充线充和车充三种充电方式。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "400-480MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "1600mAH"
+        },
+        {
+          "name": "信道数量",
+          "value": "128"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "165*56*34mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-20℃- 55℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "185g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/x15/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/x15.json"
+    }
+  ]
+}
+

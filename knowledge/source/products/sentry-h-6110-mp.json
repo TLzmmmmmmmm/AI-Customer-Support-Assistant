@@ -1,0 +1,43 @@
+{
+  "id": "sentry-h-6110-mp",
+  "name": "柯顿 SENTRY-H 6110-MP",
+  "slug": "sentry-h-6110-mp",
+  "category_id": "shortwave-radio",
+  "key_features": [
+    "背负短波",
+    "维和免检"
+  ],
+  "product_features": "Codan Sentry-H 6110-MP是一款30W便携式软件软件化背负式短波电台(SDR)。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "1.6MHz～30MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "30W"
+        },
+        {
+          "name": "外形尺寸",
+          "value": "284×24.6×96mm"
+        },
+        {
+          "name": "重量",
+          "value": "5kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/shortwave-radio/sentry-h-6110-mp/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/shortwave-radio/sentry-h-6110-mp.json"
+    }
+  ]
+}
+

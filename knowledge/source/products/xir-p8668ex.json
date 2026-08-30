@@ -1,0 +1,57 @@
+{
+  "id": "xir-p8668ex",
+  "name": "摩托罗拉 XiR P8668Ex",
+  "slug": "xir-p8668ex",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "防爆机型",
+    "音质清晰",
+    "坚固耐用",
+    "ATEX认证"
+  ],
+  "product_features": "MOTOTRBO XiR P8668Ex，数字防爆对讲机沿用工业化设计，具备ATEX安全认证，防水防尘等级：IP68，防爆等级：ATEX/IECEx Ex ib IIC T4 Gb；Ex ib IIIC T130°C Db",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "UHF：403-470MHz VHF：136-174MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "1W"
+        },
+        {
+          "name": "电池容量",
+          "value": "1800mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "1000"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "138.5x56.7x37.8mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-20℃—55℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "455.5g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/xir-p8668ex/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/xir-p8668ex.json"
+    }
+  ]
+}
+

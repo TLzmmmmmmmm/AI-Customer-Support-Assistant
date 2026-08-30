@@ -1,0 +1,59 @@
+{
+  "id": "receiver-splitter",
+  "name": "润信达 接收机分路器",
+  "slug": "receiver-splitter",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "功率定制",
+    "支持多路"
+  ],
+  "product_features": "接收机分路器可将多台信道接收机共用接入到一路射频线路上，有效节省了天线馈线及塔台架设的工程费用。本产品采用带通滤波器及低噪声放大器、高隔离功率分配器等组件,设计合理、指标优异，能充分抑制无线组网系统内外出现的各类干扰，从而提高接收信号质量，改善多天线架设中的互调干扰问题。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "136~174MHz；350~390MHz；400~470MHz"
+        },
+        {
+          "name": "使用频带范围",
+          "value": "≤4MHz"
+        },
+        {
+          "name": "接入接收机路数",
+          "value": "定制"
+        },
+        {
+          "name": "增益",
+          "value": "1dB～5dB"
+        },
+        {
+          "name": "端口特性阻抗",
+          "value": "50Ω"
+        },
+        {
+          "name": "电源电压",
+          "value": "AC-220V/50Hz DC-12V 可选"
+        },
+        {
+          "name": "工作温度范围",
+          "value": "-25℃～65℃"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "483×44.5×365 mm"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/receiver-splitter/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/receiver-splitter.json"
+    }
+  ]
+}
+

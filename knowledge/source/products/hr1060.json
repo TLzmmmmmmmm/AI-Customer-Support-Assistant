@@ -1,0 +1,57 @@
+{
+  "id": "hr1060",
+  "name": "海能达 HR1060",
+  "slug": "hr1060",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "超薄设计",
+    "模块设计",
+    "内核升级",
+    "集成网关"
+  ],
+  "product_features": "海能达推出新一代数字中转台HR1060。产品在外观、性能和后台管理均有新的发展，配置管理便捷。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "VHF:136-174MHz; UHF1:400-470MHz;"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤50W"
+        },
+        {
+          "name": "电池容量",
+          "value": "直流：13.6V±15% 交流：100-240V"
+        },
+        {
+          "name": "信道数量",
+          "value": "1024"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "44×483x366mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃-60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "5.8Kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/hr1060/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/hr1060.json"
+    }
+  ]
+}
+

@@ -1,0 +1,61 @@
+{
+  "id": "ap-controller",
+  "name": "无线 AP 管理器",
+  "slug": "ap-controller",
+  "category_id": "ict-integration",
+  "key_features": [
+    "集中管理",
+    "自主策略",
+    "网络安全",
+    "流量监控"
+  ],
+  "product_features": "新一代企业级高性能无线AP管理器，采用全新硬件架构、具备丰富的软件功能、支持全面的安全策略。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "外形尺寸",
+          "value": "330 X 173 X 44mm"
+        },
+        {
+          "name": "处理器（CPU）",
+          "value": "专业的双核64位网络处理器"
+        },
+        {
+          "name": "常规内存",
+          "value": "DDRIII 256M"
+        },
+        {
+          "name": "工作电源",
+          "value": "100~240V AC"
+        },
+        {
+          "name": "工作风扇",
+          "value": "无风扇，自然散热"
+        },
+        {
+          "name": "工作温度",
+          "value": "0ºC～40ºC"
+        },
+        {
+          "name": "工作湿度",
+          "value": "5%~95%（非冷凝）"
+        },
+        {
+          "name": "整机功耗",
+          "value": "≤25W"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/ap-controller/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/ap-controller.json"
+    }
+  ]
+}
+

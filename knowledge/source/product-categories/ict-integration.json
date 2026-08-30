@@ -1,0 +1,15 @@
+{
+  "id": "ict-integration",
+  "name": "ICT 集成",
+  "slug": "ict-integration",
+  "short_description": "融合网络、计算、安全与通信的一体化基础设施。",
+  "source_path": "/ict-integration/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/product-categories/ict-integration.json"
+    }
+  ]
+}
+

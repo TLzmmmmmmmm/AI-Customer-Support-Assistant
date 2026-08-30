@@ -1,0 +1,116 @@
+{
+  "id": "network-isolation-gateway",
+  "name": "网闸",
+  "slug": "network-isolation-gateway",
+  "category_id": "ict-integration",
+  "key_features": [
+    "安全上网",
+    "安全邮件",
+    "安全传输",
+    "集中管理"
+  ],
+  "product_features": "随着IT建设的不断深化发展，很多组织的内部网络与外部网络之间需要交换的信息越来越多，传统的方式很难兼顾安全隔离与信息交换两者的需求，更缺乏对信息安全的严格审查极易导致攻击代码的流入和重要信息的泄漏。因此网闸应运而生。",
+  "technical_parameters": [
+    {
+      "group": "安全上网",
+      "items": [
+        {
+          "name": "上网访问",
+          "value": "提供安全的上网访问，支持HTTP协议及代理等"
+        },
+        {
+          "name": "访问控制对象",
+          "value": "源地址、目标地址、目的端目、域名、URL、访问方式等"
+        },
+        {
+          "name": "内容过滤",
+          "value": "关键字"
+        },
+        {
+          "name": "脚本过滤",
+          "value": "Javascript、Applet、ActiveX等"
+        },
+        {
+          "name": "其他过滤策略",
+          "value": "文件类型、页面提交方式等"
+        }
+      ]
+    },
+    {
+      "group": "安全邮件",
+      "items": [
+        {
+          "name": "邮件访问",
+          "value": "提供安全的邮件访问，支持POP3、SMTP协议"
+        },
+        {
+          "name": "邮件主机地址过滤",
+          "value": "支持"
+        },
+        {
+          "name": "邮件内容审计过滤",
+          "value": "支持"
+        },
+        {
+          "name": "发件地址、收件地址过滤",
+          "value": "支持"
+        },
+        {
+          "name": "邮件主题过滤",
+          "value": "支持"
+        }
+      ]
+    },
+    {
+      "group": "文件传输",
+      "items": [
+        {
+          "name": "文件传输协议",
+          "value": "提供安全的文件传输功能，支持FTP等文件传输协议"
+        },
+        {
+          "name": "敏感词过滤",
+          "value": "支持"
+        },
+        {
+          "name": "文件类型过滤",
+          "value": "支持"
+        },
+        {
+          "name": "文件名过滤",
+          "value": "支持"
+        },
+        {
+          "name": "指令控制",
+          "value": "支持"
+        }
+      ]
+    },
+    {
+      "group": "系统管理",
+      "items": [
+        {
+          "name": "管理端",
+          "value": "用于通道建立、策略制定、日志查询、分析、导出等"
+        },
+        {
+          "name": "安全终端管理",
+          "value": "可通过串口终端管理方式对网闸进行维护"
+        },
+        {
+          "name": "NTP时钟",
+          "value": "支持"
+        }
+      ]
+    }
+  ],
+  "source_path": "/ict-integration/network-isolation-gateway/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/ict-integration/network-isolation-gateway.json"
+    }
+  ]
+}
+

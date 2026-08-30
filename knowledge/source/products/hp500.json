@@ -1,0 +1,57 @@
+{
+  "id": "hp500",
+  "name": "海能达 HP500",
+  "slug": "hp500",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "简单易用",
+    "语音清晰",
+    "坚固耐用",
+    "Type-C充电"
+  ],
+  "product_features": "HP500采用简单易用的双旋钮设计、使用更便捷；高性能喇叭+内置的AI智能消噪算法让通话更清晰明确；支持Type-C和座充两种充电方式；整机满足IP67防护等级。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "VHF:136-174MHz; UHF1:400-470MHz; 350-400MHz;"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "1500mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "256"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "119*55*30.5mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-30℃- 60℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "265g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/hp500/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/hp500.json"
+    }
+  ]
+}
+

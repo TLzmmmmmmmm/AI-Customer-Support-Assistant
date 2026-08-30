@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-30-rag-knowledge-documents-v1-design.md`
 
+## Core-first execution priority
+
+Execute Source Schema → Loading → Normalization → Validation → curated snapshot → 60 Normalized Documents → deterministic JSONL → Core tests as one delivery path. Do not pause Core for teaching checkpoints.
+
+The optional URL checker, elaborate aggregate diagnostics, advanced CLI polish, and excessive edge-case tests are deferred engineering hardening. They are not Core completion gates. Atomic replacement and deterministic output remain required but intentionally simple.
+
+`knowledge/source/` is the curated RAG snapshot of authoritative website content. The website maintainer is responsible for synchronizing this snapshot whenever authoritative public knowledge changes.
+
 ## Global Constraints
 
 - The runtime build must not read `D:\Shengborun` or require that repository to exist.

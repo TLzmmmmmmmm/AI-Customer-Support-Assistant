@@ -1,0 +1,15 @@
+{
+  "id": "project-implementation",
+  "name": "项目实施",
+  "summary": "完成入场准备、现场勘测、频率备案、安装施工、系统调试工作",
+  "body": "项目实施阶段，我公司依托多年系统工程建设风险控制经验，由专业工程人员按照施工技术规范和项目管理标准，完成通信设备及集成配套设施的现场勘测、频率备案、施工部署和系统调试，满足客户快速构筑高质量、定制化通信网络的建设需求。",
+  "source_path": "/support/#project-implementation",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/data/support-services.ts"
+    }
+  ]
+}
+

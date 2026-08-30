@@ -1,0 +1,57 @@
+{
+  "id": "ly598-keyboard",
+  "name": "润信达 LY598键盘",
+  "slug": "ly598-keyboard",
+  "category_id": "two-way-radio",
+  "key_features": [
+    "双屏显示",
+    "手动调频",
+    "UV双段",
+    "双模扩展"
+  ],
+  "product_features": "LY598键盘是一款带显示屏的UV双段对讲机，该型对讲机分为单屏显示或双屏显示，可以通过手动调频或电脑调频，可扩展为模拟对讲机和公网对讲机双模模式。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "136-174 Mhz / 400-470Mhz"
+        },
+        {
+          "name": "输出功率",
+          "value": "≤5W"
+        },
+        {
+          "name": "电池容量",
+          "value": "2000mAh"
+        },
+        {
+          "name": "信道数量",
+          "value": "199"
+        },
+        {
+          "name": "整机尺寸",
+          "value": "119*63*35mm"
+        },
+        {
+          "name": "工作温度",
+          "value": "-25℃-+55℃"
+        },
+        {
+          "name": "整机重量",
+          "value": "256g"
+        }
+      ]
+    }
+  ],
+  "source_path": "/two-way-radio/ly598-keyboard/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/two-way-radio/ly598-keyboard.json"
+    }
+  ]
+}
+

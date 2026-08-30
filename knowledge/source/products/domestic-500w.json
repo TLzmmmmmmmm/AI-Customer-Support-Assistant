@@ -1,0 +1,43 @@
+{
+  "id": "domestic-500w",
+  "name": "国产 500W短波电台",
+  "slug": "domestic-500w",
+  "category_id": "shortwave-radio",
+  "key_features": [
+    "国产短波",
+    "500W短波"
+  ],
+  "product_features": "该500W短波数字化抗干扰电台可用于车载，船载及固定台进行中远距离指挥协同和信息传输。配6米鞭天线通信距离800公里以上，配15米斜天线通信距离1200公里以上，配44米双极天线通信距离1800公里以上。",
+  "technical_parameters": [
+    {
+      "group": "一般规格",
+      "items": [
+        {
+          "name": "频率范围",
+          "value": "2.0000MHz～29.9999MHz"
+        },
+        {
+          "name": "输出功率",
+          "value": "500W"
+        },
+        {
+          "name": "外形尺寸",
+          "value": "545×500×600mm"
+        },
+        {
+          "name": "重量",
+          "value": "100kg"
+        }
+      ]
+    }
+  ],
+  "source_path": "/shortwave-radio/domestic-500w/",
+  "published": true,
+  "provenance": [
+    {
+      "kind": "website_file",
+      "reference": "src/content/products/shortwave-radio/domestic-500w.json"
+    }
+  ]
+}
+
