@@ -179,7 +179,7 @@ def _source_url(base_url: str, source_path: str) -> str:
     return base_url.rstrip("/") + source_path
 
 
-def _hash_payload(
+def compute_content_hash(
     type_: str,
     title: str,
     text: str,
@@ -223,7 +223,7 @@ def _document(
         "source_path": source_path,
         "source_url": _source_url(base_url, source_path),
         "source_files": source_files,
-        "content_hash": _hash_payload(type_, title, normalized_text, metadata),
+        "content_hash": compute_content_hash(type_, title, normalized_text, metadata),
         "metadata": metadata.model_dump(mode="json"),
     })
 
@@ -441,7 +441,7 @@ def validate_documents(
                 f"[ERROR] {document.document_id}\nfield: source_url\n"
                 f"reason: expected {expected_url}, got {document.source_url}"
             )
-        expected_hash = _hash_payload(
+        expected_hash = compute_content_hash(
             document.type,
             document.title,
             document.text,
