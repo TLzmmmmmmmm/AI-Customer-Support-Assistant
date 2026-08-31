@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 KEBAB_CASE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+CHUNK_ID = re.compile(
+    r"^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)+$"
+)
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE = re.compile(r"^[0-9]+$")
 NonEmptyStr = Annotated[str, Field(min_length=1)]
@@ -238,3 +241,69 @@ class KnowledgeDocument(StrictModel):
             raise ValueError(f"metadata does not match document type {self.type}")
         return self
 
+
+class KnowledgeChunk(StrictModel):
+    schema_version: Literal["1.0"]
+    chunk_id: NonEmptyStr
+    parent_document_id: NonEmptyStr
+    parent_content_hash: NonEmptyStr
+    type: Literal["product", "solution", "support", "company", "contact"]
+    section: NonEmptyStr
+    text: NonEmptyStr
+    language: Literal["zh-CN"]
+    source_url: NonEmptyStr
+    source_files: list[NonEmptyStr] = Field(min_length=1)
+    metadata: Metadata
+
+    @field_validator("chunk_id")
+    @classmethod
+    def validate_chunk_id(cls, value: str) -> str:
+        if not CHUNK_ID.fullmatch(value):
+            raise ValueError("must contain colon-separated lowercase ASCII segments")
+        return value
+
+    @field_validator("parent_content_hash")
+    @classmethod
+    def validate_parent_hash(cls, value: str) -> str:
+        if not SHA256_HEX.fullmatch(value):
+            raise ValueError("must be a lowercase SHA-256 hex digest")
+        return value
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("must be an absolute HTTP(S) URL")
+        return value
+
+    @field_validator("source_files")
+    @classmethod
+    def validate_source_files(cls, value: list[str]) -> list[str]:
+        if value != sorted(set(value)):
+            raise ValueError("must be sorted and unique")
+        return value
+
+    @field_validator("text")
+    @classmethod
+    def validate_lf_text(cls, value: str) -> str:
+        if "\r" in value:
+            raise ValueError("must use LF line endings")
+        return value
+
+    @model_validator(mode="after")
+    def validate_identity_and_metadata(self) -> "KnowledgeChunk":
+        if not self.parent_document_id.startswith(f"{self.type}:"):
+            raise ValueError("parent_document_id must start with '<type>:'")
+        if not self.chunk_id.startswith(f"{self.parent_document_id}:"):
+            raise ValueError("chunk_id must extend parent_document_id")
+        expected = {
+            "product": ProductMetadata,
+            "solution": SolutionMetadata,
+            "support": SupportMetadata,
+            "company": CompanyMetadata,
+            "contact": ContactMetadata,
+        }[self.type]
+        if not isinstance(self.metadata, expected):
+            raise ValueError(f"metadata does not match chunk type {self.type}")
+        return self
