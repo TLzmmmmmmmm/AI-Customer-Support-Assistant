@@ -246,11 +246,12 @@ class KnowledgeChunk(StrictModel):
     schema_version: Literal["1.0"]
     chunk_id: NonEmptyStr
     parent_document_id: NonEmptyStr
-    parent_content_hash: NonEmptyStr
+    parent_document_hash: NonEmptyStr
     type: Literal["product", "solution", "support", "company", "contact"]
     section: NonEmptyStr
     text: NonEmptyStr
     language: Literal["zh-CN"]
+    content_hash: NonEmptyStr
     source_url: NonEmptyStr
     source_files: list[NonEmptyStr] = Field(min_length=1)
     metadata: Metadata
@@ -262,9 +263,9 @@ class KnowledgeChunk(StrictModel):
             raise ValueError("must contain colon-separated lowercase ASCII segments")
         return value
 
-    @field_validator("parent_content_hash")
+    @field_validator("parent_document_hash", "content_hash")
     @classmethod
-    def validate_parent_hash(cls, value: str) -> str:
+    def validate_hash(cls, value: str) -> str:
         if not SHA256_HEX.fullmatch(value):
             raise ValueError("must be a lowercase SHA-256 hex digest")
         return value

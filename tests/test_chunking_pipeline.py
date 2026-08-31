@@ -22,6 +22,7 @@ from knowledge_pipeline.chunking import (
     build_and_write_chunks,
     build_chunks,
     calculate_chunk_statistics,
+    compute_chunk_content_hash,
     load_documents,
     serialize_chunks,
     validate_chunks,
@@ -175,11 +176,11 @@ def temporary_document_file(
 
 
 def valid_chunk_payload() -> dict:
-    return {
+    payload = {
         "schema_version": "1.0",
         "chunk_id": "product:xir-p8668ex:features",
         "parent_document_id": "product:xir-p8668ex",
-        "parent_content_hash": "a" * 64,
+        "parent_document_hash": "a" * 64,
         "type": "product",
         "section": "产品特点",
         "text": "# 摩托罗拉 XiR P8668Ex\n\n## 产品特点\n\n- 防爆机型",
@@ -193,6 +194,14 @@ def valid_chunk_payload() -> dict:
             "category_name": "对讲机通信",
         },
     }
+    payload["content_hash"] = compute_chunk_content_hash(
+        payload["type"],
+        payload["section"],
+        payload["text"],
+        payload["language"],
+        payload["metadata"],
+    )
+    return payload
 
 
 class KnowledgeChunkSchemaTests(unittest.TestCase):
@@ -218,11 +227,67 @@ class KnowledgeChunkSchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             KnowledgeChunk.model_validate(payload)
 
-    def test_chunk_rejects_non_hex_parent_hash(self):
+    def test_chunk_rejects_non_hex_parent_document_hash(self):
         payload = valid_chunk_payload()
-        payload["parent_content_hash"] = "A" * 64
+        payload["parent_document_hash"] = "A" * 64
         with self.assertRaises(ValidationError):
             KnowledgeChunk.model_validate(payload)
+
+    def test_chunk_rejects_non_hex_content_hash(self):
+        payload = valid_chunk_payload()
+        payload["content_hash"] = "A" * 64
+        with self.assertRaises(ValidationError):
+            KnowledgeChunk.model_validate(payload)
+
+    def test_chunk_requires_both_hash_fields(self):
+        for field in ("parent_document_hash", "content_hash"):
+            with self.subTest(field=field):
+                payload = valid_chunk_payload()
+                del payload[field]
+                with self.assertRaises(ValidationError):
+                    KnowledgeChunk.model_validate(payload)
+
+    def test_chunk_content_hash_uses_the_canonical_semantic_payload(self):
+        payload = valid_chunk_payload()
+        expected = compute_chunk_content_hash(
+            "product",
+            "产品特点",
+            "# 摩托罗拉 XiR P8668Ex\n\n## 产品特点\n\n- 防爆机型",
+            "zh-CN",
+            {
+                "product_id": "xir-p8668ex",
+                "slug": "xir-p8668ex",
+                "category_id": "two-way-radio",
+                "category_name": "对讲机通信",
+            },
+        )
+
+        self.assertEqual(payload["content_hash"], expected)
+
+    def test_chunk_content_hash_changes_when_semantic_fields_change(self):
+        payload = valid_chunk_payload()
+        original = payload["content_hash"]
+        changed_payloads = []
+        for field, value in (
+            ("section", "产品介绍"),
+            ("text", payload["text"] + "\n\n补充事实。"),
+            ("metadata", {**payload["metadata"], "slug": "changed"}),
+        ):
+            changed = {**payload, field: value}
+            changed_payloads.append(changed)
+
+        for changed in changed_payloads:
+            with self.subTest(changed=changed):
+                self.assertNotEqual(
+                    original,
+                    compute_chunk_content_hash(
+                        changed["type"],
+                        changed["section"],
+                        changed["text"],
+                        changed["language"],
+                        changed["metadata"],
+                    ),
+                )
 
     def test_chunk_rejects_crlf_text(self):
         payload = valid_chunk_payload()
@@ -431,6 +496,18 @@ class ProductChunkingTests(unittest.TestCase):
         self.assertNotIn("应用场景", "\n".join(chunk.text for chunk in chunks))
         self.assertEqual(chunks[0].metadata, document.metadata)
         self.assertEqual(chunks[0].source_files, document.source_files)
+        for chunk in chunks:
+            self.assertEqual(chunk.parent_document_hash, document.content_hash)
+            self.assertEqual(
+                chunk.content_hash,
+                compute_chunk_content_hash(
+                    chunk.type,
+                    chunk.section,
+                    chunk.text,
+                    chunk.language,
+                    chunk.metadata,
+                ),
+            )
 
     def test_product_rejects_unmapped_parameter_group(self):
         document = make_product_document().model_copy(update={
@@ -712,6 +789,24 @@ class ChunkCollectionValidationTests(unittest.TestCase):
 
         self.assertIn("source_url", str(context.exception))
 
+    def test_stale_chunk_content_hash_is_fatal_after_semantic_change(self):
+        documents = [make_product_document()]
+        chunks = build_chunks(documents)
+        changed_metadata = chunks[0].metadata.model_copy(update={"slug": "changed"})
+
+        for update in (
+            {"content_hash": "b" * 64},
+            {"section": "产品特点"},
+            {"text": chunks[0].text + "\n\n补充事实。"},
+            {"metadata": changed_metadata},
+        ):
+            with self.subTest(update=update):
+                changed = chunks[0].model_copy(update=update)
+                with self.assertRaises(BuildError) as context:
+                    validate_chunks([changed, *chunks[1:]], documents)
+
+                self.assertIn("field: content_hash", str(context.exception))
+
     def test_every_parent_must_have_a_chunk(self):
         documents = [make_product_document(), make_contact_document()]
         chunks = build_chunks(documents[:-1])
@@ -732,6 +827,22 @@ class ChunkCollectionValidationTests(unittest.TestCase):
 
 
 class ChunkSerializationTests(unittest.TestCase):
+    def test_same_semantic_payload_has_same_hash_and_jsonl_bytes(self):
+        first = KnowledgeChunk.model_validate(valid_chunk_payload())
+        reordered = valid_chunk_payload()
+        reordered["metadata"] = dict(reversed(list(reordered["metadata"].items())))
+        reordered["content_hash"] = compute_chunk_content_hash(
+            reordered["type"],
+            reordered["section"],
+            reordered["text"],
+            reordered["language"],
+            reordered["metadata"],
+        )
+        second = KnowledgeChunk.model_validate(reordered)
+
+        self.assertEqual(first.content_hash, second.content_hash)
+        self.assertEqual(serialize_chunks([first]), serialize_chunks([second]))
+
     def test_serialization_is_utf8_lf_and_byte_deterministic(self):
         documents = [make_product_document(), make_contact_document()]
         chunks = build_chunks(documents)
@@ -740,6 +851,7 @@ class ChunkSerializationTests(unittest.TestCase):
         second = serialize_chunks(build_chunks(documents))
 
         self.assertEqual(first, second)
+        self.assertEqual(chunks[0].content_hash, build_chunks(documents)[0].content_hash)
         self.assertNotIn(b"\r", first)
         self.assertTrue(first.endswith(b"\n"))
         self.assertFalse(first.endswith(b"\n\n"))
@@ -834,3 +946,68 @@ class BuildKnowledgeChunksCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("invalid JSON", stderr.getvalue())
+
+
+class RealInventoryIntegrationTests(unittest.TestCase):
+    def test_checked_in_headings_are_covered_by_explicit_registries(self):
+        input_path = Path(__file__).resolve().parents[1] / "knowledge" / "documents.jsonl"
+        documents = load_documents(input_path)
+
+        for document in documents:
+            parsed = _parse_markdown(document)
+            headings = [section.heading for section in parsed.h2_sections]
+            with self.subTest(document=document.document_id):
+                if document.type == "product":
+                    self.assertTrue(
+                        set(headings).issubset(
+                            {"产品介绍", "产品特点", "技术参数"}
+                            | set(PRODUCT_OPTIONAL_SECTION_SLUGS)
+                        )
+                    )
+                    technical_parameters = next(
+                        section
+                        for section in parsed.h2_sections
+                        if section.heading == "技术参数"
+                    )
+                    self.assertTrue(
+                        {
+                            section.heading
+                            for section in _split_h3(technical_parameters)
+                        }.issubset(PRODUCT_SPEC_SECTION_SLUGS)
+                    )
+                elif document.type == "solution":
+                    self.assertEqual(
+                        headings[:5],
+                        [
+                            "方案摘要",
+                            "核心需求",
+                            "方案设计",
+                            "方案特点",
+                            "详细内容",
+                        ],
+                    )
+                    self.assertTrue(
+                        set(headings[5:]).issubset(SOLUTION_BODY_SECTION_SLUGS)
+                    )
+                elif document.type == "company":
+                    self.assertTrue(set(headings).issubset(COMPANY_SECTION_SLUGS))
+
+    def test_checked_in_documents_build_checked_in_chunks(self):
+        repository_root = Path(__file__).resolve().parents[1]
+        input_path = repository_root / "knowledge" / "documents.jsonl"
+        output_path = repository_root / "knowledge" / "chunks.jsonl"
+        documents = load_documents(input_path)
+        chunks = build_chunks(documents)
+        self.assertEqual(len(documents), 60)
+        self.assertEqual(
+            {chunk.parent_document_id for chunk in chunks},
+            {document.document_id for document in documents},
+        )
+        artifact_records = [
+            json.loads(line) for line in output_path.read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertTrue(artifact_records)
+        self.assertTrue(all("parent_document_hash" in record for record in artifact_records))
+        self.assertTrue(all("content_hash" in record for record in artifact_records))
+        self.assertTrue(all("parent_content_hash" not in record for record in artifact_records))
+        self.assertEqual(output_path.read_bytes(), serialize_chunks(chunks))

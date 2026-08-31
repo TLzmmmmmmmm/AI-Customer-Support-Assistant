@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -9,13 +10,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import fmean, median
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from .core import BuildError, compute_content_hash
 from .models import KnowledgeChunk, KnowledgeDocument
 
 
 MAX_CHUNK_CHARACTERS = 1000
+
+
+def compute_chunk_content_hash(
+    type_: str,
+    section: str,
+    text: str,
+    language: str,
+    metadata: BaseModel | dict[str, object],
+) -> str:
+    """Return the canonical semantic SHA-256 for one Chunk."""
+    metadata_payload = (
+        metadata.model_dump(mode="json")
+        if isinstance(metadata, BaseModel)
+        else metadata
+    )
+    payload = {
+        "type": type_,
+        "section": section,
+        "text": text,
+        "language": language,
+        "metadata": metadata_payload,
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -228,15 +258,23 @@ def _chunk(
     section: str,
     text: str,
 ) -> KnowledgeChunk:
+    content_hash = compute_chunk_content_hash(
+        parent.type,
+        section,
+        text,
+        parent.language,
+        parent.metadata,
+    )
     return KnowledgeChunk.model_validate({
         "schema_version": "1.0",
         "chunk_id": chunk_id,
         "parent_document_id": parent.document_id,
-        "parent_content_hash": parent.content_hash,
+        "parent_document_hash": parent.content_hash,
         "type": parent.type,
         "section": section,
         "text": text,
         "language": parent.language,
+        "content_hash": content_hash,
         "source_url": parent.source_url,
         "source_files": parent.source_files,
         "metadata": parent.metadata.model_dump(mode="json"),
@@ -252,6 +290,7 @@ def _join_context(*parts: str) -> str:
 
 
 _LIST_ITEM = re.compile(r"^(?:[-+*]|\d+[.)])\s+")
+_MARKDOWN_SUBHEADING = re.compile(r"^#{3,6} .+$")
 
 
 def _natural_units(text: str) -> list[str]:
@@ -307,7 +346,7 @@ def _natural_units(text: str) -> list[str]:
     index = 0
     while index < len(units):
         unit = units[index]
-        if re.fullmatch(r"#{3,6} .+", unit) and index + 1 < len(units):
+        if _MARKDOWN_SUBHEADING.match(unit) and index + 1 < len(units):
             grouped.append(f"{unit}\n\n{units[index + 1]}")
             index += 2
         else:
@@ -848,7 +887,7 @@ def validate_chunks(
 
         chunks_by_parent[parent.document_id] += 1
         for field in (
-            "parent_content_hash",
+            "parent_document_hash",
             "type",
             "language",
             "source_url",
@@ -857,7 +896,7 @@ def validate_chunks(
         ):
             expected = (
                 parent.content_hash
-                if field == "parent_content_hash"
+                if field == "parent_document_hash"
                 else getattr(parent, field)
             )
             if getattr(chunk, field) != expected:
@@ -865,6 +904,19 @@ def validate_chunks(
                     f"[ERROR] {chunk.chunk_id}\nfield: {field}\n"
                     f"reason: does not match parent document {parent.document_id}"
                 )
+
+        expected_content_hash = compute_chunk_content_hash(
+            chunk.type,
+            chunk.section,
+            chunk.text,
+            chunk.language,
+            chunk.metadata,
+        )
+        if chunk.content_hash != expected_content_hash:
+            errors.append(
+                f"[ERROR] {chunk.chunk_id}\nfield: content_hash\n"
+                "reason: does not match canonical semantic content"
+            )
 
     for document in documents:
         if chunks_by_parent[document.document_id] == 0:

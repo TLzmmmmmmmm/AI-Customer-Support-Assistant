@@ -61,11 +61,12 @@ Chunk 统计只输出到构建命令的控制台并在最终交付报告中汇�
       "schema_version": "1.0",
       "chunk_id": "product:xir-p8668ex:features",
       "parent_document_id": "product:xir-p8668ex",
-      "parent_content_hash": "<64-character-lowercase-sha256>",
+      "parent_document_hash": "<64-character-lowercase-sha256>",
       "type": "product",
       "section": "产品特点",
       "text": "# 摩托罗拉 XiR P8668Ex\n\n## 产品特点\n\n...",
       "language": "zh-CN",
+      "content_hash": "<64-character-lowercase-sha256>",
       "source_url": "https://www.shengborun.com/two-way-radio/xir-p8668ex/",
       "source_files": [
         "src/content/product-categories/two-way-radio.json",
@@ -84,16 +85,17 @@ Chunk 统计只输出到构建命令的控制台并在最终交付报告中汇�
 - `schema_version`：Chunk contract 版本，V1 固定为 `1.0`。
 - `chunk_id`：稳定、可读、确定的 Chunk 身份，不使用 UUID。
 - `parent_document_id`：Day 2 父 Document 身份。
-- `parent_content_hash`：父 Document 当前语义内容哈希，用于识别过期 Chunk。
+- `parent_document_hash`：父 Document 当前语义内容哈希，用于识别过期 Chunk。
 - `type`：`product`、`solution`、`support`、`company`、`contact` 之一。
 - `section`：真实、人类可读的原始章节名称，允许中文。
 - `text`：未来的 retrieval unit；包含足够父级身份和未经改写的事实内容。
 - `language`：继承父 Document，当前为 `zh-CN`。
+- `content_hash`：Chunk 自身规范语义负载的 SHA-256；负载仅含 `type`、`section`、`text`、`language` 和类型化 `metadata`，使用 `ensure_ascii=False`、排序键、紧凑分隔符和 UTF-8。
 - `source_url`：继承父 Document 的网页 citation URL。
 - `source_files`：继承父 Document 的已排序 provenance 文件列表。
 - `metadata`：完整继承 Day 2 已经精简的类型专属 metadata。
 
-不增加 `chunk_hash`。父哈希足以发现父文档变化；整个 Chunk 输出会确定性重建和原子替换。
+Chunk 同时保留父文档哈希和自身语义哈希。自身哈希不包含 schema 版本、Chunk 或父 Document ID、父哈希、URL、文件、时间戳或文件系统路径；整个 Chunk 输出仍会确定性重建和原子替换。
 
 ## 5. Chunk ID Design
 
@@ -256,7 +258,8 @@ Day 3 在切分前重新验证 `documents.jsonl` 的 JSONL 语法和 Day 2 Docum
 - 所有 Chunk Schema 字段存在，未知字段被拒绝。
 - `chunk_id` 全局唯一并符合允许的 ASCII 格式。
 - `parent_document_id` 对应本次输入中的真实 Document。
-- `parent_content_hash` 与父 Document 当前 `content_hash` 一致。
+- `parent_document_hash` 与父 Document 当前 `content_hash` 一致。
+- 每个 `content_hash` 都从其规范语义负载重新计算并验证。
 - `type`、`language`、`source_url`、`source_files` 和 `metadata` 与父 Document 一致。
 - `section` 非空，且符合对应类型的固定章节或显式标题映射。
 - `text` trim 后非空。

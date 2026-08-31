@@ -23,6 +23,10 @@
 - Output is UTF-8 JSONL, LF-only, fixed field order, no timestamps, atomic, and byte deterministic.
 - Preserve every Day 2 test and stop before embedding, vector storage, retrieval, reranking, LLM calls, or RAG generation.
 
+## Binding final schema migration
+
+The pre-release `parent_content_hash` field is superseded by `parent_document_hash`, which copies the parent Document `content_hash` exactly. Every Chunk also has its own `content_hash`, calculated from compact, UTF-8 canonical JSON containing only `type`, `section`, `text`, `language`, and typed `metadata`; use `ensure_ascii=False`, `sort_keys=True`, and `separators=(",", ":")`. Collection and temporary-file validation independently recalculate both hash contracts. No uniqueness constraint is imposed on Chunk `content_hash`, because identical semantic payloads are allowed unless evidence requires otherwise.
+
 ## File Structure
 
 - Modify `knowledge_pipeline/models.py`: define strict Chunk Schema v1 and Chunk ID validation.
@@ -64,11 +68,12 @@ def valid_chunk_payload() -> dict:
         "schema_version": "1.0",
         "chunk_id": "product:xir-p8668ex:features",
         "parent_document_id": "product:xir-p8668ex",
-        "parent_content_hash": "a" * 64,
+        "parent_document_hash": "a" * 64,
         "type": "product",
         "section": "产品特点",
         "text": "# 摩托罗拉 XiR P8668Ex\n\n## 产品特点\n\n- 防爆机型",
         "language": "zh-CN",
+        "content_hash": "b" * 64,
         "source_url": "https://www.shengborun.com/two-way-radio/xir-p8668ex/",
         "source_files": ["src/content/products/two-way-radio/xir-p8668ex.json"],
         "metadata": {
@@ -118,11 +123,12 @@ class KnowledgeChunk(StrictModel):
     schema_version: Literal["1.0"]
     chunk_id: NonEmptyStr
     parent_document_id: NonEmptyStr
-    parent_content_hash: NonEmptyStr
+    parent_document_hash: NonEmptyStr
     type: Literal["product", "solution", "support", "company", "contact"]
     section: NonEmptyStr
     text: NonEmptyStr
     language: Literal["zh-CN"]
+    content_hash: NonEmptyStr
     source_url: NonEmptyStr
     source_files: list[NonEmptyStr] = Field(min_length=1)
     metadata: Metadata
@@ -134,7 +140,7 @@ class KnowledgeChunk(StrictModel):
             raise ValueError("must contain colon-separated lowercase ASCII segments")
         return value
 
-    @field_validator("parent_content_hash")
+    @field_validator("parent_document_hash", "content_hash")
     @classmethod
     def validate_parent_hash(cls, value: str) -> str:
         if not SHA256_HEX.fullmatch(value):
@@ -622,7 +628,7 @@ class ChunkCandidate:
     covered_unit_keys: tuple[str, ...]
 ```
 
-Create chunks only through this interface, which copies `parent_content_hash`, `type`, `language`, `source_url`, `source_files`, and `metadata` from the parent:
+Create chunks only through this interface, which copies `parent_document_hash`, `type`, `language`, `source_url`, `source_files`, and `metadata` from the parent, and calculates the Chunk `content_hash` from its canonical semantic payload:
 
 ```python
 def _chunk(
@@ -636,11 +642,12 @@ def _chunk(
         "schema_version": "1.0",
         "chunk_id": chunk_id,
         "parent_document_id": parent.document_id,
-        "parent_content_hash": parent.content_hash,
+        "parent_document_hash": parent.content_hash,
         "type": parent.type,
         "section": section,
         "text": text,
         "language": parent.language,
+        "content_hash": compute_chunk_content_hash(parent.type, section, text, parent.language, parent.metadata),
         "source_url": parent.source_url,
         "source_files": parent.source_files,
         "metadata": parent.metadata.model_dump(mode="json"),
