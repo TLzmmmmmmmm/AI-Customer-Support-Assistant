@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from statistics import fmean, median
 
 from pydantic import ValidationError
 
@@ -819,3 +822,170 @@ def build_chunks(
         _validate_coverage(document, units, candidates)
         chunks.extend(candidate.chunk for candidate in candidates)
     return chunks
+
+
+def validate_chunks(
+    chunks: list[KnowledgeChunk],
+    documents: list[KnowledgeDocument],
+) -> None:
+    parent_by_id = {document.document_id: document for document in documents}
+    chunk_ids: set[str] = set()
+    chunks_by_parent: Counter[str] = Counter()
+    errors: list[str] = []
+
+    for chunk in chunks:
+        if chunk.chunk_id in chunk_ids:
+            errors.append(f"[ERROR] duplicate chunk_id: {chunk.chunk_id}")
+        chunk_ids.add(chunk.chunk_id)
+
+        parent = parent_by_id.get(chunk.parent_document_id)
+        if parent is None:
+            errors.append(
+                f"[ERROR] {chunk.chunk_id}\nfield: parent_document_id\n"
+                f"reason: unknown parent_document_id {chunk.parent_document_id}"
+            )
+            continue
+
+        chunks_by_parent[parent.document_id] += 1
+        for field in (
+            "parent_content_hash",
+            "type",
+            "language",
+            "source_url",
+            "source_files",
+            "metadata",
+        ):
+            expected = (
+                parent.content_hash
+                if field == "parent_content_hash"
+                else getattr(parent, field)
+            )
+            if getattr(chunk, field) != expected:
+                errors.append(
+                    f"[ERROR] {chunk.chunk_id}\nfield: {field}\n"
+                    f"reason: does not match parent document {parent.document_id}"
+                )
+
+    for document in documents:
+        if chunks_by_parent[document.document_id] == 0:
+            errors.append(
+                f"[ERROR] {document.document_id}\nreason: parent document has no chunks"
+            )
+
+    if errors:
+        raise BuildError(errors)
+
+    expected_chunks = build_chunks(documents)
+    actual_payloads = [chunk.model_dump(mode="json") for chunk in chunks]
+    expected_payloads = [
+        chunk.model_dump(mode="json") for chunk in expected_chunks
+    ]
+    if actual_payloads != expected_payloads:
+        raise BuildError(
+            "[ERROR] chunk order or content does not match fresh deterministic build"
+        )
+
+
+def serialize_chunks(chunks: list[KnowledgeChunk]) -> bytes:
+    lines = [
+        json.dumps(
+            chunk.model_dump(mode="json"),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        for chunk in chunks
+    ]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+@dataclass(frozen=True)
+class ChunkStatistics:
+    total_documents: int
+    total_chunks: int
+    average_characters: float
+    median_characters: float
+    minimum_characters: int
+    maximum_characters: int
+    chunks_per_document: dict[str, int]
+    chunks_per_type: dict[str, int]
+
+
+def calculate_chunk_statistics(
+    documents: list[KnowledgeDocument],
+    chunks: list[KnowledgeChunk],
+) -> ChunkStatistics:
+    validate_chunks(chunks, documents)
+    lengths = [len(chunk.text) for chunk in chunks]
+    chunks_per_document = Counter(
+        chunk.parent_document_id for chunk in chunks
+    )
+    chunks_per_type = Counter(chunk.type for chunk in chunks)
+    return ChunkStatistics(
+        total_documents=len(documents),
+        total_chunks=len(chunks),
+        average_characters=fmean(lengths) if lengths else 0.0,
+        median_characters=float(median(lengths)) if lengths else 0.0,
+        minimum_characters=min(lengths) if lengths else 0,
+        maximum_characters=max(lengths) if lengths else 0,
+        chunks_per_document={
+            document.document_id: chunks_per_document[document.document_id]
+            for document in documents
+        },
+        chunks_per_type={
+            type_: chunks_per_type[type_]
+            for type_ in sorted(chunks_per_type)
+        },
+    )
+
+
+def write_chunks(
+    output_path: Path,
+    chunks: list[KnowledgeChunk],
+    documents: list[KnowledgeDocument],
+) -> None:
+    validate_chunks(chunks, documents)
+    payload = serialize_chunks(chunks)
+    temp_path: Path | None = None
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        temporary_lines = temp_path.read_text(encoding="utf-8").splitlines()
+        parsed = [
+            KnowledgeChunk.model_validate(json.loads(line))
+            for line in temporary_lines
+            if line
+        ]
+        validate_chunks(parsed, documents)
+        if serialize_chunks(parsed) != payload:
+            raise BuildError(
+                "temporary JSONL verification was not byte deterministic"
+            )
+        os.replace(temp_path, output_path)
+        temp_path = None
+    except (OSError, json.JSONDecodeError, ValidationError) as error:
+        raise BuildError(f"failed to write {output_path}: {error}") from error
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
+def build_and_write_chunks(
+    input_path: Path,
+    output_path: Path,
+) -> "ChunkStatistics":
+    documents = load_documents(input_path)
+    chunks = build_chunks(documents)
+    validate_chunks(chunks, documents)
+    write_chunks(output_path, chunks, documents)
+    return calculate_chunk_statistics(documents, chunks)

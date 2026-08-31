@@ -1,7 +1,8 @@
 import json
 import tempfile
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 from typing import Iterator
 
@@ -18,11 +19,16 @@ from knowledge_pipeline.chunking import (
     _parse_markdown,
     _split_h3,
     _validate_coverage,
+    build_and_write_chunks,
     build_chunks,
+    calculate_chunk_statistics,
     load_documents,
+    serialize_chunks,
+    validate_chunks,
 )
 from knowledge_pipeline.core import BuildError, compute_content_hash
 from knowledge_pipeline.models import KnowledgeChunk, KnowledgeDocument
+from scripts.build_knowledge_chunks import main as build_chunks_main
 
 
 def make_document(
@@ -671,3 +677,160 @@ class NaturalSplitAndCoverageTests(unittest.TestCase):
             _validate_coverage(document, [unit], [candidate, candidate])
 
         self.assertIn("assigned more than once", str(context.exception))
+
+
+class ChunkCollectionValidationTests(unittest.TestCase):
+    def test_duplicate_chunk_id_is_fatal(self):
+        documents = [make_product_document()]
+        chunks = build_chunks(documents)
+
+        with self.assertRaises(BuildError) as context:
+            validate_chunks([chunks[0], chunks[0]], documents)
+
+        self.assertIn("duplicate chunk_id", str(context.exception))
+
+    def test_unknown_parent_id_is_fatal(self):
+        documents = [make_product_document()]
+        changed = build_chunks(documents)[0].model_copy(
+            update={"parent_document_id": "product:unknown"}
+        )
+
+        with self.assertRaises(BuildError) as context:
+            validate_chunks([changed], documents)
+
+        self.assertIn("unknown parent_document_id", str(context.exception))
+
+    def test_inherited_source_url_must_match_parent(self):
+        documents = [make_product_document()]
+        chunks = build_chunks(documents)
+        changed = chunks[0].model_copy(
+            update={"source_url": "https://example.com/wrong"}
+        )
+
+        with self.assertRaises(BuildError) as context:
+            validate_chunks([changed, *chunks[1:]], documents)
+
+        self.assertIn("source_url", str(context.exception))
+
+    def test_every_parent_must_have_a_chunk(self):
+        documents = [make_product_document(), make_contact_document()]
+        chunks = build_chunks(documents[:-1])
+
+        with self.assertRaises(BuildError) as context:
+            validate_chunks(chunks, documents)
+
+        self.assertIn("has no chunks", str(context.exception))
+
+    def test_chunk_order_must_match_the_deterministic_builder(self):
+        documents = [make_product_document()]
+        chunks = build_chunks(documents)
+
+        with self.assertRaises(BuildError) as context:
+            validate_chunks(list(reversed(chunks)), documents)
+
+        self.assertIn("order or content", str(context.exception))
+
+
+class ChunkSerializationTests(unittest.TestCase):
+    def test_serialization_is_utf8_lf_and_byte_deterministic(self):
+        documents = [make_product_document(), make_contact_document()]
+        chunks = build_chunks(documents)
+
+        first = serialize_chunks(chunks)
+        second = serialize_chunks(build_chunks(documents))
+
+        self.assertEqual(first, second)
+        self.assertNotIn(b"\r", first)
+        self.assertTrue(first.endswith(b"\n"))
+        self.assertFalse(first.endswith(b"\n\n"))
+        self.assertIn("产品特点".encode("utf-8"), first)
+        lines = first.decode("utf-8").splitlines()
+        self.assertEqual(len(lines), len(chunks))
+        self.assertTrue(all(": " not in line for line in lines))
+        self.assertEqual(
+            list(json.loads(lines[0])),
+            list(chunks[0].model_dump(mode="json")),
+        )
+
+    def test_failed_build_preserves_existing_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "documents.jsonl"
+            output_path = root / "chunks.jsonl"
+            input_path.write_text("{invalid}\n", encoding="utf-8")
+            output_path.write_bytes(b"previous-output\n")
+
+            with self.assertRaises(BuildError):
+                build_and_write_chunks(input_path, output_path)
+
+            self.assertEqual(output_path.read_bytes(), b"previous-output\n")
+
+
+class ChunkStatisticsTests(unittest.TestCase):
+    def test_statistics_use_unicode_character_lengths(self):
+        documents = [make_product_document(), make_contact_document()]
+        chunks = build_chunks(documents)
+
+        stats = calculate_chunk_statistics(documents, chunks)
+        lengths = [len(chunk.text) for chunk in chunks]
+
+        self.assertEqual(stats.total_documents, 2)
+        self.assertEqual(stats.total_chunks, len(chunks))
+        self.assertEqual(stats.average_characters, sum(lengths) / len(lengths))
+        self.assertEqual(stats.median_characters, 48.5)
+        self.assertEqual(stats.minimum_characters, min(lengths))
+        self.assertEqual(stats.maximum_characters, max(lengths))
+        self.assertEqual(stats.chunks_per_document, {
+            "product:xir-p8668ex": 3,
+            "contact:shengborun": 1,
+        })
+        self.assertEqual(stats.chunks_per_type, {"contact": 1, "product": 3})
+
+    def test_statistics_handle_an_empty_collection(self):
+        stats = calculate_chunk_statistics([], [])
+
+        self.assertEqual(stats.total_documents, 0)
+        self.assertEqual(stats.total_chunks, 0)
+        self.assertEqual(stats.average_characters, 0.0)
+        self.assertEqual(stats.median_characters, 0.0)
+        self.assertEqual(stats.minimum_characters, 0)
+        self.assertEqual(stats.maximum_characters, 0)
+
+
+class BuildKnowledgeChunksCliTests(unittest.TestCase):
+    def test_cli_writes_chunks_and_prints_labeled_statistics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "documents.jsonl"
+            output_path = root / "chunks.jsonl"
+            with temporary_document_file([make_contact_document()]) as source:
+                input_path.write_bytes(source.read_bytes())
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = build_chunks_main([
+                    "--input", str(input_path), "--output", str(output_path),
+                ])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Documents processed: 1", stdout.getvalue())
+        self.assertIn("Chunks generated: 1", stdout.getvalue())
+        self.assertIn("- contact:shengborun: 1", stdout.getvalue())
+        self.assertIn("- contact: 1", stdout.getvalue())
+        self.assertIn(f"Output: {output_path}", stdout.getvalue())
+
+    def test_cli_reports_build_error_to_stderr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "documents.jsonl"
+            output_path = root / "chunks.jsonl"
+            input_path.write_text("{invalid}\n", encoding="utf-8")
+            stderr = StringIO()
+
+            with redirect_stderr(stderr):
+                exit_code = build_chunks_main([
+                    "--input", str(input_path), "--output", str(output_path),
+                ])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("invalid JSON", stderr.getvalue())
