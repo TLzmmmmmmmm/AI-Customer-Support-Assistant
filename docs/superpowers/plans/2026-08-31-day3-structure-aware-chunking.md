@@ -726,7 +726,7 @@ class OtherTypeChunkingTests(unittest.TestCase):
 - [ ] **Step 7: Implement Support, Company, and Contact rules**
 
 - Support uses its complete normalized text and `section` equal to its service title; oversized Support content uses the common natural splitter.
-- Company with one real H2 uses one Chunk; multiple real H2 sections use an explicit Company heading registry and repeat H1 identity.
+- Company with one real H2 uses one Chunk; multiple real H2 sections use an explicit Company heading registry and repeat H1 identity. A Company with no H2 uses `<parent_document_id>:overview`, the parent title as `section`, and complete parent text, adding deterministic numeric suffixes only when natural boundaries require secondary splitting.
 - Contact uses the complete normalized text and never enters the soft-limit splitter.
 - Any preamble facts must be assigned to the first appropriate Chunk or a deterministic overview Chunk; they may not be dropped.
 
@@ -759,7 +759,7 @@ class NaturalSplitAndCoverageTests(unittest.TestCase):
 
 - [ ] **Step 9: Implement natural splitting and coverage validation**
 
-Implement `_natural_units` to separate blank-line paragraphs and recognize complete Markdown list items. Implement a greedy packer that counts the repeated identity/heading prefix in each Chunk, never splits a unit, and adds numeric suffixes only when more than one output Chunk is produced.
+Implement `_natural_units` to separate blank-line paragraphs and recognize complete Markdown list items. Track active H3–H6 ancestry for each following factual unit until a heading of the same or shallower nested level; every secondary-split Chunk repeats H1, H2, and that active ancestry. Implement a greedy packer that counts the repeated identity/heading prefix in each Chunk, never splits a factual unit, and adds numeric suffixes only when more than one output Chunk is produced.
 
 Before returning from `build_chunks`, validate coverage:
 
@@ -867,7 +867,7 @@ Compare full `model_dump(mode="json")` payloads against the freshly built expect
 
 - [ ] **Step 4: Write failing serialization and atomic-output tests**
 
-Test UTF-8 Chinese, LF-only output, one compact object per line, fixed field order, final newline, two identical builds, and preservation of an existing output file on invalid input:
+Test UTF-8 Chinese, LF-only output, U+2028/U+2029 preservation inside a JSON record, one compact object per line, fixed field order, final newline, two identical builds, and preservation of an existing output file on invalid input:
 
 ```python
 class ChunkSerializationTests(unittest.TestCase):
@@ -896,7 +896,7 @@ class ChunkSerializationTests(unittest.TestCase):
 
 - [ ] **Step 5: Implement deterministic serialization and atomic writing**
 
-`serialize_chunks` must serialize model fields in declaration order with `ensure_ascii=False` and compact separators, preserving the already validated list order:
+`serialize_chunks` must serialize model fields in declaration order with `ensure_ascii=False` and compact separators, preserving the already validated list order. Input loading and temporary-file re-read share one LF-only JSONL record splitter so U+2028 and U+2029 never become record delimiters:
 
 ```python
 def serialize_chunks(chunks: list[KnowledgeChunk]) -> bytes:

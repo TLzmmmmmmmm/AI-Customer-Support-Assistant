@@ -104,17 +104,25 @@ def _validation_field_path(location: tuple[object, ...]) -> str:
     return result
 
 
+def _split_jsonl_records(contents: str) -> list[str]:
+    """Split JSONL only on its LF record delimiter."""
+    if not contents:
+        return []
+    records = contents.split("\n")
+    if contents.endswith("\n"):
+        records.pop()
+    return records
+
+
 def load_documents(input_path: Path) -> list[KnowledgeDocument]:
     if not input_path.is_file():
         raise BuildError(f"[ERROR] {input_path}\nreason: input file does not exist")
 
     try:
         contents = input_path.read_text(encoding="utf-8")
-    except OSError as error:
+    except (OSError, UnicodeError) as error:
         raise BuildError(f"[ERROR] {input_path}\nreason: {error}") from error
-    lines = [] if not contents else contents.split("\n")
-    if lines and contents.endswith("\n"):
-        lines.pop()
+    lines = _split_jsonl_records(contents)
 
     documents: list[KnowledgeDocument] = []
     document_ids: set[str] = set()
@@ -290,7 +298,7 @@ def _join_context(*parts: str) -> str:
 
 
 _LIST_ITEM = re.compile(r"^(?:[-+*]|\d+[.)])\s+")
-_MARKDOWN_SUBHEADING = re.compile(r"^#{3,6} .+$")
+_MARKDOWN_SUBHEADING = re.compile(r"^(#{3,6}) .+$")
 
 
 def _natural_units(text: str) -> list[str]:
@@ -303,6 +311,11 @@ def _natural_units(text: str) -> list[str]:
     index = 0
     while index < len(lines):
         if not lines[index].strip():
+            index += 1
+            continue
+
+        if _MARKDOWN_SUBHEADING.fullmatch(lines[index]):
+            units.append(lines[index])
             index += 1
             continue
 
@@ -337,22 +350,13 @@ def _natural_units(text: str) -> list[str]:
             index < len(lines)
             and lines[index].strip()
             and not _LIST_ITEM.match(lines[index])
+            and not _MARKDOWN_SUBHEADING.fullmatch(lines[index])
         ):
             paragraph.append(lines[index])
             index += 1
         units.append("\n".join(paragraph))
 
-    grouped: list[str] = []
-    index = 0
-    while index < len(units):
-        unit = units[index]
-        if _MARKDOWN_SUBHEADING.match(unit) and index + 1 < len(units):
-            grouped.append(f"{unit}\n\n{units[index + 1]}")
-            index += 2
-        else:
-            grouped.append(unit)
-            index += 1
-    return grouped
+    return units
 
 
 def _join_natural_units(units: list[str]) -> str:
@@ -373,13 +377,26 @@ def _semantic_blocks(
     key_prefix: str,
     ancestor_headings: tuple[str, ...],
 ) -> list[SemanticBlock]:
-    return [
-        SemanticBlock(
+    blocks: list[SemanticBlock] = []
+    active_nested_headings: list[tuple[int, str]] = []
+    for index, unit in enumerate(_natural_units(text), start=1):
+        heading_match = _MARKDOWN_SUBHEADING.fullmatch(unit)
+        if heading_match:
+            level = len(heading_match.group(1))
+            active_nested_headings = [
+                heading
+                for heading in active_nested_headings
+                if heading[0] < level
+            ]
+            active_nested_headings.append((level, unit))
+            continue
+        blocks.append(SemanticBlock(
             SemanticUnit(f"{key_prefix}:{index}", unit),
-            ancestor_headings,
-        )
-        for index, unit in enumerate(_natural_units(text), start=1)
-    ]
+            ancestor_headings + tuple(
+                heading for _, heading in active_nested_headings
+            ),
+        ))
+    return blocks
 
 
 def _render_blocks(identity_text: str, blocks: list[SemanticBlock]) -> str:
@@ -777,7 +794,21 @@ def _company_candidates(
 ) -> tuple[list[SemanticUnit], list[ChunkCandidate]]:
     parsed = _parse_markdown(parent)
     if not parsed.h2_sections:
-        raise _error(parent, "Company document must contain at least one H2 section")
+        identity = SemanticUnit("identity:title", parsed.title_line)
+        return _split_section(
+            parent,
+            base_chunk_id=f"{parent.document_id}:overview",
+            section=parent.title,
+            identity=identity,
+            blocks=_semantic_blocks(
+                parsed.preamble,
+                key_prefix="company:overview",
+                ancestor_headings=(),
+            ),
+            full_text=parent.text,
+            max_characters=max_characters,
+            include_identity_unit=True,
+        )
 
     identity = SemanticUnit("identity:title", parsed.title_line)
     units: list[SemanticUnit] = []
@@ -947,7 +978,10 @@ def serialize_chunks(chunks: list[KnowledgeChunk]) -> bytes:
         )
         for chunk in chunks
     ]
-    return ("\n".join(lines) + "\n").encode("utf-8")
+    serialized = "\n".join(lines)
+    if lines:
+        serialized += "\n"
+    return serialized.encode("utf-8")
 
 
 @dataclass(frozen=True)
@@ -1012,11 +1046,12 @@ def write_chunks(
             handle.flush()
             os.fsync(handle.fileno())
 
-        temporary_lines = temp_path.read_text(encoding="utf-8").splitlines()
+        temporary_lines = _split_jsonl_records(
+            temp_path.read_text(encoding="utf-8")
+        )
         parsed = [
             KnowledgeChunk.model_validate(json.loads(line))
             for line in temporary_lines
-            if line
         ]
         validate_chunks(parsed, documents)
         if serialize_chunks(parsed) != payload:
@@ -1025,7 +1060,7 @@ def write_chunks(
             )
         os.replace(temp_path, output_path)
         temp_path = None
-    except (OSError, json.JSONDecodeError, ValidationError) as error:
+    except (OSError, UnicodeError, json.JSONDecodeError, ValidationError) as error:
         raise BuildError(f"failed to write {output_path}: {error}") from error
     finally:
         if temp_path is not None:

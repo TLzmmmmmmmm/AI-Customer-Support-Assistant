@@ -362,6 +362,20 @@ class DocumentLoaderTests(unittest.TestCase):
 
         self.assertEqual(loaded, [document])
 
+    def test_invalid_utf8_reports_input_path_and_decode_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "documents.jsonl"
+            path.write_bytes(b"\xff\n")
+
+            with self.assertRaises(BuildError) as context:
+                load_documents(path)
+
+        message = str(context.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("reason:", message)
+        self.assertIn("utf-8", message)
+        self.assertIn("invalid start byte", message)
+
     def test_loads_valid_documents_in_input_order(self):
         documents = [make_solution_document(), make_product_document()]
 
@@ -644,8 +658,91 @@ class OtherTypeChunkingTests(unittest.TestCase):
         self.assertEqual(len(chunks), 1)
         self.assertIn("统一社会信用代码：测试值", chunks[0].text)
 
+    def test_company_without_h2_falls_back_to_one_complete_overview_chunk(self):
+        facts = ("公司成立于2011年。", "公司专注通信行业需求。")
+        document = make_document(
+            type_="company",
+            entity_id="shengborun",
+            title="北京盛博润通信设备有限公司",
+            text=(
+                "# 北京盛博润通信设备有限公司\n\n"
+                f"{facts[0]}\n\n{facts[1]}"
+            ),
+            source_url="https://www.shengborun.com/about/#company",
+            source_files=["src/pages/about.astro"],
+            metadata={"company_id": "shengborun"},
+        )
+
+        chunks = build_chunks([document])
+
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "company:shengborun:overview",
+        ])
+        self.assertEqual(chunks[0].section, document.title)
+        self.assertEqual(chunks[0].text, document.text)
+        for fact in facts:
+            self.assertEqual(chunks[0].text.count(fact), 1)
+
+    def test_company_without_h2_splits_at_natural_boundaries_with_stable_suffixes(self):
+        facts = ("第一段完整公司事实" * 4, "第二段完整公司事实" * 4)
+        document = make_document(
+            type_="company",
+            entity_id="shengborun",
+            title="北京盛博润通信设备有限公司",
+            text=(
+                "# 北京盛博润通信设备有限公司\n\n"
+                f"{facts[0]}\n\n{facts[1]}"
+            ),
+            source_url="https://www.shengborun.com/about/#company",
+            source_files=["src/pages/about.astro"],
+            metadata={"company_id": "shengborun"},
+        )
+
+        chunks = build_chunks([document], max_characters=70)
+
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "company:shengborun:overview:1",
+            "company:shengborun:overview:2",
+        ])
+        combined = "\n".join(chunk.text for chunk in chunks)
+        for fact in facts:
+            self.assertEqual(combined.count(fact), 1)
+
 
 class NaturalSplitAndCoverageTests(unittest.TestCase):
+
+    def test_nested_h3_ancestry_repeats_across_splits_without_repeating_facts(self):
+        facts = (
+            "第一段风险事实" * 4,
+            "第二段风险事实" * 4,
+            "- 第三项风险事实" * 4,
+        )
+        nested_body = "### 持续风险\n\n" + "\n\n".join(facts)
+        document = make_solution_document(
+            make_solution_document().text.replace(
+                "### 风险感知滞后\n\n风险发现不及时。\n\n"
+                "### 协同指挥低效\n\n跨部门协同困难。",
+                nested_body,
+            )
+        )
+
+        chunks = build_chunks([document], max_characters=85)
+        body_chunks = [
+            chunk
+            for chunk in chunks
+            if chunk.chunk_id.startswith(
+                "solution:smart-emergency:body:business-pain-points:"
+            )
+        ]
+
+        self.assertGreaterEqual(len(body_chunks), 2)
+        for chunk in body_chunks:
+            self.assertIn("## 业务痛点", chunk.text)
+            self.assertIn("### 持续风险", chunk.text)
+        combined = "\n".join(chunk.text for chunk in body_chunks)
+        for fact in facts:
+            self.assertEqual(combined.count(fact), 1)
+
     def test_leading_support_summary_paragraphs_participate_in_soft_limit_packing(self):
         first_summary = "摘要甲" * 10
         second_summary = "摘要乙" * 10
@@ -841,6 +938,26 @@ class ChunkCollectionValidationTests(unittest.TestCase):
 
 
 class ChunkSerializationTests(unittest.TestCase):
+
+    def test_atomic_write_preserves_u2028_u2029_records_and_exact_bytes(self):
+        document = make_support_document("第一段\u2028第二段\u2029第三段")
+        expected = serialize_chunks(build_chunks([document]))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_path = root / "documents.jsonl"
+            output_path = root / "chunks.jsonl"
+            with temporary_document_file([document]) as source:
+                input_path.write_bytes(source.read_bytes())
+
+            build_and_write_chunks(input_path, output_path)
+
+            actual = output_path.read_bytes()
+
+        self.assertEqual(actual, expected)
+        self.assertIn("\u2028".encode("utf-8"), actual)
+        self.assertIn("\u2029".encode("utf-8"), actual)
+
     def test_same_semantic_payload_has_same_hash_and_jsonl_bytes(self):
         first = KnowledgeChunk.model_validate(valid_chunk_payload())
         reordered = valid_chunk_payload()

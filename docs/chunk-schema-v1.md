@@ -93,6 +93,7 @@ All Chunks repeat the parent H1 title. When a section must be split, its relevan
 
 - Each registered H2 becomes `company:<company-id>:<registered-slug>`.
 - The first section retains any parent preamble. Current `公司简介` maps to `:company-profile`.
+- If a Company Document has no H2, it falls back to `company:<company-id>:overview`, uses the parent title as `section`, and preserves the complete parent text. If natural paragraph or list-item boundaries require secondary splitting, the parts use deterministic `:1`, `:2`, and later suffixes; otherwise it remains one exact whole-document Chunk.
 
 ### Contact
 
@@ -138,7 +139,7 @@ The fixed Product, Solution, Support, and Contact IDs described above are also l
 
 ## Size, natural units, and factual fidelity
 
-The production soft maximum is 1000 Unicode characters measured with Python character length, not UTF-8 bytes or model tokens. The splitter packs natural units in source order. A paragraph is a unit, each Markdown list item is a unit, and an H3–H6 heading is grouped with its following unit.
+The production soft maximum is 1000 Unicode characters measured with Python character length, not UTF-8 bytes or model tokens. The splitter packs natural units in source order. A paragraph is a unit and each Markdown list item is a unit. H3–H6 headings establish active ancestry through the next heading of the same or shallower nested level; every secondary-split part repeats the H1, H2, and active nested ancestry for its factual units.
 
 The maximum is intentionally soft. If one indivisible unit plus required title/heading context exceeds 1000 characters, that Chunk remains over the limit rather than rewriting or cutting the fact. Contact is an indivisible whole-document exception. These cases are accepted and reported by statistics, not silently truncated.
 
@@ -155,7 +156,7 @@ Before publication, the build verifies:
 - every defined semantic unit is covered, no factual unit is assigned more than once, and exact unit text occurs in its Chunk;
 - `chunk_id` values are unique and satisfy the ASCII identity contract;
 - Chunk content and order equal a fresh deterministic build from the same Documents;
-- JSONL serialization is compact UTF-8, LF-only, in deterministic Document/section/unit order, with one final newline.
+- JSONL serialization is compact UTF-8, LF-only, in deterministic Document/section/unit order, with one final newline. Record parsing uses LF only, so valid U+2028 and U+2029 characters inside JSON strings remain factual text rather than becoming record boundaries.
 
 Output replacement is atomic. The builder writes a temporary file beside the destination, parses and validates every temporary record, confirms byte-deterministic reserialization, then replaces `knowledge/chunks.jsonl`. A failed build leaves the previous artifact unchanged.
 

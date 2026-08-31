@@ -213,7 +213,7 @@ Contact 始终保持一个 Chunk。
 
 ## 11. Company Chunking
 
-若父 Document 存在真实语义章节，则按真实章节切分；否则保持一个 Chunk。
+若父 Document 存在真实语义章节，则按真实章节切分；否则使用 `<parent_document_id>:overview`、以父 Document title 作为 `section` 并保留完整父文本。没有自然边界触发二次切分时保持一个 Chunk；需要二次切分时使用确定性数字后缀。
 
 不得为达到目标长度而人为创造公司章节。超过 1000 字符时应用通用自然边界规则。
 
