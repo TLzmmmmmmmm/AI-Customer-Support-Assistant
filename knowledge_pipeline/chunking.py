@@ -57,9 +57,12 @@ def load_documents(input_path: Path) -> list[KnowledgeDocument]:
         raise BuildError(f"[ERROR] {input_path}\nreason: input file does not exist")
 
     try:
-        lines = input_path.read_text(encoding="utf-8").splitlines()
+        contents = input_path.read_text(encoding="utf-8")
     except OSError as error:
         raise BuildError(f"[ERROR] {input_path}\nreason: {error}") from error
+    lines = contents.split("\n")
+    if contents.endswith("\n"):
+        lines.pop()
 
     documents: list[KnowledgeDocument] = []
     document_ids: set[str] = set()

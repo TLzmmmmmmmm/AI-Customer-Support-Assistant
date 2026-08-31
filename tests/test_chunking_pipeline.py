@@ -270,6 +270,14 @@ class HeadingRegistryTests(unittest.TestCase):
 
 
 class DocumentLoaderTests(unittest.TestCase):
+    def test_loads_u2028_and_u2029_as_text_within_one_jsonl_record(self):
+        document = make_support_document("第一段\u2028第二段\u2029第三段")
+
+        with temporary_document_file([document]) as path:
+            loaded = load_documents(path)
+
+        self.assertEqual(loaded, [document])
+
     def test_loads_valid_documents_in_input_order(self):
         documents = [make_solution_document(), make_product_document()]
 
