@@ -13,8 +13,12 @@ from knowledge_pipeline.chunking import (
     PRODUCT_OPTIONAL_SECTION_SLUGS,
     PRODUCT_SPEC_SECTION_SLUGS,
     SOLUTION_BODY_SECTION_SLUGS,
+    ChunkCandidate,
+    SemanticUnit,
     _parse_markdown,
     _split_h3,
+    _validate_coverage,
+    build_chunks,
     load_documents,
 )
 from knowledge_pipeline.core import BuildError, compute_content_hash
@@ -398,3 +402,232 @@ class MarkdownParserTests(unittest.TestCase):
 
         self.assertEqual([section.heading for section in parsed.h2_sections], ["服务摘要", "服务内容"])
         self.assertEqual(_split_h3(parsed.h2_sections[1]), [])
+
+
+class ProductChunkingTests(unittest.TestCase):
+    def test_product_splits_overview_features_and_parameter_groups(self):
+        document = make_product_document()
+
+        chunks = build_chunks([document])
+
+        self.assertEqual(
+            [chunk.chunk_id for chunk in chunks],
+            [
+                "product:xir-p8668ex:overview",
+                "product:xir-p8668ex:features",
+                "product:xir-p8668ex:spec:general",
+            ],
+        )
+        self.assertEqual(chunks[2].section, "一般规格")
+        self.assertIn("# 摩托罗拉 XiR P8668Ex", chunks[2].text)
+        self.assertIn("## 技术参数", chunks[2].text)
+        self.assertIn("### 一般规格", chunks[2].text)
+        self.assertNotIn("应用场景", "\n".join(chunk.text for chunk in chunks))
+        self.assertEqual(chunks[0].metadata, document.metadata)
+        self.assertEqual(chunks[0].source_files, document.source_files)
+
+    def test_product_rejects_unmapped_parameter_group(self):
+        document = make_product_document().model_copy(update={
+            "text": make_product_document().text.replace("一般规格", "未来规格"),
+        })
+
+        with self.assertRaises(BuildError) as context:
+            build_chunks([document])
+
+        message = str(context.exception)
+        self.assertIn("product:xir-p8668ex", message)
+        self.assertIn("未来规格", message)
+
+    def test_product_rejects_duplicate_parameter_group_id(self):
+        document = make_product_document().model_copy(update={
+            "text": make_product_document().text
+            + "\n\n### 一般规格\n\n- 工作电压：7.4V",
+        })
+
+        with self.assertRaises(BuildError) as context:
+            build_chunks([document])
+
+        message = str(context.exception)
+        self.assertIn("product:xir-p8668ex", message)
+        self.assertIn("duplicate", message)
+
+
+class SolutionChunkingTests(unittest.TestCase):
+    def test_solution_keeps_h3_children_in_their_real_h2_chunk(self):
+        chunks = build_chunks([make_solution_document()])
+        by_id = {chunk.chunk_id: chunk for chunk in chunks}
+
+        self.assertEqual(
+            list(by_id),
+            [
+                "solution:smart-emergency:summary",
+                "solution:smart-emergency:core-needs",
+                "solution:smart-emergency:design",
+                "solution:smart-emergency:features",
+                "solution:smart-emergency:body:business-pain-points",
+            ],
+        )
+        pain_points = by_id[
+            "solution:smart-emergency:body:business-pain-points"
+        ]
+        self.assertEqual(pain_points.section, "业务痛点")
+        self.assertIn("### 风险感知滞后", pain_points.text)
+        self.assertIn("### 协同指挥低效", pain_points.text)
+
+    def test_solution_preserves_direct_details_prose_without_empty_wrapper_chunk(self):
+        direct_prose = make_solution_document().text.replace(
+            "## 详细内容\n\n## 业务痛点",
+            "## 详细内容\n\n详细内容的直接事实。\n\n## 业务痛点",
+        )
+        with_details = build_chunks([make_solution_document(direct_prose)])
+        without_details = build_chunks([make_solution_document()])
+
+        self.assertIn(
+            "solution:smart-emergency:details",
+            [chunk.chunk_id for chunk in with_details],
+        )
+        details = next(
+            chunk
+            for chunk in with_details
+            if chunk.chunk_id == "solution:smart-emergency:details"
+        )
+        self.assertIn("详细内容的直接事实。", details.text)
+        self.assertNotIn(
+            "solution:smart-emergency:details",
+            [chunk.chunk_id for chunk in without_details],
+        )
+
+    def test_solution_rejects_unmapped_or_duplicate_body_heading(self):
+        base = make_solution_document().text
+        documents = (
+            make_solution_document(base.replace("业务痛点", "未来章节", 1)),
+            make_solution_document(base + "\n\n## 业务痛点\n\n重复章节。"),
+        )
+
+        for document, expected in zip(documents, ("未来章节", "duplicate")):
+            with self.subTest(expected=expected):
+                with self.assertRaises(BuildError) as context:
+                    build_chunks([document])
+                message = str(context.exception)
+                self.assertIn(document.document_id, message)
+                self.assertIn(expected, message)
+
+
+class OtherTypeChunkingTests(unittest.TestCase):
+    def test_short_support_company_and_contact_remain_whole(self):
+        documents = [
+            make_support_document(),
+            make_company_document(),
+            make_contact_document(),
+        ]
+
+        chunks = build_chunks(documents)
+
+        self.assertEqual(
+            [chunk.chunk_id for chunk in chunks],
+            [
+                "support:solution-design:content",
+                "company:shengborun:company-profile",
+                "contact:shengborun:contact",
+            ],
+        )
+        self.assertEqual(chunks[0].section, "方案设计")
+        self.assertEqual(chunks[0].text, documents[0].text)
+        self.assertEqual(chunks[1].text, documents[1].text)
+        self.assertEqual(chunks[2].text, documents[2].text)
+
+    def test_company_rejects_unmapped_future_h2(self):
+        document = make_company_document().model_copy(update={
+            "text": make_company_document().text + "\n\n## 企业愿景\n\n成为行业伙伴。",
+        })
+
+        with self.assertRaises(BuildError) as context:
+            build_chunks([document])
+
+        message = str(context.exception)
+        self.assertIn("company:shengborun", message)
+        self.assertIn("企业愿景", message)
+
+    def test_company_preamble_is_preserved_in_first_section(self):
+        document = make_company_document().model_copy(update={
+            "text": make_company_document().text.replace(
+                "\n\n## 公司简介",
+                "\n\n统一社会信用代码：测试值\n\n## 公司简介",
+            ),
+        })
+
+        chunks = build_chunks([document])
+
+        self.assertEqual(len(chunks), 1)
+        self.assertIn("统一社会信用代码：测试值", chunks[0].text)
+
+
+class NaturalSplitAndCoverageTests(unittest.TestCase):
+    def test_oversized_section_splits_only_between_complete_list_items(self):
+        document = make_solution_document(text=long_feature_solution_text())
+
+        chunks = build_chunks([document], max_characters=50)
+
+        feature_chunks = [
+            chunk for chunk in chunks if ":features:" in chunk.chunk_id
+        ]
+        self.assertEqual(
+            [chunk.chunk_id.rsplit(":", 1)[-1] for chunk in feature_chunks],
+            ["1", "2"],
+        )
+        combined = "\n".join(chunk.text for chunk in feature_chunks)
+        for item in ("- 特点甲完整内容", "- 特点乙完整内容"):
+            self.assertEqual(combined.count(item), 1)
+
+    def test_paragraphs_pack_greedily_without_truncation_or_repetition(self):
+        paragraphs = [
+            "第一段完整事实" * 3,
+            "第二段完整事实" * 3,
+            "第三段完整事实" * 3,
+        ]
+        document = make_support_document(body="\n\n".join(paragraphs))
+
+        chunks = build_chunks([document], max_characters=90)
+
+        self.assertEqual(
+            [chunk.chunk_id for chunk in chunks],
+            [
+                "support:solution-design:content:1",
+                "support:solution-design:content:2",
+            ],
+        )
+        self.assertIn(paragraphs[0], chunks[0].text)
+        self.assertIn(paragraphs[1], chunks[0].text)
+        self.assertIn(paragraphs[2], chunks[1].text)
+        combined = "\n".join(chunk.text for chunk in chunks)
+        for paragraph in paragraphs:
+            self.assertEqual(combined.count(paragraph), 1)
+
+    def test_indivisible_paragraph_may_exceed_soft_limit(self):
+        document = make_support_document(body="连续事实" * 80)
+
+        chunks = build_chunks([document], max_characters=100)
+
+        self.assertEqual(len(chunks), 1)
+        self.assertGreater(len(chunks[0].text), 100)
+
+    def test_contact_never_enters_soft_limit_splitter(self):
+        document = make_contact_document()
+
+        chunks = build_chunks([document], max_characters=10)
+
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "contact:shengborun:contact",
+        ])
+        self.assertEqual(chunks[0].text, document.text)
+
+    def test_coverage_rejects_a_factual_unit_assigned_twice(self):
+        document = make_support_document()
+        chunk = build_chunks([document])[0]
+        unit = SemanticUnit("fact", "确认客户需求。")
+        candidate = ChunkCandidate(chunk, (unit.key,))
+
+        with self.assertRaises(BuildError) as context:
+            _validate_coverage(document, [unit], [candidate, candidate])
+
+        self.assertIn("assigned more than once", str(context.exception))
