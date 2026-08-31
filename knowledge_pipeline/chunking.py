@@ -42,6 +42,12 @@ class ChunkCandidate:
     covered_unit_keys: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class SemanticBlock:
+    unit: SemanticUnit
+    ancestor_headings: tuple[str, ...]
+
+
 def _document_error(
     input_path: Path,
     line_number: int,
@@ -251,21 +257,48 @@ def _natural_units(text: str) -> list[str]:
         return []
 
     units: list[str] = []
-    for block in re.split(r"\n{2,}", stripped):
-        current: list[str] = []
-        current_is_list = False
-        for line in block.split("\n"):
-            is_list_item = bool(_LIST_ITEM.match(line))
-            if is_list_item and current:
-                units.append("\n".join(current))
-                current = []
-            elif not is_list_item and current and not current_is_list:
-                current.append(line)
-                continue
-            current.append(line)
-            current_is_list = is_list_item or current_is_list
-        if current:
-            units.append("\n".join(current))
+    lines = stripped.split("\n")
+    index = 0
+    while index < len(lines):
+        if not lines[index].strip():
+            index += 1
+            continue
+
+        if _LIST_ITEM.match(lines[index]):
+            item_lines = [lines[index]]
+            index += 1
+            while index < len(lines):
+                if _LIST_ITEM.match(lines[index]):
+                    break
+                if lines[index].strip():
+                    item_lines.append(lines[index])
+                    index += 1
+                    continue
+
+                continuation = index
+                while continuation < len(lines) and not lines[continuation].strip():
+                    continuation += 1
+                if (
+                    continuation < len(lines)
+                    and lines[continuation].startswith((" ", "\t"))
+                ):
+                    item_lines.extend(lines[index:continuation])
+                    index = continuation
+                    continue
+                break
+            units.append("\n".join(item_lines))
+            continue
+
+        paragraph = [lines[index]]
+        index += 1
+        while (
+            index < len(lines)
+            and lines[index].strip()
+            and not _LIST_ITEM.match(lines[index])
+        ):
+            paragraph.append(lines[index])
+            index += 1
+        units.append("\n".join(paragraph))
 
     grouped: list[str] = []
     index = 0
@@ -292,8 +325,36 @@ def _join_natural_units(units: list[str]) -> str:
     return result
 
 
-def _render_chunk_text(prefix: str, unit_texts: list[str]) -> str:
-    return _join_context(prefix, _join_natural_units(unit_texts))
+def _semantic_blocks(
+    text: str,
+    *,
+    key_prefix: str,
+    ancestor_headings: tuple[str, ...],
+) -> list[SemanticBlock]:
+    return [
+        SemanticBlock(
+            SemanticUnit(f"{key_prefix}:{index}", unit),
+            ancestor_headings,
+        )
+        for index, unit in enumerate(_natural_units(text), start=1)
+    ]
+
+
+def _render_blocks(identity_text: str, blocks: list[SemanticBlock]) -> str:
+    parts = [identity_text]
+    index = 0
+    while index < len(blocks):
+        ancestor_headings = blocks[index].ancestor_headings
+        parts.extend(ancestor_headings)
+        texts: list[str] = []
+        while (
+            index < len(blocks)
+            and blocks[index].ancestor_headings == ancestor_headings
+        ):
+            texts.append(blocks[index].unit.text)
+            index += 1
+        parts.append(_join_natural_units(texts))
+    return _join_context(*parts)
 
 
 def _split_section(
@@ -301,33 +362,23 @@ def _split_section(
     *,
     base_chunk_id: str,
     section: str,
-    first_prefix: str,
-    repeat_prefix: str,
-    content: str,
+    identity: SemanticUnit,
+    blocks: list[SemanticBlock],
     full_text: str,
-    unit_key_prefix: str,
     max_characters: int,
-    leading_units: tuple[SemanticUnit, ...] = (),
+    include_identity_unit: bool = False,
 ) -> tuple[list[SemanticUnit], list[ChunkCandidate]]:
-    content_units = [
-        SemanticUnit(f"{unit_key_prefix}:{index}", unit)
-        for index, unit in enumerate(_natural_units(content), start=1)
-    ]
-    if not content_units:
+    if not blocks:
         raise _error(parent, f"section {section} has no factual content")
 
-    groups: list[list[SemanticUnit]] = []
-    current: list[SemanticUnit] = []
-    for unit in content_units:
-        prefix = first_prefix if not groups else repeat_prefix
-        proposed = current + [unit]
-        proposed_text = _render_chunk_text(
-            prefix,
-            [item.text for item in proposed],
-        )
+    groups: list[list[SemanticBlock]] = []
+    current: list[SemanticBlock] = []
+    for block in blocks:
+        proposed = current + [block]
+        proposed_text = _render_blocks(identity.text, proposed)
         if current and len(proposed_text) > max_characters:
             groups.append(current)
-            current = [unit]
+            current = [block]
         else:
             current = proposed
     if current:
@@ -338,13 +389,11 @@ def _split_section(
     for index, group in enumerate(groups, start=1):
         chunk_id = f"{base_chunk_id}:{index}" if multiple else base_chunk_id
         if multiple:
-            prefix = first_prefix if index == 1 else repeat_prefix
-            text = _render_chunk_text(prefix, [unit.text for unit in group])
+            text = _render_blocks(identity.text, group)
         else:
             text = full_text.strip("\n")
-        covered_keys = [unit.key for unit in group]
-        if index == 1:
-            covered_keys = [unit.key for unit in leading_units] + covered_keys
+        covered_keys = [identity.key]
+        covered_keys.extend(block.unit.key for block in group)
         candidates.append(ChunkCandidate(
             _chunk(
                 parent,
@@ -354,7 +403,10 @@ def _split_section(
             ),
             tuple(covered_keys),
         ))
-    return [*leading_units, *content_units], candidates
+    units = [block.unit for block in blocks]
+    if include_identity_unit:
+        units.insert(0, identity)
+    return units, candidates
 
 
 def _validate_coverage(
@@ -427,38 +479,43 @@ def _product_candidates(
             raise _error(parent, f"unmapped Product H2 heading: {section.heading}")
 
     identity = SemanticUnit("identity:title", parsed.title_line)
-    overview_leading = [identity]
-    overview_first_prefix_parts = [parsed.title_line]
+    overview_blocks: list[SemanticBlock] = []
     if parsed.preamble:
-        preamble_units = tuple(
-            SemanticUnit(f"overview:preamble:{index}", unit)
-            for index, unit in enumerate(_natural_units(parsed.preamble), start=1)
+        overview_blocks.extend(
+            _semantic_blocks(
+                parsed.preamble,
+                key_prefix="overview:preamble",
+                ancestor_headings=(),
+            )
         )
-        overview_leading.extend(preamble_units)
-        overview_first_prefix_parts.append(parsed.preamble)
     overview_heading = f"## {introduction.heading}"
-    overview_first_prefix_parts.append(overview_heading)
+    overview_blocks.extend(_semantic_blocks(
+        introduction.body,
+        key_prefix="overview:content",
+        ancestor_headings=(overview_heading,),
+    ))
     units, candidates = _split_section(
         parent,
         base_chunk_id=f"{parent.document_id}:overview",
         section=introduction.heading,
-        first_prefix=_join_context(*overview_first_prefix_parts),
-        repeat_prefix=_join_context(parsed.title_line, overview_heading),
-        content=introduction.body,
+        identity=identity,
+        blocks=overview_blocks,
         full_text=_join_context(parsed.title_line, parsed.preamble, introduction.raw),
-        unit_key_prefix="overview:content",
         max_characters=max_characters,
-        leading_units=tuple(overview_leading),
+        include_identity_unit=True,
     )
+    feature_heading = f"## {features.heading}"
     feature_units, feature_candidates = _split_section(
         parent,
         base_chunk_id=f"{parent.document_id}:features",
         section=features.heading,
-        first_prefix=_join_context(parsed.title_line, f"## {features.heading}"),
-        repeat_prefix=_join_context(parsed.title_line, f"## {features.heading}"),
-        content=features.body,
+        identity=identity,
+        blocks=_semantic_blocks(
+            features.body,
+            key_prefix="features:content",
+            ancestor_headings=(feature_heading,),
+        ),
         full_text=_join_context(parsed.title_line, features.raw),
-        unit_key_prefix="features:content",
         max_characters=max_characters,
     )
     units.extend(feature_units)
@@ -484,20 +541,18 @@ def _product_candidates(
         if base_chunk_id in generated_ids:
             raise _error(parent, f"duplicate generated chunk_id: {base_chunk_id}")
         generated_ids.add(base_chunk_id)
-        prefix = _join_context(
-            parsed.title_line,
-            specifications_prefix,
-            f"### {group.heading}",
-        )
+        group_heading = f"### {group.heading}"
         group_units, group_candidates = _split_section(
             parent,
             base_chunk_id=base_chunk_id,
             section=group.heading,
-            first_prefix=prefix,
-            repeat_prefix=prefix,
-            content=group.body,
+            identity=identity,
+            blocks=_semantic_blocks(
+                group.body,
+                key_prefix=f"spec:{index}",
+                ancestor_headings=(specifications_prefix, group_heading),
+            ),
             full_text=_join_context(parsed.title_line, specifications_prefix, group.raw),
-            unit_key_prefix=f"spec:{index}",
             max_characters=max_characters,
         )
         units.extend(group_units)
@@ -509,16 +564,18 @@ def _product_candidates(
         if base_chunk_id in generated_ids:
             raise _error(parent, f"duplicate generated chunk_id: {base_chunk_id}")
         generated_ids.add(base_chunk_id)
-        prefix = _join_context(parsed.title_line, f"## {section.heading}")
+        optional_heading = f"## {section.heading}"
         section_units, section_candidates = _split_section(
             parent,
             base_chunk_id=base_chunk_id,
             section=section.heading,
-            first_prefix=prefix,
-            repeat_prefix=prefix,
-            content=section.body,
+            identity=identity,
+            blocks=_semantic_blocks(
+                section.body,
+                key_prefix=f"optional:{index}",
+                ancestor_headings=(optional_heading,),
+            ),
             full_text=_join_context(parsed.title_line, section.raw),
-            unit_key_prefix=f"optional:{index}",
             max_characters=max_characters,
         )
         units.extend(section_units)
@@ -558,48 +615,45 @@ def _solution_candidates(
         zip(fixed_sections, SOLUTION_FIXED_SECTIONS)
     ):
         heading = f"## {section.heading}"
-        first_prefix_parts = [parsed.title_line]
-        leading_units: list[SemanticUnit] = []
-        repeat_prefix = _join_context(parsed.title_line, heading)
+        blocks: list[SemanticBlock] = []
         if index == 0 and parsed.preamble:
-            leading_units.append(identity)
-            leading_units.extend(
-                SemanticUnit(f"summary:preamble:{unit_index}", unit)
-                for unit_index, unit in enumerate(
-                    _natural_units(parsed.preamble), start=1
-                )
-            )
-            first_prefix_parts.append(parsed.preamble)
-        elif index == 0:
-            leading_units.append(identity)
-        first_prefix_parts.append(heading)
+            blocks.extend(_semantic_blocks(
+                parsed.preamble,
+                key_prefix="summary:preamble",
+                ancestor_headings=(),
+            ))
+        blocks.extend(_semantic_blocks(
+            section.body,
+            key_prefix=f"fixed:{index}",
+            ancestor_headings=(heading,),
+        ))
         section_units, section_candidates = _split_section(
             parent,
             base_chunk_id=f"{parent.document_id}:{slug}",
             section=section.heading,
-            first_prefix=_join_context(*first_prefix_parts),
-            repeat_prefix=repeat_prefix,
-            content=section.body,
+            identity=identity,
+            blocks=blocks,
             full_text=_join_context(parsed.title_line, parsed.preamble if index == 0 else "", section.raw),
-            unit_key_prefix=f"fixed:{index}",
             max_characters=max_characters,
-            leading_units=tuple(leading_units),
+            include_identity_unit=index == 0,
         )
         units.extend(section_units)
         candidates.extend(section_candidates)
 
     details = parsed.h2_sections[details_index]
     if details.body.strip():
-        prefix = _join_context(parsed.title_line, f"## {details.heading}")
+        details_heading = f"## {details.heading}"
         details_units, details_candidates = _split_section(
             parent,
             base_chunk_id=f"{parent.document_id}:details",
             section=details.heading,
-            first_prefix=prefix,
-            repeat_prefix=prefix,
-            content=details.body,
+            identity=identity,
+            blocks=_semantic_blocks(
+                details.body,
+                key_prefix="details",
+                ancestor_headings=(details_heading,),
+            ),
             full_text=_join_context(parsed.title_line, details.raw),
-            unit_key_prefix="details",
             max_characters=max_characters,
         )
         units.extend(details_units)
@@ -614,16 +668,18 @@ def _solution_candidates(
         if chunk_id in generated_ids:
             raise _error(parent, f"duplicate generated chunk_id: {chunk_id}")
         generated_ids.add(chunk_id)
-        prefix = _join_context(parsed.title_line, f"## {section.heading}")
+        body_heading = f"## {section.heading}"
         section_units, section_candidates = _split_section(
             parent,
             base_chunk_id=chunk_id,
             section=section.heading,
-            first_prefix=prefix,
-            repeat_prefix=prefix,
-            content=section.body,
+            identity=identity,
+            blocks=_semantic_blocks(
+                section.body,
+                key_prefix=f"body:{index}",
+                ancestor_headings=(body_heading,),
+            ),
             full_text=_join_context(parsed.title_line, section.raw),
-            unit_key_prefix=f"body:{index}",
             max_characters=max_characters,
         )
         units.extend(section_units)
@@ -641,33 +697,35 @@ def _support_candidates(
         raise _error(
             parent,
             f"expected Support H2 sequence ['服务摘要', '服务内容'], got {list(headings)}",
-        )
+    )
     summary, content = parsed.h2_sections
-    leading_units = [SemanticUnit("identity:title", parsed.title_line)]
-    leading_units.extend(
-        SemanticUnit(f"support:preamble:{index}", unit)
-        for index, unit in enumerate(_natural_units(parsed.preamble), start=1)
+    identity = SemanticUnit("identity:title", parsed.title_line)
+    summary_heading = f"## {summary.heading}"
+    content_heading = f"## {content.heading}"
+    blocks = _semantic_blocks(
+        parsed.preamble,
+        key_prefix="support:preamble",
+        ancestor_headings=(),
     )
-    leading_units.extend(
-        SemanticUnit(f"support:summary:{index}", unit)
-        for index, unit in enumerate(_natural_units(summary.body), start=1)
-    )
+    blocks.extend(_semantic_blocks(
+        summary.body,
+        key_prefix="support:summary",
+        ancestor_headings=(summary_heading,),
+    ))
+    blocks.extend(_semantic_blocks(
+        content.body,
+        key_prefix="support:content",
+        ancestor_headings=(content_heading,),
+    ))
     return _split_section(
         parent,
         base_chunk_id=f"{parent.document_id}:content",
         section=parent.title,
-        first_prefix=_join_context(
-            parsed.title_line,
-            parsed.preamble,
-            summary.raw,
-            f"## {content.heading}",
-        ),
-        repeat_prefix=_join_context(parsed.title_line, f"## {content.heading}"),
-        content=content.body,
+        identity=identity,
+        blocks=blocks,
         full_text=parent.text,
-        unit_key_prefix="support:content",
         max_characters=max_characters,
-        leading_units=tuple(leading_units),
+        include_identity_unit=True,
     )
 
 
@@ -692,34 +750,32 @@ def _company_candidates(
             raise _error(parent, f"duplicate generated chunk_id: {chunk_id}")
         generated_ids.add(chunk_id)
         heading = f"## {section.heading}"
-        first_prefix_parts = [parsed.title_line]
-        leading_units: list[SemanticUnit] = []
+        blocks: list[SemanticBlock] = []
         if index == 0:
-            leading_units.append(identity)
             if parsed.preamble:
-                leading_units.extend(
-                    SemanticUnit(f"company:preamble:{unit_index}", unit)
-                    for unit_index, unit in enumerate(
-                        _natural_units(parsed.preamble), start=1
-                    )
-                )
-                first_prefix_parts.append(parsed.preamble)
-        first_prefix_parts.append(heading)
+                blocks.extend(_semantic_blocks(
+                    parsed.preamble,
+                    key_prefix="company:preamble",
+                    ancestor_headings=(),
+                ))
+        blocks.extend(_semantic_blocks(
+            section.body,
+            key_prefix=f"company:section:{index}",
+            ancestor_headings=(heading,),
+        ))
         section_units, section_candidates = _split_section(
             parent,
             base_chunk_id=chunk_id,
             section=section.heading,
-            first_prefix=_join_context(*first_prefix_parts),
-            repeat_prefix=_join_context(parsed.title_line, heading),
-            content=section.body,
+            identity=identity,
+            blocks=blocks,
             full_text=_join_context(
                 parsed.title_line,
                 parsed.preamble if index == 0 else "",
                 section.raw,
             ),
-            unit_key_prefix=f"company:section:{index}",
             max_characters=max_characters,
-            leading_units=tuple(leading_units),
+            include_identity_unit=index == 0,
         )
         units.extend(section_units)
         candidates.extend(section_candidates)

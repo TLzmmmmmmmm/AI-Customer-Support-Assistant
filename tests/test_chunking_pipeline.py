@@ -563,6 +563,43 @@ class OtherTypeChunkingTests(unittest.TestCase):
 
 
 class NaturalSplitAndCoverageTests(unittest.TestCase):
+    def test_leading_support_summary_paragraphs_participate_in_soft_limit_packing(self):
+        first_summary = "摘要甲" * 10
+        second_summary = "摘要乙" * 10
+        document = make_support_document().model_copy(update={
+            "text": (
+                "# 方案设计\n\n"
+                f"## 服务摘要\n\n{first_summary}\n\n{second_summary}\n\n"
+                "## 服务内容\n\n短内容。"
+            ),
+        })
+
+        chunks = build_chunks([document], max_characters=80)
+
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk.text) <= 80 for chunk in chunks))
+        combined = "\n".join(chunk.text for chunk in chunks)
+        self.assertEqual(combined.count(first_summary), 1)
+        self.assertEqual(combined.count(second_summary), 1)
+
+    def test_list_item_keeps_its_indented_continuation_paragraph_indivisible(self):
+        first_line = "- 主项首段主项首段"
+        continuation = "  延续段落延续段落"
+        feature_text = f"{first_line}\n\n{continuation}\n\n- 第二项内容第二项内容"
+        document = make_solution_document(
+            make_solution_document().text.replace("- 协同指挥", feature_text)
+        )
+
+        chunks = build_chunks([document], max_characters=35)
+
+        feature_chunks = [
+            chunk for chunk in chunks if ":features:" in chunk.chunk_id
+        ]
+        self.assertEqual(len(feature_chunks), 2)
+        self.assertIn(first_line, feature_chunks[0].text)
+        self.assertIn(continuation, feature_chunks[0].text)
+        self.assertNotIn(continuation, feature_chunks[1].text)
+
     def test_oversized_section_splits_only_between_complete_list_items(self):
         document = make_solution_document(text=long_feature_solution_text())
 
@@ -604,12 +641,15 @@ class NaturalSplitAndCoverageTests(unittest.TestCase):
             self.assertEqual(combined.count(paragraph), 1)
 
     def test_indivisible_paragraph_may_exceed_soft_limit(self):
-        document = make_support_document(body="连续事实" * 80)
+        body = "连续事实" * 80
+        document = make_support_document(body=body)
 
         chunks = build_chunks([document], max_characters=100)
 
-        self.assertEqual(len(chunks), 1)
-        self.assertGreater(len(chunks[0].text), 100)
+        body_chunks = [chunk for chunk in chunks if body in chunk.text]
+        self.assertEqual(len(body_chunks), 1)
+        self.assertGreater(len(body_chunks[0].text), 100)
+        self.assertEqual("\n".join(chunk.text for chunk in chunks).count(body), 1)
 
     def test_contact_never_enters_soft_limit_splitter(self):
         document = make_contact_document()
