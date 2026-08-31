@@ -60,8 +60,8 @@ def load_documents(input_path: Path) -> list[KnowledgeDocument]:
         contents = input_path.read_text(encoding="utf-8")
     except OSError as error:
         raise BuildError(f"[ERROR] {input_path}\nreason: {error}") from error
-    lines = contents.split("\n")
-    if contents.endswith("\n"):
+    lines = [] if not contents else contents.split("\n")
+    if lines and contents.endswith("\n"):
         lines.pop()
 
     documents: list[KnowledgeDocument] = []

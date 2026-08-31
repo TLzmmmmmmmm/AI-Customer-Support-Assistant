@@ -270,6 +270,15 @@ class HeadingRegistryTests(unittest.TestCase):
 
 
 class DocumentLoaderTests(unittest.TestCase):
+    def test_loads_zero_byte_file_as_no_documents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "documents.jsonl"
+            path.write_text("", encoding="utf-8")
+
+            loaded = load_documents(path)
+
+        self.assertEqual(loaded, [])
+
     def test_loads_u2028_and_u2029_as_text_within_one_jsonl_record(self):
         document = make_support_document("第一段\u2028第二段\u2029第三段")
 
