@@ -877,6 +877,19 @@ def validate_chunks(
             errors.append(f"[ERROR] duplicate chunk_id: {chunk.chunk_id}")
         chunk_ids.add(chunk.chunk_id)
 
+        expected_content_hash = compute_chunk_content_hash(
+            chunk.type,
+            chunk.section,
+            chunk.text,
+            chunk.language,
+            chunk.metadata,
+        )
+        if chunk.content_hash != expected_content_hash:
+            errors.append(
+                f"[ERROR] {chunk.chunk_id}\nfield: content_hash\n"
+                "reason: does not match canonical semantic content"
+            )
+
         parent = parent_by_id.get(chunk.parent_document_id)
         if parent is None:
             errors.append(
@@ -904,19 +917,6 @@ def validate_chunks(
                     f"[ERROR] {chunk.chunk_id}\nfield: {field}\n"
                     f"reason: does not match parent document {parent.document_id}"
                 )
-
-        expected_content_hash = compute_chunk_content_hash(
-            chunk.type,
-            chunk.section,
-            chunk.text,
-            chunk.language,
-            chunk.metadata,
-        )
-        if chunk.content_hash != expected_content_hash:
-            errors.append(
-                f"[ERROR] {chunk.chunk_id}\nfield: content_hash\n"
-                "reason: does not match canonical semantic content"
-            )
 
     for document in documents:
         if chunks_by_parent[document.document_id] == 0:

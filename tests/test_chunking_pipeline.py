@@ -777,6 +777,20 @@ class ChunkCollectionValidationTests(unittest.TestCase):
 
         self.assertIn("unknown parent_document_id", str(context.exception))
 
+    def test_unknown_parent_and_stale_content_hash_report_both_errors(self):
+        documents = [make_product_document()]
+        changed = build_chunks(documents)[0].model_copy(update={
+            "parent_document_id": "product:unknown",
+            "content_hash": "b" * 64,
+        })
+
+        with self.assertRaises(BuildError) as context:
+            validate_chunks([changed], documents)
+
+        message = str(context.exception)
+        self.assertIn("unknown parent_document_id", message)
+        self.assertIn("field: content_hash", message)
+
     def test_inherited_source_url_must_match_parent(self):
         documents = [make_product_document()]
         chunks = build_chunks(documents)
