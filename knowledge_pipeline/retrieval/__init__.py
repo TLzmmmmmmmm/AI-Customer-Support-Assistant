@@ -1,4 +1,5 @@
 from .config import DashScopeCredentials, EmbeddingConfig, RetrievalConfig
+from .embedding import DashScopeEmbeddingProvider, EmbeddingProvider
 from .models import (
     EmbeddingAPIError,
     EmbeddingBatch,
@@ -18,10 +19,12 @@ from .models import (
 
 __all__ = [
     "DashScopeCredentials",
+    "DashScopeEmbeddingProvider",
     "EmbeddingAPIError",
     "EmbeddingBatch",
     "EmbeddingConfig",
     "EmbeddingConfigurationError",
+    "EmbeddingProvider",
     "EntityCatalogError",
     "EntityMatch",
     "RetrievalConfig",
