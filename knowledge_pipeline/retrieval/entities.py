@@ -15,7 +15,7 @@ _FIRST_H1 = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 
 def _normalize(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value).casefold().strip()
-    return _SEPARATORS.sub("-", normalized)
+    return _SEPARATORS.sub("", normalized)
 
 
 def _has_alphanumeric_boundaries(text: str, start: int, length: int) -> bool:

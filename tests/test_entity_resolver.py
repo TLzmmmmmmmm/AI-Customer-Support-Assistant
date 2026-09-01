@@ -97,7 +97,7 @@ class EntityResolverTests(unittest.TestCase):
         resolver = ExactEntityResolver.from_records([
             product_record(
                 "domestic-20w",
-                heading="国产 20W 短波电台",
+                heading="国产 20W短波电台",
             )
         ])
 
