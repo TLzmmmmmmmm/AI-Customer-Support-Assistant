@@ -260,6 +260,21 @@ SOLUTION_FIXED_SECTIONS = (
     ("方案特点", "features"),
 )
 
+SOLUTION_BODY_MERGE_GROUPS = {
+    ("行业背景", "行业通信现状"): (
+        "industry-context",
+        "行业背景与通信现状",
+    ),
+    ("针对大型石油石化企业的数字集群系统解决方案", "方案描述"): (
+        "solution",
+        "数字集群系统解决方案",
+    ),
+    ("建设背景", "业务痛点", "客户需求"): (
+        "context-and-needs",
+        "建设背景、业务痛点与客户需求",
+    ),
+}
+
 
 def _chunk(
     parent: KnowledgeDocument,
@@ -711,39 +726,67 @@ def _solution_candidates(
             f"expected Solution H2 sequence {list(expected_headings)}, got {list(actual_headings)}",
         )
 
+    details = parsed.h2_sections[details_index]
+    body_sections = list(parsed.h2_sections[details_index + 1:])
+    registered_body_slugs: set[str] = set()
+    for section in body_sections:
+        slug = SOLUTION_BODY_SECTION_SLUGS.get(section.heading)
+        if slug is None:
+            raise _error(parent, f"unmapped Solution H2 heading: {section.heading}")
+        if slug in registered_body_slugs:
+            raise _error(parent, f"duplicate Solution body heading: {section.heading}")
+        registered_body_slugs.add(slug)
+
+    if len(parent.text) <= SOLUTION_WHOLE_DOCUMENT_MAX_CHARACTERS:
+        unit = SemanticUnit("content", parent.text)
+        return [unit], [ChunkCandidate(
+            _chunk(
+                parent,
+                chunk_id=f"{parent.document_id}:content",
+                section=parent.title,
+                text=parent.text,
+            ),
+            (unit.key,),
+        )]
+
     identity = SemanticUnit("identity:title", parsed.title_line)
-    units: list[SemanticUnit] = []
-    candidates: list[ChunkCandidate] = []
-    for index, (section, (_, slug)) in enumerate(
-        zip(fixed_sections, SOLUTION_FIXED_SECTIONS)
+    overview_sections = list(fixed_sections)
+    if (
+        len(body_sections) >= 2
+        and tuple(section.heading for section in body_sections[:2])
+        == ("方案概述", "系统功能")
     ):
+        overview_sections.append(body_sections.pop(0))
+
+    overview_blocks: list[SemanticBlock] = []
+    if parsed.preamble:
+        overview_blocks.extend(_semantic_blocks(
+            parsed.preamble,
+            key_prefix="overview:preamble",
+            ancestor_headings=(),
+        ))
+    for index, section in enumerate(overview_sections):
         heading = f"## {section.heading}"
-        blocks: list[SemanticBlock] = []
-        if index == 0 and parsed.preamble:
-            blocks.extend(_semantic_blocks(
-                parsed.preamble,
-                key_prefix="summary:preamble",
-                ancestor_headings=(),
-            ))
-        blocks.extend(_semantic_blocks(
+        overview_blocks.extend(_semantic_blocks(
             section.body,
-            key_prefix=f"fixed:{index}",
+            key_prefix=f"overview:section:{index}",
             ancestor_headings=(heading,),
         ))
-        section_units, section_candidates = _split_section(
-            parent,
-            base_chunk_id=f"{parent.document_id}:{slug}",
-            section=section.heading,
-            identity=identity,
-            blocks=blocks,
-            full_text=_join_context(parsed.title_line, parsed.preamble if index == 0 else "", section.raw),
-            max_characters=max_characters,
-            include_identity_unit=index == 0,
-        )
-        units.extend(section_units)
-        candidates.extend(section_candidates)
+    units, candidates = _split_section(
+        parent,
+        base_chunk_id=f"{parent.document_id}:overview",
+        section="方案概览",
+        identity=identity,
+        blocks=overview_blocks,
+        full_text=_join_context(
+            parsed.title_line,
+            parsed.preamble,
+            *(section.raw for section in overview_sections),
+        ),
+        max_characters=max_characters,
+        include_identity_unit=True,
+    )
 
-    details = parsed.h2_sections[details_index]
     if details.body.strip():
         details_heading = f"## {details.heading}"
         details_units, details_candidates = _split_section(
@@ -763,30 +806,60 @@ def _solution_candidates(
         candidates.extend(details_candidates)
 
     generated_ids = {candidate.chunk.chunk_id for candidate in candidates}
-    for index, section in enumerate(parsed.h2_sections[details_index + 1:]):
-        slug = SOLUTION_BODY_SECTION_SLUGS.get(section.heading)
-        if slug is None:
-            raise _error(parent, f"unmapped Solution H2 heading: {section.heading}")
+    index = 0
+    while index < len(body_sections):
+        matched_sections: list[MarkdownSection] | None = None
+        slug: str | None = None
+        section_label: str | None = None
+        for headings, (registered_slug, registered_label) in sorted(
+            SOLUTION_BODY_MERGE_GROUPS.items(),
+            key=lambda item: len(item[0]),
+            reverse=True,
+        ):
+            candidate_sections = body_sections[index:index + len(headings)]
+            if tuple(section.heading for section in candidate_sections) == headings:
+                matched_sections = candidate_sections
+                slug = registered_slug
+                section_label = registered_label
+                break
+        if matched_sections is None:
+            matched_sections = [body_sections[index]]
+            heading = matched_sections[0].heading
+            slug = (
+                "solution-overview"
+                if heading == "方案概述"
+                else SOLUTION_BODY_SECTION_SLUGS[heading]
+            )
+            section_label = heading
+
         chunk_id = f"{parent.document_id}:body:{slug}"
         if chunk_id in generated_ids:
             raise _error(parent, f"duplicate generated chunk_id: {chunk_id}")
         generated_ids.add(chunk_id)
-        body_heading = f"## {section.heading}"
+
+        blocks: list[SemanticBlock] = []
+        for section_offset, section in enumerate(matched_sections):
+            body_heading = f"## {section.heading}"
+            blocks.extend(_semantic_blocks(
+                section.body,
+                key_prefix=f"body:{index + section_offset}",
+                ancestor_headings=(body_heading,),
+            ))
         section_units, section_candidates = _split_section(
             parent,
             base_chunk_id=chunk_id,
-            section=section.heading,
+            section=section_label,
             identity=identity,
-            blocks=_semantic_blocks(
-                section.body,
-                key_prefix=f"body:{index}",
-                ancestor_headings=(body_heading,),
+            blocks=blocks,
+            full_text=_join_context(
+                parsed.title_line,
+                *(section.raw for section in matched_sections),
             ),
-            full_text=_join_context(parsed.title_line, section.raw),
             max_characters=max_characters,
         )
         units.extend(section_units)
         candidates.extend(section_candidates)
+        index += len(matched_sections)
     return units, candidates
 
 

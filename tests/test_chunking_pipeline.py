@@ -131,6 +131,16 @@ def make_solution_document(text: str | None = None) -> KnowledgeDocument:
     )
 
 
+def make_solution_document_with_length(length: int) -> KnowledgeDocument:
+    base = make_solution_document()
+    summary = "提升应急管理能力。"
+    padding = length - len(base.text)
+    if padding < 0:
+        raise ValueError("requested Solution fixture length is too small")
+    text = base.text.replace(summary, summary + "甲" * padding)
+    return make_solution_document(text)
+
+
 def long_feature_solution_text() -> str:
     return (
         "# 智慧应急解决方案\n\n"
@@ -594,20 +604,35 @@ class ProductChunkingTests(unittest.TestCase):
 
 
 class SolutionChunkingTests(unittest.TestCase):
-    def test_solution_keeps_h3_children_in_their_real_h2_chunk(self):
-        chunks = build_chunks([make_solution_document()])
+    def test_solution_at_700_characters_stays_one_complete_chunk(self):
+        document = make_solution_document_with_length(700)
+
+        chunks = build_chunks([document])
+
+        self.assertEqual(len(document.text), 700)
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "solution:smart-emergency:content",
+        ])
+        self.assertEqual(chunks[0].section, document.title)
+        self.assertEqual(chunks[0].text, document.text)
+
+    def test_solution_over_700_merges_fixed_sections_and_keeps_body_context(self):
+        document = make_solution_document_with_length(701)
+
+        chunks = build_chunks([document])
         by_id = {chunk.chunk_id: chunk for chunk in chunks}
 
         self.assertEqual(
             list(by_id),
             [
-                "solution:smart-emergency:summary",
-                "solution:smart-emergency:core-needs",
-                "solution:smart-emergency:design",
-                "solution:smart-emergency:features",
+                "solution:smart-emergency:overview",
                 "solution:smart-emergency:body:business-pain-points",
             ],
         )
+        overview = by_id["solution:smart-emergency:overview"]
+        self.assertEqual(overview.section, "方案概览")
+        for heading in ("方案摘要", "核心需求", "方案设计", "方案特点"):
+            self.assertIn(f"## {heading}", overview.text)
         pain_points = by_id[
             "solution:smart-emergency:body:business-pain-points"
         ]
@@ -616,12 +641,13 @@ class SolutionChunkingTests(unittest.TestCase):
         self.assertIn("### 协同指挥低效", pain_points.text)
 
     def test_solution_preserves_direct_details_prose_without_empty_wrapper_chunk(self):
-        direct_prose = make_solution_document().text.replace(
+        long_document = make_solution_document_with_length(701)
+        direct_prose = long_document.text.replace(
             "## 详细内容\n\n## 业务痛点",
             "## 详细内容\n\n详细内容的直接事实。\n\n## 业务痛点",
         )
         with_details = build_chunks([make_solution_document(direct_prose)])
-        without_details = build_chunks([make_solution_document()])
+        without_details = build_chunks([long_document])
 
         self.assertIn(
             "solution:smart-emergency:details",
@@ -977,7 +1003,7 @@ class NaturalSplitAndCoverageTests(unittest.TestCase):
         )
         nested_body = "### 持续风险\n\n" + "\n\n".join(facts)
         document = make_solution_document(
-            make_solution_document().text.replace(
+            make_solution_document_with_length(701).text.replace(
                 "### 风险感知滞后\n\n风险发现不及时。\n\n"
                 "### 协同指挥低效\n\n跨部门协同困难。",
                 nested_body,
@@ -1025,13 +1051,18 @@ class NaturalSplitAndCoverageTests(unittest.TestCase):
         continuation = "  延续段落延续段落"
         feature_text = f"{first_line}\n\n{continuation}\n\n- 第二项内容第二项内容"
         document = make_solution_document(
-            make_solution_document().text.replace("- 协同指挥", feature_text)
+            make_solution_document_with_length(701).text.replace(
+                "- 协同指挥",
+                feature_text,
+            )
         )
 
         chunks = build_chunks([document], max_characters=35)
 
         feature_chunks = [
-            chunk for chunk in chunks if ":features:" in chunk.chunk_id
+            chunk
+            for chunk in chunks
+            if first_line in chunk.text or "- 第二项内容第二项内容" in chunk.text
         ]
         self.assertEqual(len(feature_chunks), 2)
         self.assertIn(first_line, feature_chunks[0].text)
@@ -1039,17 +1070,25 @@ class NaturalSplitAndCoverageTests(unittest.TestCase):
         self.assertNotIn(continuation, feature_chunks[1].text)
 
     def test_oversized_section_splits_only_between_complete_list_items(self):
-        document = make_solution_document(text=long_feature_solution_text())
+        document = make_solution_document(
+            make_solution_document_with_length(701).text.replace(
+                "- 协同指挥",
+                (
+                    "- 特点甲完整内容特点甲完整内容特点甲完整内容\n"
+                    "- 特点乙完整内容特点乙完整内容特点乙完整内容"
+                ),
+            )
+        )
 
         chunks = build_chunks([document], max_characters=50)
 
         feature_chunks = [
-            chunk for chunk in chunks if ":features:" in chunk.chunk_id
+            chunk
+            for chunk in chunks
+            if "- 特点甲完整内容" in chunk.text or "- 特点乙完整内容" in chunk.text
         ]
-        self.assertEqual(
-            [chunk.chunk_id.rsplit(":", 1)[-1] for chunk in feature_chunks],
-            ["1", "2"],
-        )
+        self.assertEqual(len(feature_chunks), 2)
+        self.assertTrue(all("## 方案特点" in chunk.text for chunk in feature_chunks))
         combined = "\n".join(chunk.text for chunk in feature_chunks)
         for item in ("- 特点甲完整内容", "- 特点乙完整内容"):
             self.assertEqual(combined.count(item), 1)
@@ -1400,3 +1439,37 @@ class RealInventoryIntegrationTests(unittest.TestCase):
         self.assertTrue(all("content_hash" in record for record in artifact_records))
         self.assertTrue(all("parent_content_hash" not in record for record in artifact_records))
         self.assertEqual(output_path.read_bytes(), serialize_chunks(chunks))
+
+    def test_checked_in_solutions_follow_the_approved_merge_plan(self):
+        repository_root = Path(__file__).resolve().parents[1]
+        documents = load_documents(repository_root / "knowledge" / "documents.jsonl")
+        solution_chunks = [
+            chunk for chunk in build_chunks(documents) if chunk.type == "solution"
+        ]
+        by_parent: dict[str, list[str]] = {}
+        for chunk in solution_chunks:
+            by_parent.setdefault(chunk.parent_document_id, []).append(chunk.chunk_id)
+
+        self.assertEqual(by_parent, {
+            "solution:civil-defense": ["solution:civil-defense:content"],
+            "solution:emergency-mesh": ["solution:emergency-mesh:content"],
+            "solution:enterprise": [
+                "solution:enterprise:overview",
+                "solution:enterprise:body:industry-background",
+                "solution:enterprise:body:solution",
+            ],
+            "solution:hotel": [
+                "solution:hotel:overview",
+                "solution:hotel:body:system-functions",
+            ],
+            "solution:petrochemical": [
+                "solution:petrochemical:overview",
+                "solution:petrochemical:body:industry-context",
+                "solution:petrochemical:body:solution",
+            ],
+            "solution:smart-emergency": [
+                "solution:smart-emergency:overview",
+                "solution:smart-emergency:body:context-and-needs",
+                "solution:smart-emergency:body:solution-overview",
+            ],
+        })

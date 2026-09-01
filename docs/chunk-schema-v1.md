@@ -79,9 +79,14 @@ All Chunks repeat the parent H1 title. When a section must be split, its relevan
 
 ### Solution
 
-- The required leading H2 sequence is `方案摘要`, `核心需求`, `方案设计`, `方案特点`; it becomes `:summary`, `:core-needs`, `:design`, and `:features` respectively.
+- When the complete parent `text` is at most 700 Unicode characters, the entire Solution becomes `solution:<solution-id>:content`. Its Chunk text is exactly the complete normalized parent text.
+- For a Solution longer than 700 characters, the required leading H2 sequence `方案摘要`, `核心需求`, `方案设计`, `方案特点` becomes `solution:<solution-id>:overview`; `section` is `方案概览`.
 - Exactly one `详细内容` boundary must follow those four sections. Non-empty direct content under that boundary becomes `:details`.
-- Each following registered H2 becomes `solution:<solution-id>:body:<registered-slug>`.
+- For the Hotel source shape, the immediately following `方案概述` is included in `:overview`; `系统功能` remains `:body:system-functions`.
+- Adjacent `行业背景` and `行业通信现状` become `:body:industry-context`.
+- Adjacent `针对大型石油石化企业的数字集群系统解决方案` and `方案描述` become `:body:solution`.
+- Adjacent `建设背景`, `业务痛点`, and `客户需求` become `:body:context-and-needs`; a later standalone `方案概述` becomes `:body:solution-overview`.
+- Other registered body H2 sections remain individual `solution:<solution-id>:body:<registered-slug>` Chunks.
 - Natural units beneath a body section are packed together up to the soft maximum. An H3 heading is indivisible from its following paragraph or list item, so related child context is not orphaned.
 
 ### Support
@@ -139,7 +144,9 @@ The fixed Product, Solution, Support, and Contact IDs described above are also l
 
 ## Size, natural units, and factual fidelity
 
-The production soft maximum is 1000 Unicode characters measured with Python character length, not UTF-8 bytes or model tokens. The splitter packs natural units in source order. A paragraph is a unit and each Markdown list item is a unit. H3–H6 headings establish active ancestry through the next heading of the same or shallower nested level; every secondary-split part repeats the H1, H2, and active nested ancestry for its factual units.
+Product whole-document aggregation uses a 600-Unicode-character boundary and Solution whole-document aggregation uses a 700-character boundary, both measured with Python character length rather than UTF-8 bytes or model tokens. These boundaries choose between one complete entity Chunk and the larger-document semantic layout; they are distinct from the general secondary-splitting limit.
+
+The production soft maximum for a semantic Chunk is 1000 Unicode characters. The splitter packs natural units in source order. A paragraph is a unit and each Markdown list item is a unit. H3–H6 headings establish active ancestry through the next heading of the same or shallower nested level; every secondary-split part repeats the H1, H2, and active nested ancestry for its factual units.
 
 The maximum is intentionally soft. If one indivisible unit plus required title/heading context exceeds 1000 characters, that Chunk remains over the limit rather than rewriting or cutting the fact. Contact is an indivisible whole-document exception. These cases are accepted and reported by statistics, not silently truncated.
 
