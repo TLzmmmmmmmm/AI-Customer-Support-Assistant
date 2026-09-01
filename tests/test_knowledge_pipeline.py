@@ -12,7 +12,7 @@ from knowledge_pipeline.core import (
     serialize_documents,
     validate_documents,
 )
-from knowledge_pipeline.models import ProductSource
+from knowledge_pipeline.models import CatalogMetadata, ProductSource
 
 
 BASE_URL = "https://www.shengborun.com"
@@ -113,9 +113,28 @@ class KnowledgeSchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ProductSource.model_validate(payload)
 
+    def test_catalog_metadata_requires_sorted_unique_category_ids(self):
+        valid = CatalogMetadata(
+            catalog_id="products",
+            category_ids=["ict-integration", "two-way-radio"],
+        )
+        self.assertEqual(valid.catalog_id, "products")
+
+        for category_ids in (
+            ["two-way-radio", "ict-integration"],
+            ["two-way-radio", "two-way-radio"],
+            [],
+        ):
+            with self.subTest(category_ids=category_ids):
+                with self.assertRaises(ValidationError):
+                    CatalogMetadata(
+                        catalog_id="products",
+                        category_ids=category_ids,
+                    )
+
 
 class KnowledgePipelineTests(unittest.TestCase):
-    def test_curated_snapshot_builds_60_normalized_documents(self):
+    def test_curated_snapshot_builds_61_normalized_documents(self):
         source_root = Path(__file__).resolve().parents[1] / "knowledge" / "source"
 
         inventory = load_sources(source_root)
@@ -129,11 +148,14 @@ class KnowledgePipelineTests(unittest.TestCase):
         documents = build_documents(source_root, BASE_URL)
         counts = {
             type_: sum(document.type == type_ for document in documents)
-            for type_ in ("product", "solution", "support", "company", "contact")
+            for type_ in (
+                "catalog", "product", "solution", "support", "company", "contact"
+            )
         }
         self.assertEqual(
             counts,
             {
+                "catalog": 1,
                 "product": 49,
                 "solution": 6,
                 "support": 3,
@@ -141,9 +163,9 @@ class KnowledgePipelineTests(unittest.TestCase):
                 "contact": 1,
             },
         )
-        self.assertEqual(len(documents), 60)
+        self.assertEqual(len(documents), 61)
 
-    def test_build_normalizes_each_entity_but_not_product_category(self):
+    def test_build_normalizes_products_and_one_category_catalog(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             write_complete_fixture(root)
@@ -154,12 +176,35 @@ class KnowledgePipelineTests(unittest.TestCase):
             self.assertEqual(
                 set(by_id),
                 {
+                    "catalog:products",
                     "product:xir-p8668ex",
                     "solution:petrochemical",
                     "support:solution-design",
                     "company:shengborun",
                     "contact:shengborun",
                 },
+            )
+            catalog = by_id["catalog:products"]
+            self.assertEqual(catalog.type, "catalog")
+            self.assertEqual(catalog.title, "产品分类")
+            self.assertEqual(catalog.source_path, "/products/")
+            self.assertEqual(
+                catalog.text,
+                "# 产品分类\n\n"
+                "网站目前展示以下 1 类产品。\n\n"
+                "## 对讲机通信\n\n"
+                "专业可靠的即时通信设备。",
+            )
+            self.assertEqual(
+                catalog.metadata.model_dump(mode="json"),
+                {
+                    "catalog_id": "products",
+                    "category_ids": ["two-way-radio"],
+                },
+            )
+            self.assertEqual(
+                catalog.source_files,
+                ["src/content/product-categories/two-way-radio.json"],
             )
             product = by_id["product:xir-p8668ex"]
             self.assertEqual(

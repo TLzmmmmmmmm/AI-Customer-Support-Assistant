@@ -97,6 +97,45 @@ class RetrievalConfigurationTests(unittest.TestCase):
 
 
 class VectorRecordTests(unittest.TestCase):
+    def test_catalog_vector_record_preserves_structured_category_metadata(self):
+        payload = record_payload()
+        payload.update({
+            "chunk_id": "catalog:products:overview",
+            "parent_document_id": "catalog:products",
+            "type": "catalog",
+            "section": "产品分类",
+            "text": "# 产品分类\n\n网站目前展示四类产品。",
+            "source_url": "https://www.shengborun.com/products/",
+            "source_files": [
+                "src/content/product-categories/ict-integration.json",
+                "src/content/product-categories/mesh-network.json",
+                "src/content/product-categories/shortwave-radio.json",
+                "src/content/product-categories/two-way-radio.json",
+            ],
+            "metadata": {
+                "catalog_id": "products",
+                "category_ids": [
+                    "ict-integration",
+                    "mesh-network",
+                    "shortwave-radio",
+                    "two-way-radio",
+                ],
+            },
+        })
+
+        record = VectorRecord.model_validate(payload)
+
+        self.assertEqual(record.type, "catalog")
+        self.assertEqual(
+            record.metadata.category_ids,
+            [
+                "ict-integration",
+                "mesh-network",
+                "shortwave-radio",
+                "two-way-radio",
+            ],
+        )
+
     def test_valid_vector_record_preserves_semantic_section(self):
         record = VectorRecord.model_validate(record_payload())
 

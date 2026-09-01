@@ -90,6 +90,39 @@ def make_product_document() -> KnowledgeDocument:
     )
 
 
+def make_catalog_document() -> KnowledgeDocument:
+    text = (
+        "# 产品分类\n\n"
+        "网站目前展示以下 4 类产品。\n\n"
+        "## 对讲机通信\n\n专业可靠的即时通信设备。\n\n"
+        "## 短波通信\n\n面向远距离通信场景。\n\n"
+        "## 自组网通信\n\n支持快速灵活组网。\n\n"
+        "## ICT 集成\n\n提供信息通信技术集成产品。"
+    )
+    return make_document(
+        type_="catalog",
+        entity_id="products",
+        title="产品分类",
+        text=text,
+        source_url="https://www.shengborun.com/products/",
+        source_files=[
+            "src/content/product-categories/ict-integration.json",
+            "src/content/product-categories/mesh-network.json",
+            "src/content/product-categories/shortwave-radio.json",
+            "src/content/product-categories/two-way-radio.json",
+        ],
+        metadata={
+            "catalog_id": "products",
+            "category_ids": [
+                "ict-integration",
+                "mesh-network",
+                "shortwave-radio",
+                "two-way-radio",
+            ],
+        },
+    )
+
+
 def make_product_document_with_length(length: int) -> KnowledgeDocument:
     base = make_product_document()
     introduction = "数字防爆对讲机。"
@@ -681,6 +714,20 @@ class SolutionChunkingTests(unittest.TestCase):
 
 
 class OtherTypeChunkingTests(unittest.TestCase):
+    def test_product_catalog_stays_one_authoritative_overview_chunk(self):
+        document = make_catalog_document()
+
+        chunks = build_chunks([document])
+
+        self.assertEqual(len(chunks), 1)
+        chunk = chunks[0]
+        self.assertEqual(chunk.chunk_id, "catalog:products:overview")
+        self.assertEqual(chunk.section, "产品分类")
+        self.assertEqual(chunk.text, document.text)
+        self.assertEqual(chunk.metadata, document.metadata)
+        self.assertEqual(chunk.source_url, document.source_url)
+        self.assertEqual(chunk.source_files, document.source_files)
+
     def test_short_support_company_and_contact_remain_whole(self):
         documents = [
             make_support_document(),
@@ -1426,7 +1473,7 @@ class RealInventoryIntegrationTests(unittest.TestCase):
         output_path = repository_root / "knowledge" / "chunks.jsonl"
         documents = load_documents(input_path)
         chunks = build_chunks(documents)
-        self.assertEqual(len(documents), 60)
+        self.assertEqual(len(documents), 61)
         self.assertEqual(
             {chunk.parent_document_id for chunk in chunks},
             {document.document_id for document in documents},

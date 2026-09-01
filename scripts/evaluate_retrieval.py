@@ -47,7 +47,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--suite",
         type=Path,
-        default=REPOSITORY_ROOT / "eval" / "retrieval_v1.json",
+        default=REPOSITORY_ROOT / "eval" / "retrieval_v1_1.json",
     )
     parser.add_argument(
         "--chunks",
@@ -62,7 +62,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=REPOSITORY_ROOT / "eval" / "retrieval_v1_results.json",
+        default=REPOSITORY_ROOT / "eval" / "retrieval_v1_1_results.json",
     )
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument(

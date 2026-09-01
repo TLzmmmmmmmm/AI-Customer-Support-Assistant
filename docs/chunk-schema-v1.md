@@ -41,7 +41,7 @@ Every line in `knowledge/chunks.jsonl` is one compact UTF-8 JSON object with LF 
 | `chunk_id` | Globally unique, colon-separated lowercase ASCII/kebab-case segments. It extends `parent_document_id`. Split parts add deterministic numeric suffixes such as `:1`. |
 | `parent_document_id` | Exact Day 2 `document_id`; it begins with the same `type`. |
 | `parent_document_hash` | Exact lowercase SHA-256 `content_hash` of the parent Document. |
-| `type` | One of `product`, `solution`, `support`, `company`, or `contact`. |
+| `type` | One of `catalog`, `product`, `solution`, `support`, `company`, or `contact`. |
 | `section` | Human-readable Chinese source section or entity title. It is not the ID slug. |
 | `text` | Exact factual parent text selected for this Chunk, with enough repeated Markdown identity and heading context to stand alone. LF only. |
 | `language` | Always `zh-CN`. |
@@ -60,6 +60,7 @@ Top-level fields provide stable identity and provenance. `chunk_id` identifies t
 
 | Type | Metadata fields |
 |---|---|
+| Catalog | `catalog_id`, `category_ids` |
 | Product | `product_id`, `slug`, `category_id`, `category_name` |
 | Solution | `solution_id`, `slug` |
 | Support | `service_id` |
@@ -69,6 +70,12 @@ Top-level fields provide stable identity and provenance. `chunk_id` identifies t
 ## Production chunking rules
 
 All Chunks repeat the parent H1 title. When a section must be split, its relevant ancestor headings are also repeated so every part remains understandable. Repeated title and heading context is allowed; factual semantic units are assigned exactly once.
+
+### Product Catalog
+
+- The authoritative `catalog:products` Document remains one complete Chunk named `catalog:products:overview`.
+- Its inherited semantic `section` is `产品分类`; the label is not renamed by Day 4.
+- The Chunk preserves the four category names, short descriptions, metadata, and complete multi-file provenance together so category-overview questions have one exact retrieval target.
 
 ### Product
 
@@ -140,7 +147,7 @@ Other variable-heading registries:
 | Solution body H2 | 客户需求 | `customer-requirements` |
 | Company H2 | 公司简介 | `company-profile` |
 
-The fixed Product, Solution, Support, and Contact IDs described above are also literal reviewed mappings; they are not derived from Chinese text.
+The fixed Catalog, Product, Solution, Support, and Contact IDs described above are also literal reviewed mappings; they are not derived from Chinese text.
 
 ## Size, natural units, and factual fidelity
 
@@ -170,6 +177,9 @@ Output replacement is atomic. The builder writes a temporary file beside the des
 ## Statistics
 
 The CLI reports total Documents, total Chunks, average, median, minimum, and maximum `text` length, plus Chunk counts for every Document and type. All lengths are Unicode character counts. They are descriptive production statistics, not token estimates.
+
+The current checked-in artifacts contain 61 Documents and 73 Chunks, including
+one `catalog` Document and its one overview Chunk.
 
 ## Build and synchronization responsibility
 

@@ -25,18 +25,21 @@ The build does not automatically detect drift between the website and the snapsh
 | Source type | Source records | Normalized Documents |
 |---|---:|---:|
 | Product | 49 | 49 |
-| Product Category | 4 | 0 |
+| Product Category | 4 | 1 catalog overview |
 | Solution | 6 | 6 |
 | Support Service | 3 | 3 |
 | Company | 1 | 1 |
 | Contact | 1 | 1 |
-| Total | 64 | 60 |
+| Total | 64 | 61 |
 
-Product Categories validate and enrich Products but do not become V1 documents.
+The four Product Categories validate and enrich Products and are also
+deterministically aggregated into one authoritative product-catalog overview
+Document. Individual categories do not become separate Documents.
 
 ## Included knowledge
 
 - Product identity, category, features, description, and technical parameters.
+- The complete published product-category overview and each category's short description.
 - Solution identity, summary, core needs, design, features, and full Markdown body.
 - Each Support Service's name, summary, and body.
 - The four Company introduction paragraphs.
@@ -179,7 +182,7 @@ Every line in knowledge/documents.jsonl is one UTF-8 JSON object:
 }
 ~~~
 
-Allowed document types are product, solution, support, company, and contact.
+Allowed document types are catalog, product, solution, support, company, and contact.
 
 Document IDs use the pattern type:stable-source-id. They do not contain a URL, timestamp, file path, or content hash.
 
@@ -193,6 +196,7 @@ metadata is small, type-specific filtering and debugging information:
 
 | Type | Metadata |
 |---|---|
+| Catalog | catalog_id, category_ids |
 | Product | product_id, slug, category_id, category_name |
 | Solution | solution_id, slug |
 | Support | service_id |
@@ -202,6 +206,17 @@ metadata is small, type-specific filtering and debugging information:
 Descriptions, parameters, solution details, and contact values are not hidden only in metadata.
 
 ## Source → Document transformation
+
+Product Catalog:
+
+~~~text
+all published Product Categories in reviewed business order
++ category names + short descriptions
+→ one catalog:products Document
+~~~
+
+Its source URL is `/products/`, and its provenance is the sorted union of all
+four contributing Product Category source files.
 
 Product:
 
@@ -310,4 +325,3 @@ Online URL checking is deferred engineering hardening and is not part of the V1 
 6. Review the count report and changed JSONL records.
 7. Run all tests.
 8. Commit Source JSON and regenerated documents.jsonl together.
-

@@ -29,7 +29,9 @@ from knowledge_pipeline.retrieval.records import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EVAL_PATH = ROOT / "eval" / "retrieval_v1.json"
+EVAL_PATH = ROOT / "eval" / "retrieval_v1_1.json"
+HISTORICAL_EVAL_PATH = ROOT / "eval" / "retrieval_v1.json"
+HISTORICAL_RESULT_PATH = ROOT / "eval" / "retrieval_v1_results.json"
 CHUNKS_PATH = ROOT / "knowledge" / "chunks.jsonl"
 
 
@@ -119,6 +121,10 @@ class FakeProvider:
 
 
 class RetrievalEvaluationFixtureTests(unittest.TestCase):
+    def test_historical_v1_suite_and_result_are_preserved(self):
+        self.assertTrue(HISTORICAL_EVAL_PATH.is_file())
+        self.assertTrue(HISTORICAL_RESULT_PATH.is_file())
+
     def test_suite_contains_exactly_the_approved_baseline_cases(self):
         suite = load_evaluation_suite(EVAL_PATH)
 
@@ -140,6 +146,24 @@ class RetrievalEvaluationFixtureTests(unittest.TestCase):
         digest = hashlib.sha256(CHUNKS_PATH.read_bytes()).hexdigest()
 
         self.assertEqual(suite.chunk_snapshot_sha256, digest)
+
+    def test_catalog_overview_case_uses_the_authoritative_summary_chunk(self):
+        suite = load_evaluation_suite(EVAL_PATH)
+        catalog_case = next(
+            item for item in suite.cases
+            if item.source_case_id == "baseline-001"
+        )
+
+        self.assertEqual(
+            catalog_case.expected_chunk_ids,
+            ["catalog:products:overview"],
+        )
+        self.assertEqual(
+            catalog_case.expected_parent_document_ids,
+            ["catalog:products"],
+        )
+        self.assertEqual(catalog_case.match_requirement, "any")
+        self.assertEqual(catalog_case.relevance_groups, [])
 
 
 class RetrievalEvaluationMetricTests(unittest.TestCase):
@@ -235,6 +259,14 @@ class RetrievalEvaluationMetricTests(unittest.TestCase):
 
 
 class RetrievalEvaluationCliTests(unittest.TestCase):
+    def test_cli_defaults_to_latest_v1_1_suite_and_result(self):
+        from scripts import evaluate_retrieval
+
+        args = evaluate_retrieval.parse_args([])
+
+        self.assertEqual(args.suite.name, "retrieval_v1_1.json")
+        self.assertEqual(args.output.name, "retrieval_v1_1_results.json")
+
     def test_plan_only_estimates_queries_without_provider_or_vectors(self):
         from scripts import evaluate_retrieval
 

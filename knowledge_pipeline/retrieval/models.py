@@ -12,6 +12,7 @@ from pydantic import Field, field_validator, model_validator
 from knowledge_pipeline.models import (
     CHUNK_ID,
     SHA256_HEX,
+    CatalogMetadata,
     CompanyMetadata,
     ContactMetadata,
     KnowledgeChunk,
@@ -55,7 +56,9 @@ class VectorRecord(StrictModel):
     schema_version: Literal["1.0"]
     chunk_id: str = Field(min_length=1)
     parent_document_id: str = Field(min_length=1)
-    type: Literal["product", "solution", "support", "company", "contact"]
+    type: Literal[
+        "catalog", "product", "solution", "support", "company", "contact"
+    ]
     section: str = Field(min_length=1)
     text: str = Field(min_length=1)
     language: Literal["zh-CN"]
@@ -116,6 +119,7 @@ class VectorRecord(StrictModel):
         if not self.chunk_id.startswith(f"{self.parent_document_id}:"):
             raise ValueError("chunk_id must extend parent_document_id")
         expected_metadata_type = {
+            "catalog": CatalogMetadata,
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,

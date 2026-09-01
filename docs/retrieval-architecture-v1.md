@@ -3,7 +3,7 @@
 ## Production data flow
 
 ```text
-knowledge/chunks.jsonl (Day 3, 72 chunks)
+knowledge/chunks.jsonl (Day 3, 73 chunks)
         │
         │ stable chunk_id + content_hash reuse check
         ▼
@@ -96,10 +96,12 @@ This query command calls the paid external embedding provider once.
 
 ## Fixed retrieval evaluation
 
-`eval/retrieval_v1.json` freezes 18 answerable or partially answerable queries
-from baseline cases 001–017 and 019. It pins the exact Day 3 chunk-file SHA-256,
-explicit expected chunks/parents/entities, and four relevance groups for the
-catalog-overview question.
+`eval/retrieval_v1_1.json` is the current fixed suite of 18 answerable queries
+from baseline cases 001–017 and 019. It pins the exact 73-Chunk Day 3 artifact,
+explicit expected chunks/parents/entities, and uses
+`catalog:products:overview` as the single authoritative target for the
+catalog-overview question. The original `eval/retrieval_v1.json` suite and its
+result remain preserved as the pre-catalog historical baseline.
 
 Reported metrics are Hit@1/3/5, mean reciprocal rank, expected chunk and parent
 Recall@5, exact-entity accuracy, and complete multi-source recall. Important
@@ -130,4 +132,3 @@ V1 contains no generation LLM, RAG prompt, answer generation, reranking,
 BM25/full hybrid search, FAISS, Chroma/vector database, agent, GPU, local
 embedding model, or model-serving infrastructure. The existing chat endpoint
 is unchanged.
-

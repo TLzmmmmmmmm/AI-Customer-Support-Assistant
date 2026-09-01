@@ -158,6 +158,27 @@ class ProductMetadata(StrictModel):
     category_name: NonEmptyStr
 
 
+class CatalogMetadata(StrictModel):
+    catalog_id: NonEmptyStr
+    category_ids: list[NonEmptyStr] = Field(min_length=1)
+
+    @field_validator("catalog_id")
+    @classmethod
+    def validate_catalog_id(cls, value: str) -> str:
+        if not KEBAB_CASE.fullmatch(value):
+            raise ValueError("must be lowercase kebab-case")
+        return value
+
+    @field_validator("category_ids")
+    @classmethod
+    def validate_category_ids(cls, value: list[str]) -> list[str]:
+        if value != sorted(set(value)):
+            raise ValueError("must be sorted and unique")
+        if any(not KEBAB_CASE.fullmatch(item) for item in value):
+            raise ValueError("items must be lowercase kebab-case")
+        return value
+
+
 class SolutionMetadata(StrictModel):
     solution_id: NonEmptyStr
     slug: NonEmptyStr
@@ -176,7 +197,8 @@ class ContactMetadata(StrictModel):
 
 
 Metadata = (
-    ProductMetadata
+    CatalogMetadata
+    | ProductMetadata
     | SolutionMetadata
     | SupportMetadata
     | CompanyMetadata
@@ -187,7 +209,9 @@ Metadata = (
 class KnowledgeDocument(StrictModel):
     schema_version: Literal["1.0"]
     document_id: NonEmptyStr
-    type: Literal["product", "solution", "support", "company", "contact"]
+    type: Literal[
+        "catalog", "product", "solution", "support", "company", "contact"
+    ]
     title: NonEmptyStr
     text: NonEmptyStr
     language: Literal["zh-CN"]
@@ -231,6 +255,7 @@ class KnowledgeDocument(StrictModel):
         if not self.document_id.startswith(f"{self.type}:"):
             raise ValueError("document_id must start with '<type>:'")
         expected = {
+            "catalog": CatalogMetadata,
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,
@@ -247,7 +272,9 @@ class KnowledgeChunk(StrictModel):
     chunk_id: NonEmptyStr
     parent_document_id: NonEmptyStr
     parent_document_hash: NonEmptyStr
-    type: Literal["product", "solution", "support", "company", "contact"]
+    type: Literal[
+        "catalog", "product", "solution", "support", "company", "contact"
+    ]
     section: NonEmptyStr
     text: NonEmptyStr
     language: Literal["zh-CN"]
@@ -299,6 +326,7 @@ class KnowledgeChunk(StrictModel):
         if not self.chunk_id.startswith(f"{self.parent_document_id}:"):
             raise ValueError("chunk_id must extend parent_document_id")
         expected = {
+            "catalog": CatalogMetadata,
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,

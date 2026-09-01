@@ -988,13 +988,31 @@ def _contact_candidates(
     return [unit], [candidate]
 
 
+def _catalog_candidates(
+    parent: KnowledgeDocument,
+) -> tuple[list[SemanticUnit], list[ChunkCandidate]]:
+    unit = SemanticUnit("overview", parent.text)
+    candidate = ChunkCandidate(
+        _chunk(
+            parent,
+            chunk_id=f"{parent.document_id}:overview",
+            section=parent.title,
+            text=parent.text,
+        ),
+        (unit.key,),
+    )
+    return [unit], [candidate]
+
+
 def build_chunks(
     documents: list[KnowledgeDocument],
     max_characters: int = MAX_CHUNK_CHARACTERS,
 ) -> list[KnowledgeChunk]:
     chunks: list[KnowledgeChunk] = []
     for document in documents:
-        if document.type == "product":
+        if document.type == "catalog":
+            units, candidates = _catalog_candidates(document)
+        elif document.type == "product":
             units, candidates = _product_candidates(document, max_characters)
         elif document.type == "solution":
             units, candidates = _solution_candidates(document, max_characters)

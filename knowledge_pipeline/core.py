@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ValidationError
 
 from .models import (
+    CatalogMetadata,
     CompanyMetadata,
     CompanySource,
     ContactMetadata,
@@ -27,7 +28,15 @@ from .models import (
 )
 
 
-DOCUMENT_TYPES = ("product", "solution", "support", "company", "contact")
+DOCUMENT_TYPES = (
+    "catalog", "product", "solution", "support", "company", "contact"
+)
+PRODUCT_CATEGORY_DISPLAY_ORDER = (
+    "two-way-radio",
+    "shortwave-radio",
+    "mesh-network",
+    "ict-integration",
+)
 MODEL_BY_DIRECTORY = {
     "products": ProductSource,
     "product-categories": ProductCategorySource,
@@ -263,6 +272,45 @@ def normalize_product(
     )
 
 
+def normalize_product_catalog(
+    categories: Iterable[ProductCategorySource],
+    base_url: str,
+) -> KnowledgeDocument:
+    order = {
+        category_id: index
+        for index, category_id in enumerate(PRODUCT_CATEGORY_DISPLAY_ORDER)
+    }
+    published = sorted(
+        (category for category in categories if category.published),
+        key=lambda category: (order.get(category.id, len(order)), category.id),
+    )
+    if not published:
+        raise BuildError("cannot build product catalog without published categories")
+    sections = "\n\n".join(
+        f"## {category.name}\n\n{category.short_description}"
+        for category in published
+    )
+    text = (
+        "# 产品分类\n\n"
+        f"网站目前展示以下 {len(published)} 类产品。\n\n"
+        f"{sections}"
+    )
+    metadata = CatalogMetadata(
+        catalog_id="products",
+        category_ids=sorted(category.id for category in published),
+    )
+    return _document(
+        type_="catalog",
+        entity_id="products",
+        title="产品分类",
+        text=text,
+        source_path="/products/",
+        source_files=_source_files(*published),
+        metadata=metadata,
+        base_url=base_url,
+    )
+
+
 def normalize_solution(source: SolutionSource, base_url: str) -> KnowledgeDocument:
     needs = "\n".join(f"- {item}" for item in source.core_needs)
     features = "\n".join(f"- {item}" for item in source.features)
@@ -394,6 +442,7 @@ def build_documents(source_root: Path, base_url: str) -> list[KnowledgeDocument]
     inventory = load_sources(source_root)
     _validate_source_relationships(inventory)
     documents: list[KnowledgeDocument] = []
+    documents.append(normalize_product_catalog(inventory.categories.values(), base_url))
     for source in inventory.products.values():
         if source.published:
             documents.append(

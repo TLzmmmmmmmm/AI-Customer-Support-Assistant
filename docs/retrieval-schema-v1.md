@@ -12,7 +12,7 @@ contains reproducible 1024-dimensional vectors. Records are sorted by
 | `schema_version` | Always `1.0`. |
 | `chunk_id` | Stable Day 3 chunk identifier and vector-record identity. |
 | `parent_document_id` | Stable parent knowledge-document identifier. |
-| `type` | `product`, `solution`, `support`, `company`, or `contact`. |
+| `type` | `catalog`, `product`, `solution`, `support`, `company`, or `contact`. |
 | `section` | The Day 3 semantic section label, inherited exactly without renaming. |
 | `text` | Full chunk text used as the document embedding input. |
 | `language` | Currently `zh-CN`. |
@@ -83,4 +83,3 @@ Only the command with `--execute` creates the external provider and may incur
 DashScope usage charges. Charges are billed through the Alibaba Cloud account
 associated with `DASHSCOPE_API_KEY` and `DASHSCOPE_WORKSPACE_ID`; the script
 does not perform a separate payment operation.
-

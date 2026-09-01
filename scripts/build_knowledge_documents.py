@@ -43,7 +43,9 @@ def main(argv: list[str] | None = None) -> int:
 
     total = sum(counts.values())
     print(f"Documents generated: {total}")
-    for type_ in ("product", "solution", "support", "company", "contact"):
+    for type_ in (
+        "catalog", "product", "solution", "support", "company", "contact"
+    ):
         print(f"- {type_}: {counts[type_]}")
     print(f"Output: {args.output}")
     return 0
@@ -51,4 +53,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
