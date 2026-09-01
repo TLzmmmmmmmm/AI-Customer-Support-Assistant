@@ -27,6 +27,7 @@ from .records import (
     validate_records_against_chunks,
     write_vector_records,
 )
+from .retriever import Retriever, format_debug_results
 
 __all__ = [
     "DashScopeCredentials",
@@ -44,6 +45,7 @@ __all__ = [
     "RetrievalError",
     "RetrievalEvaluationError",
     "RetrievalResult",
+    "Retriever",
     "SearchHit",
     "VectorBuildPlan",
     "VectorBuildStats",
@@ -52,6 +54,7 @@ __all__ = [
     "VectorRecord",
     "VectorRecordValidationError",
     "execute_vector_build",
+    "format_debug_results",
     "load_chunks",
     "load_vector_records",
     "plan_vector_build",
