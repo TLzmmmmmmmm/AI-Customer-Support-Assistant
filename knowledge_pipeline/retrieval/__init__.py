@@ -1,5 +1,6 @@
 from .config import DashScopeCredentials, EmbeddingConfig, RetrievalConfig
 from .embedding import DashScopeEmbeddingProvider, EmbeddingProvider
+from .entities import ExactEntityResolver
 from .index import NumpyExactVectorIndex, VectorIndex
 from .models import (
     EmbeddingAPIError,
@@ -37,6 +38,7 @@ __all__ = [
     "EmbeddingProvider",
     "EntityCatalogError",
     "EntityMatch",
+    "ExactEntityResolver",
     "NumpyExactVectorIndex",
     "RetrievalConfig",
     "RetrievalError",
