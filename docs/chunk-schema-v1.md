@@ -72,10 +72,10 @@ All Chunks repeat the parent H1 title. When a section must be split, its relevan
 
 ### Product
 
-- `产品介绍` becomes `product:<product-id>:overview` and includes the Product title, category preamble, and introduction.
-- `产品特点` becomes `product:<product-id>:features`.
-- Every `技术参数` H3 group becomes `product:<product-id>:spec:<registered-slug>`. A group remains separate from every other parameter group.
-- A registered optional `应用场景` H2 becomes `product:<product-id>:applications` only when that heading and factual text already exist in the Day 2 Document. The build never infers an application or a Product–Solution association.
+- When the complete parent `text` is at most 600 Unicode characters, the entire Product becomes `product:<product-id>:content`. Its Chunk text is byte-for-byte the complete normalized parent text.
+- When the complete parent `text` is longer than 600 characters, the category preamble, `产品介绍`, and `产品特点` become `product:<product-id>:overview`; `section` is `产品介绍与特点`.
+- For a Product longer than 600 characters, the complete `技术参数` section, including all registered H3 parameter groups in source order, becomes `product:<product-id>:specifications`.
+- A registered optional `应用场景` H2 remains inside the whole `:content` Chunk for a short Product. For a long Product it becomes `product:<product-id>:applications`. It exists only when that heading and factual text already exist in the Day 2 Document. The build never infers an application or a Product–Solution association.
 
 ### Solution
 

@@ -90,6 +90,24 @@ def make_product_document() -> KnowledgeDocument:
     )
 
 
+def make_product_document_with_length(length: int) -> KnowledgeDocument:
+    base = make_product_document()
+    introduction = "数字防爆对讲机。"
+    padding = length - len(base.text)
+    if padding < 0:
+        raise ValueError("requested Product fixture length is too small")
+    text = base.text.replace(introduction, introduction + "甲" * padding)
+    return make_document(
+        type_="product",
+        entity_id="xir-p8668ex",
+        title=base.title,
+        text=text,
+        source_url=base.source_url,
+        source_files=base.source_files,
+        metadata=base.metadata.model_dump(mode="json"),
+    )
+
+
 def make_solution_document(text: str | None = None) -> KnowledgeDocument:
     normalized = text or (
         "# 智慧应急解决方案\n\n"
@@ -492,23 +510,47 @@ class MarkdownParserTests(unittest.TestCase):
 
 
 class ProductChunkingTests(unittest.TestCase):
-    def test_product_splits_overview_features_and_parameter_groups(self):
+    def test_product_at_600_characters_stays_one_complete_chunk(self):
+        document = make_product_document_with_length(600)
+
+        chunks = build_chunks([document])
+
+        self.assertEqual(len(document.text), 600)
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "product:xir-p8668ex:content",
+        ])
+        self.assertEqual(chunks[0].section, document.title)
+        self.assertEqual(chunks[0].text, document.text)
+
+    def test_product_over_600_characters_uses_two_semantic_chunks(self):
+        document = make_product_document_with_length(601)
+
+        chunks = build_chunks([document])
+
+        self.assertEqual(len(document.text), 601)
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "product:xir-p8668ex:overview",
+            "product:xir-p8668ex:specifications",
+        ])
+        self.assertEqual(chunks[0].section, "产品介绍与特点")
+        self.assertIn("## 产品介绍", chunks[0].text)
+        self.assertIn("## 产品特点", chunks[0].text)
+        self.assertNotIn("## 技术参数", chunks[0].text)
+        self.assertEqual(chunks[1].section, "技术参数")
+        self.assertIn("## 技术参数", chunks[1].text)
+        self.assertIn("### 一般规格", chunks[1].text)
+        self.assertNotIn("## 产品特点", chunks[1].text)
+
+    def test_short_product_preserves_full_document_and_provenance(self):
         document = make_product_document()
 
         chunks = build_chunks([document])
 
-        self.assertEqual(
-            [chunk.chunk_id for chunk in chunks],
-            [
-                "product:xir-p8668ex:overview",
-                "product:xir-p8668ex:features",
-                "product:xir-p8668ex:spec:general",
-            ],
-        )
-        self.assertEqual(chunks[2].section, "一般规格")
-        self.assertIn("# 摩托罗拉 XiR P8668Ex", chunks[2].text)
-        self.assertIn("## 技术参数", chunks[2].text)
-        self.assertIn("### 一般规格", chunks[2].text)
+        self.assertEqual([chunk.chunk_id for chunk in chunks], [
+            "product:xir-p8668ex:content",
+        ])
+        self.assertEqual(chunks[0].section, document.title)
+        self.assertEqual(chunks[0].text, document.text)
         self.assertNotIn("应用场景", "\n".join(chunk.text for chunk in chunks))
         self.assertEqual(chunks[0].metadata, document.metadata)
         self.assertEqual(chunks[0].source_files, document.source_files)
@@ -1144,7 +1186,7 @@ class ChunkCollectionValidationTests(unittest.TestCase):
         self.assertIn("has no chunks", str(context.exception))
 
     def test_chunk_order_must_match_the_deterministic_builder(self):
-        documents = [make_product_document()]
+        documents = [make_product_document_with_length(601)]
         chunks = build_chunks(documents)
 
         with self.assertRaises(BuildError) as context:
@@ -1236,14 +1278,14 @@ class ChunkStatisticsTests(unittest.TestCase):
         self.assertEqual(stats.total_documents, 2)
         self.assertEqual(stats.total_chunks, len(chunks))
         self.assertEqual(stats.average_characters, sum(lengths) / len(lengths))
-        self.assertEqual(stats.median_characters, 48.5)
+        self.assertEqual(stats.median_characters, 83.5)
         self.assertEqual(stats.minimum_characters, min(lengths))
         self.assertEqual(stats.maximum_characters, max(lengths))
         self.assertEqual(stats.chunks_per_document, {
-            "product:xir-p8668ex": 3,
+            "product:xir-p8668ex": 1,
             "contact:shengborun": 1,
         })
-        self.assertEqual(stats.chunks_per_type, {"contact": 1, "product": 3})
+        self.assertEqual(stats.chunks_per_type, {"contact": 1, "product": 1})
 
     def test_statistics_handle_an_empty_collection(self):
         stats = calculate_chunk_statistics([], [])

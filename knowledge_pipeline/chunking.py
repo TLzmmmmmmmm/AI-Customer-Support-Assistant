@@ -17,6 +17,8 @@ from .models import KnowledgeChunk, KnowledgeDocument
 
 
 MAX_CHUNK_CHARACTERS = 1000
+PRODUCT_WHOLE_DOCUMENT_MAX_CHARACTERS = 600
+SOLUTION_WHOLE_DOCUMENT_MAX_CHARACTERS = 700
 
 
 def compute_chunk_content_hash(
@@ -569,53 +571,6 @@ def _product_candidates(
         if section.heading not in PRODUCT_OPTIONAL_SECTION_SLUGS:
             raise _error(parent, f"unmapped Product H2 heading: {section.heading}")
 
-    identity = SemanticUnit("identity:title", parsed.title_line)
-    overview_blocks: list[SemanticBlock] = []
-    if parsed.preamble:
-        overview_blocks.extend(
-            _semantic_blocks(
-                parsed.preamble,
-                key_prefix="overview:preamble",
-                ancestor_headings=(),
-            )
-        )
-    overview_heading = f"## {introduction.heading}"
-    overview_blocks.extend(_semantic_blocks(
-        introduction.body,
-        key_prefix="overview:content",
-        ancestor_headings=(overview_heading,),
-    ))
-    units, candidates = _split_section(
-        parent,
-        base_chunk_id=f"{parent.document_id}:overview",
-        section=introduction.heading,
-        identity=identity,
-        blocks=overview_blocks,
-        full_text=_join_context(parsed.title_line, parsed.preamble, introduction.raw),
-        max_characters=max_characters,
-        include_identity_unit=True,
-    )
-    feature_heading = f"## {features.heading}"
-    feature_units, feature_candidates = _split_section(
-        parent,
-        base_chunk_id=f"{parent.document_id}:features",
-        section=features.heading,
-        identity=identity,
-        blocks=_semantic_blocks(
-            features.body,
-            key_prefix="features:content",
-            ancestor_headings=(feature_heading,),
-        ),
-        full_text=_join_context(parsed.title_line, features.raw),
-        max_characters=max_characters,
-    )
-    units.extend(feature_units)
-    candidates.extend(feature_candidates)
-    generated_ids = {
-        f"{parent.document_id}:overview",
-        f"{parent.document_id}:features",
-    }
-
     groups = _split_h3(specifications)
     if not groups:
         raise _error(parent, "Product 技术参数 must contain at least one H3 group")
@@ -624,30 +579,87 @@ def _product_candidates(
     first_group_offset = prefix_body.find("### ")
     if first_group_offset >= 0 and prefix_body[:first_group_offset].strip():
         raise _error(parent, "Product 技术参数 contains unassigned prose before its first H3")
-    for index, group in enumerate(groups):
+    registered_group_slugs: set[str] = set()
+    for group in groups:
         slug = PRODUCT_SPEC_SECTION_SLUGS.get(group.heading)
         if slug is None:
             raise _error(parent, f"unmapped Product H3 heading: {group.heading}")
-        base_chunk_id = f"{parent.document_id}:spec:{slug}"
-        if base_chunk_id in generated_ids:
-            raise _error(parent, f"duplicate generated chunk_id: {base_chunk_id}")
-        generated_ids.add(base_chunk_id)
-        group_heading = f"### {group.heading}"
-        group_units, group_candidates = _split_section(
-            parent,
-            base_chunk_id=base_chunk_id,
-            section=group.heading,
-            identity=identity,
-            blocks=_semantic_blocks(
-                group.body,
-                key_prefix=f"spec:{index}",
-                ancestor_headings=(specifications_prefix, group_heading),
+        if slug in registered_group_slugs:
+            raise _error(
+                parent,
+                f"duplicate Product technical-parameter group: {group.heading}",
+            )
+        registered_group_slugs.add(slug)
+
+    if len(parent.text) <= PRODUCT_WHOLE_DOCUMENT_MAX_CHARACTERS:
+        unit = SemanticUnit("content", parent.text)
+        return [unit], [ChunkCandidate(
+            _chunk(
+                parent,
+                chunk_id=f"{parent.document_id}:content",
+                section=parent.title,
+                text=parent.text,
             ),
-            full_text=_join_context(parsed.title_line, specifications_prefix, group.raw),
-            max_characters=max_characters,
-        )
-        units.extend(group_units)
-        candidates.extend(group_candidates)
+            (unit.key,),
+        )]
+
+    identity = SemanticUnit("identity:title", parsed.title_line)
+    overview_blocks: list[SemanticBlock] = []
+    if parsed.preamble:
+        overview_blocks.extend(_semantic_blocks(
+            parsed.preamble,
+            key_prefix="overview:preamble",
+            ancestor_headings=(),
+        ))
+    overview_blocks.extend(_semantic_blocks(
+        introduction.body,
+        key_prefix="overview:introduction",
+        ancestor_headings=(f"## {introduction.heading}",),
+    ))
+    overview_blocks.extend(_semantic_blocks(
+        features.body,
+        key_prefix="overview:features",
+        ancestor_headings=(f"## {features.heading}",),
+    ))
+    units, candidates = _split_section(
+        parent,
+        base_chunk_id=f"{parent.document_id}:overview",
+        section="产品介绍与特点",
+        identity=identity,
+        blocks=overview_blocks,
+        full_text=_join_context(
+            parsed.title_line,
+            parsed.preamble,
+            introduction.raw,
+            features.raw,
+        ),
+        max_characters=max_characters,
+        include_identity_unit=True,
+    )
+
+    specification_blocks: list[SemanticBlock] = []
+    for index, group in enumerate(groups):
+        group_heading = f"### {group.heading}"
+        specification_blocks.extend(_semantic_blocks(
+            group.body,
+            key_prefix=f"spec:{index}",
+            ancestor_headings=(specifications_prefix, group_heading),
+        ))
+    specification_units, specification_candidates = _split_section(
+        parent,
+        base_chunk_id=f"{parent.document_id}:specifications",
+        section=specifications.heading,
+        identity=identity,
+        blocks=specification_blocks,
+        full_text=_join_context(parsed.title_line, specifications.raw),
+        max_characters=max_characters,
+    )
+    units.extend(specification_units)
+    candidates.extend(specification_candidates)
+    generated_ids = {
+        f"{parent.document_id}:overview",
+        f"{parent.document_id}:specifications",
+    }
 
     for index, section in enumerate(optional_sections):
         slug = PRODUCT_OPTIONAL_SECTION_SLUGS[section.heading]
