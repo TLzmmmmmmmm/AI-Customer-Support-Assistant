@@ -149,6 +149,9 @@ class VectorBuildPlan:
     reusable_embeddings: Mapping[str, Sequence[float]]
     to_embed: Sequence[KnowledgeChunk]
     deleted_chunk_ids: Sequence[str]
+    embedding_provider: str
+    embedding_model: str
+    embedding_dimensions: int
     total_characters: int
     estimated_tokens: int
     estimated_cost_yuan: Decimal

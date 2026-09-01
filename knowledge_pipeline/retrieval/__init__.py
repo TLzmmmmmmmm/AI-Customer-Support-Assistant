@@ -16,6 +16,15 @@ from .models import (
     VectorRecord,
     VectorRecordValidationError,
 )
+from .records import (
+    execute_vector_build,
+    load_chunks,
+    load_vector_records,
+    plan_vector_build,
+    serialize_vector_records,
+    validate_records_against_chunks,
+    write_vector_records,
+)
 
 __all__ = [
     "DashScopeCredentials",
@@ -37,4 +46,11 @@ __all__ = [
     "VectorIndexNotReadyError",
     "VectorRecord",
     "VectorRecordValidationError",
+    "execute_vector_build",
+    "load_chunks",
+    "load_vector_records",
+    "plan_vector_build",
+    "serialize_vector_records",
+    "validate_records_against_chunks",
+    "write_vector_records",
 ]
