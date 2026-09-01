@@ -1,6 +1,12 @@
 from .config import DashScopeCredentials, EmbeddingConfig, RetrievalConfig
 from .embedding import DashScopeEmbeddingProvider, EmbeddingProvider
 from .entities import ExactEntityResolver
+from .evaluation import (
+    evaluate_retrieval,
+    load_evaluation_suite,
+    serialize_evaluation_result,
+    validate_suite_against_chunks,
+)
 from .index import NumpyExactVectorIndex, VectorIndex
 from .models import (
     EmbeddingAPIError,
@@ -10,7 +16,13 @@ from .models import (
     EntityMatch,
     RetrievalError,
     RetrievalEvaluationError,
+    RetrievalEvaluationCase,
+    RetrievalEvaluationResult,
+    RetrievalEvaluationSuite,
+    RetrievalFailure,
+    RetrievalMetrics,
     RetrievalResult,
+    RelevanceGroup,
     SearchHit,
     VectorBuildPlan,
     VectorBuildStats,
@@ -43,8 +55,14 @@ __all__ = [
     "NumpyExactVectorIndex",
     "RetrievalConfig",
     "RetrievalError",
+    "RetrievalEvaluationCase",
     "RetrievalEvaluationError",
+    "RetrievalEvaluationResult",
+    "RetrievalEvaluationSuite",
+    "RetrievalFailure",
+    "RetrievalMetrics",
     "RetrievalResult",
+    "RelevanceGroup",
     "Retriever",
     "SearchHit",
     "VectorBuildPlan",
@@ -54,11 +72,15 @@ __all__ = [
     "VectorRecord",
     "VectorRecordValidationError",
     "execute_vector_build",
+    "evaluate_retrieval",
     "format_debug_results",
     "load_chunks",
+    "load_evaluation_suite",
     "load_vector_records",
     "plan_vector_build",
     "serialize_vector_records",
+    "serialize_evaluation_result",
+    "validate_suite_against_chunks",
     "validate_records_against_chunks",
     "write_vector_records",
 ]

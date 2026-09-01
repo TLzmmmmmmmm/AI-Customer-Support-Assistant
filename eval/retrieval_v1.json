@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "shengborun-semantic-retrieval-v1",
+  "chunk_snapshot_sha256": "46c4d7f3367d255ca94e21d4600f4b776a1eaa3f2af04678e92e3cb075441cbc",
+  "default_top_k": 5,
+  "cases": [
+    {
+      "id": "retrieval-v1-001",
+      "source_case_id": "baseline-001",
+      "category": "catalog_overview",
+      "query": "贵公司目前网站展示了哪几类产品？",
+      "expected_chunk_ids": [
+        "product:ap-controller:content", "product:ap:content", "product:band-pass-duplexer:content", "product:cavity-combiner:content", "product:domestic-125w:content", "product:domestic-20w:content", "product:domestic-500w:content", "product:domestic-5w:content", "product:e-center:overview", "product:e-center:specifications", "product:e-mesh580p:overview", "product:e-mesh580p:specifications", "product:e-pack200:content", "product:envoy-x:content", "product:firewall:content", "product:gateway:content", "product:hp500:content", "product:hp500cqst:content", "product:hp710ex:content", "product:hp780:content", "product:hp780cqst:content", "product:hp790ex:content", "product:hr1060:content", "product:industrial-switch:content", "product:jm-ua4wl:content", "product:jomesh-bp2w:overview", "product:jomesh-bp2w:specifications", "product:jomesh-hs:overview", "product:jomesh-hs:specifications", "product:jomesh-od10w:overview", "product:jomesh-od10w:specifications", "product:ly198:content", "product:ly598-keyboard:content", "product:ly598:content", "product:network-isolation-gateway:content", "product:optic-repeater-near:content", "product:optic-repeater-remote:content", "product:pne380:content", "product:receiver-splitter:content", "product:router:content", "product:sentry-h-6110-mp:content", "product:sentry-h-6120:content", "product:server:content", "product:slr1000:content", "product:slr5300:content", "product:switch:content", "product:x15:content", "product:x5s:content", "product:x6s:content", "product:x7:content", "product:xir-gp328d-plus-ex:content", "product:xir-gp338d-plus-ex:content", "product:xir-p6600i-ex:content", "product:xir-p8668ex:content"
+      ],
+      "expected_parent_document_ids": [
+        "product:ap-controller", "product:ap", "product:band-pass-duplexer", "product:cavity-combiner", "product:domestic-125w", "product:domestic-20w", "product:domestic-500w", "product:domestic-5w", "product:e-center", "product:e-mesh580p", "product:e-pack200", "product:envoy-x", "product:firewall", "product:gateway", "product:hp500", "product:hp500cqst", "product:hp710ex", "product:hp780", "product:hp780cqst", "product:hp790ex", "product:hr1060", "product:industrial-switch", "product:jm-ua4wl", "product:jomesh-bp2w", "product:jomesh-hs", "product:jomesh-od10w", "product:ly198", "product:ly598-keyboard", "product:ly598", "product:network-isolation-gateway", "product:optic-repeater-near", "product:optic-repeater-remote", "product:pne380", "product:receiver-splitter", "product:router", "product:sentry-h-6110-mp", "product:sentry-h-6120", "product:server", "product:slr1000", "product:slr5300", "product:switch", "product:x15", "product:x5s", "product:x6s", "product:x7", "product:xir-gp328d-plus-ex", "product:xir-gp338d-plus-ex", "product:xir-p6600i-ex", "product:xir-p8668ex"
+      ],
+      "expected_entity_ids": [],
+      "match_requirement": "all_groups",
+      "relevance_groups": [
+        {
+          "id": "ict-integration",
+          "acceptable_chunk_ids": ["product:ap-controller:content", "product:ap:content", "product:firewall:content", "product:gateway:content", "product:industrial-switch:content", "product:network-isolation-gateway:content", "product:router:content", "product:server:content", "product:switch:content"]
+        },
+        {
+          "id": "mesh-network",
+          "acceptable_chunk_ids": ["product:e-center:overview", "product:e-center:specifications", "product:e-mesh580p:overview", "product:e-mesh580p:specifications", "product:e-pack200:content", "product:jm-ua4wl:content", "product:jomesh-bp2w:overview", "product:jomesh-bp2w:specifications", "product:jomesh-hs:overview", "product:jomesh-hs:specifications", "product:jomesh-od10w:overview", "product:jomesh-od10w:specifications", "product:pne380:content"]
+        },
+        {
+          "id": "shortwave-radio",
+          "acceptable_chunk_ids": ["product:domestic-125w:content", "product:domestic-20w:content", "product:domestic-500w:content", "product:domestic-5w:content", "product:envoy-x:content", "product:sentry-h-6110-mp:content", "product:sentry-h-6120:content"]
+        },
+        {
+          "id": "two-way-radio",
+          "acceptable_chunk_ids": ["product:band-pass-duplexer:content", "product:cavity-combiner:content", "product:hp500:content", "product:hp500cqst:content", "product:hp710ex:content", "product:hp780:content", "product:hp780cqst:content", "product:hp790ex:content", "product:hr1060:content", "product:ly198:content", "product:ly598-keyboard:content", "product:ly598:content", "product:optic-repeater-near:content", "product:optic-repeater-remote:content", "product:receiver-splitter:content", "product:slr1000:content", "product:slr5300:content", "product:x15:content", "product:x5s:content", "product:x6s:content", "product:x7:content", "product:xir-gp328d-plus-ex:content", "product:xir-gp338d-plus-ex:content", "product:xir-p6600i-ex:content", "product:xir-p8668ex:content"]
+        }
+      ]
+    },
+    {
+      "id": "retrieval-v1-002", "source_case_id": "baseline-002", "category": "product_spec", "query": "摩托罗拉 XiR P8668Ex 支持什么频段？", "expected_chunk_ids": ["product:xir-p8668ex:content"], "expected_parent_document_ids": ["product:xir-p8668ex"], "expected_entity_ids": ["product:xir-p8668ex"], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-003", "source_case_id": "baseline-003", "category": "product_spec", "query": "海能达 HP780 的频率范围、输出功率、电池容量和防护等级分别是什么？", "expected_chunk_ids": ["product:hp780:content"], "expected_parent_document_ids": ["product:hp780"], "expected_entity_ids": ["product:hp780"], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-004", "source_case_id": "baseline-004", "category": "product_comparison", "query": "海能达 HP780 和 HP790Ex 在输出功率、电池容量以及防爆信息方面有什么区别？", "expected_chunk_ids": ["product:hp780:content", "product:hp790ex:content"], "expected_parent_document_ids": ["product:hp780", "product:hp790ex"], "expected_entity_ids": ["product:hp780", "product:hp790ex"], "match_requirement": "all", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-005", "source_case_id": "baseline-005", "category": "product_spec", "query": "海能达 HR1060 的输出功率、信道数量和供电规格是什么？", "expected_chunk_ids": ["product:hr1060:content"], "expected_parent_document_ids": ["product:hr1060"], "expected_entity_ids": ["product:hr1060"], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-006", "source_case_id": "baseline-006", "category": "product_spec", "query": "国产 20W 短波电台搭配 3 米鞭天线、15 米斜天线和 44 米双极天线时，网站分别给出了怎样的通信距离？", "expected_chunk_ids": ["product:domestic-20w:content"], "expected_parent_document_ids": ["product:domestic-20w"], "expected_entity_ids": ["product:domestic-20w"], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-007", "source_case_id": "baseline-007", "category": "product_capability", "query": "海能达 PNE380 是什么设备？它的便携性、待机时间和组网能力有哪些公开参数？", "expected_chunk_ids": ["product:pne380:content"], "expected_parent_document_ids": ["product:pne380"], "expected_entity_ids": ["product:pne380"], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-008", "source_case_id": "baseline-008", "category": "solution_knowledge", "query": "酒店无线对讲解决方案如何支持跨部门协作和紧急情况下的优先通信？", "expected_chunk_ids": ["solution:hotel:body:system-functions"], "expected_parent_document_ids": ["solution:hotel"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-009", "source_case_id": "baseline-009", "category": "solution_knowledge", "query": "企事业单位数字常规通信方案如何在不增加频点的情况下扩充容量？网站给出的示例是多少终端？", "expected_chunk_ids": ["solution:enterprise:body:solution"], "expected_parent_document_ids": ["solution:enterprise"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-010", "source_case_id": "baseline-010", "category": "solution_knowledge", "query": "石油石化数字集群方案怎样解决中控室信号盲区、统一调度和电话互联问题？", "expected_chunk_ids": ["solution:petrochemical:body:solution"], "expected_parent_document_ids": ["solution:petrochemical"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-011", "source_case_id": "baseline-011", "category": "solution_knowledge", "query": "人防行业宽带自组网解决方案采用什么网络结构，可以向后方回传哪些现场数据？", "expected_chunk_ids": ["solution:civil-defense:content"], "expected_parent_document_ids": ["solution:civil-defense"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-012", "source_case_id": "baseline-012", "category": "solution_knowledge", "query": "智慧应急解决方案中的业务中台、数据中台和技术中台分别承担什么作用？", "expected_chunk_ids": ["solution:smart-emergency:body:solution-overview"], "expected_parent_document_ids": ["solution:smart-emergency"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-013", "source_case_id": "baseline-013", "category": "support_service", "query": "你们的方案设计服务主要会考虑哪些通信网络因素？", "expected_chunk_ids": ["support:solution-design:content"], "expected_parent_document_ids": ["support:solution-design"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-014", "source_case_id": "baseline-014", "category": "support_service", "query": "项目实施阶段具体包括哪些工作？", "expected_chunk_ids": ["support:project-implementation:content"], "expected_parent_document_ids": ["support:project-implementation"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-015", "source_case_id": "baseline-015", "category": "support_service", "query": "交付培训阶段会交付哪些资料，并培训哪些内容？", "expected_chunk_ids": ["support:delivery-training:content"], "expected_parent_document_ids": ["support:delivery-training"], "expected_entity_ids": [], "match_requirement": "any", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-016", "source_case_id": "baseline-016", "category": "cross_source_synthesis", "query": "宽带自组网应急管理方案和人防行业宽带自组网方案有什么共同点和侧重点差异？", "expected_chunk_ids": ["solution:emergency-mesh:content", "solution:civil-defense:content"], "expected_parent_document_ids": ["solution:emergency-mesh", "solution:civil-defense"], "expected_entity_ids": [], "match_requirement": "all", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-017", "source_case_id": "baseline-017", "category": "grounded_recommendation", "query": "我需要在存在爆炸性气体风险的区域使用对讲机。仅根据网站公开资料，在 HP780 和 HP790Ex 之间应优先进一步确认哪一款，为什么？", "expected_chunk_ids": ["product:hp780:content", "product:hp790ex:content"], "expected_parent_document_ids": ["product:hp780", "product:hp790ex"], "expected_entity_ids": ["product:hp780", "product:hp790ex"], "match_requirement": "all", "relevance_groups": []
+    },
+    {
+      "id": "retrieval-v1-019", "source_case_id": "baseline-019", "category": "uncertainty_boundary", "query": "国产 20W 短波电台配 15 米斜天线，能不能保证在任何地形都通信 200 公里以上？", "expected_chunk_ids": ["product:domestic-20w:content"], "expected_parent_document_ids": ["product:domestic-20w"], "expected_entity_ids": ["product:domestic-20w"], "match_requirement": "any", "relevance_groups": []
+    }
+  ]
+}

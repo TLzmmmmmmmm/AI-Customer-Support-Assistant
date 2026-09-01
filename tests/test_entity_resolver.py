@@ -84,6 +84,31 @@ class EntityResolverTests(unittest.TestCase):
             ["product:ap"],
         )
 
+    def test_ascii_model_alias_can_touch_chinese_grammar(self):
+        self.assertEqual(
+            [
+                match.parent_document_id
+                for match in self.resolver.resolve("HP780的频率范围")
+            ],
+            ["product:hp780"],
+        )
+
+    def test_chinese_product_heading_can_be_followed_without_space(self):
+        resolver = ExactEntityResolver.from_records([
+            product_record(
+                "domestic-20w",
+                heading="国产 20W 短波电台",
+            )
+        ])
+
+        self.assertEqual(
+            [
+                match.parent_document_id
+                for match in resolver.resolve("国产 20W 短波电台搭配什么天线？")
+            ],
+            ["product:domestic-20w"],
+        )
+
     def test_duplicate_aliases_for_same_parent_are_deduplicated(self):
         duplicate = product_record(
             "hp780",

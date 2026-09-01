@@ -22,10 +22,10 @@ def _has_alphanumeric_boundaries(text: str, start: int, length: int) -> bool:
     before = text[start - 1] if start > 0 else None
     end = start + length
     after = text[end] if end < len(text) else None
-    return not (
-        (before is not None and before.isalnum())
-        or (after is not None and after.isalnum())
-    )
+    def is_model_character(value: str | None) -> bool:
+        return value is not None and value.isascii() and value.isalnum()
+
+    return not (is_model_character(before) or is_model_character(after))
 
 
 class ExactEntityResolver:

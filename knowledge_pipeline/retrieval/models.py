@@ -212,6 +212,118 @@ class RetrievalResult(StrictModel):
         return value
 
 
+class RelevanceGroup(StrictModel):
+    id: str = Field(min_length=1)
+    acceptable_chunk_ids: list[str] = Field(min_length=1)
+
+    @field_validator("acceptable_chunk_ids")
+    @classmethod
+    def validate_chunk_ids(cls, value: list[str]) -> list[str]:
+        if value != sorted(set(value)):
+            raise ValueError("acceptable_chunk_ids must be sorted and unique")
+        return value
+
+
+class RetrievalEvaluationCase(StrictModel):
+    id: str = Field(min_length=1)
+    source_case_id: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    query: str = Field(min_length=1)
+    expected_chunk_ids: list[str] = Field(min_length=1)
+    expected_parent_document_ids: list[str] = Field(min_length=1)
+    expected_entity_ids: list[str]
+    match_requirement: Literal["any", "all", "all_groups"]
+    relevance_groups: list[RelevanceGroup]
+
+    @field_validator(
+        "expected_chunk_ids",
+        "expected_parent_document_ids",
+        "expected_entity_ids",
+    )
+    @classmethod
+    def validate_unique_references(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("expected references must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_match_requirement(self) -> "RetrievalEvaluationCase":
+        if self.match_requirement == "all_groups":
+            if not self.relevance_groups:
+                raise ValueError("all_groups requires relevance_groups")
+            grouped = {
+                chunk_id
+                for group in self.relevance_groups
+                for chunk_id in group.acceptable_chunk_ids
+            }
+            if grouped != set(self.expected_chunk_ids):
+                raise ValueError(
+                    "relevance groups must exactly cover expected_chunk_ids"
+                )
+        elif self.relevance_groups:
+            raise ValueError(
+                "relevance_groups are only valid with all_groups"
+            )
+        return self
+
+
+class RetrievalEvaluationSuite(StrictModel):
+    schema_version: Literal["1.0"]
+    suite_id: str = Field(min_length=1)
+    chunk_snapshot_sha256: str = Field(min_length=1)
+    default_top_k: int = Field(gt=0)
+    cases: list[RetrievalEvaluationCase] = Field(min_length=1)
+
+    @field_validator("chunk_snapshot_sha256")
+    @classmethod
+    def validate_snapshot_hash(cls, value: str) -> str:
+        if not SHA256_HEX.fullmatch(value):
+            raise ValueError("must be a lowercase SHA-256 hex digest")
+        return value
+
+    @model_validator(mode="after")
+    def validate_case_ids(self) -> "RetrievalEvaluationSuite":
+        ids = [case.id for case in self.cases]
+        source_ids = [case.source_case_id for case in self.cases]
+        if len(ids) != len(set(ids)):
+            raise ValueError("evaluation case ids must be unique")
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("evaluation source_case_ids must be unique")
+        return self
+
+
+class RetrievalMetrics(StrictModel):
+    total_cases: int = Field(gt=0)
+    hit_at_1: float = Field(ge=0.0, le=1.0)
+    hit_at_3: float = Field(ge=0.0, le=1.0)
+    hit_at_5: float = Field(ge=0.0, le=1.0)
+    mean_reciprocal_rank: float = Field(ge=0.0, le=1.0)
+    expected_chunk_recall_at_5: float = Field(ge=0.0, le=1.0)
+    expected_parent_recall_at_5: float = Field(ge=0.0, le=1.0)
+    entity_accuracy: float = Field(ge=0.0, le=1.0)
+    complete_multi_source_recall: float = Field(ge=0.0, le=1.0)
+
+
+class RetrievalFailure(StrictModel):
+    case_id: str = Field(min_length=1)
+    source_case_id: str = Field(min_length=1)
+    kind: Literal[
+        "missing_top_k",
+        "incomplete_multi_source",
+        "missed_entity",
+        "late_rank",
+    ]
+    message: str = Field(min_length=1)
+
+
+class RetrievalEvaluationResult(StrictModel):
+    schema_version: Literal["1.0"]
+    suite_id: str = Field(min_length=1)
+    top_k: int = Field(gt=0)
+    metrics: RetrievalMetrics
+    failures: list[RetrievalFailure]
+
+
 __all__ = [
     "EmbeddingAPIError",
     "EmbeddingBatch",
@@ -220,7 +332,13 @@ __all__ = [
     "EntityMatch",
     "RetrievalError",
     "RetrievalEvaluationError",
+    "RetrievalEvaluationCase",
+    "RetrievalEvaluationResult",
+    "RetrievalEvaluationSuite",
+    "RetrievalFailure",
+    "RetrievalMetrics",
     "RetrievalResult",
+    "RelevanceGroup",
     "SearchHit",
     "VectorBuildPlan",
     "VectorBuildStats",
