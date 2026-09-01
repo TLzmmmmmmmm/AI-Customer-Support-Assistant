@@ -216,9 +216,14 @@ Changing the model, provider, or dimension invalidates all vectors. Changing
 chunk order does not. Deleted chunk IDs are removed, new IDs are embedded,
 and a stable ID with a new content hash is re-embedded.
 
+When `chunk_id`, `content_hash`, and embedding configuration still match but a
+non-embedded copied field such as provenance changes, the build reuses the
+vector and refreshes the record from the current Day 3 chunk. Runtime loading
+still rejects such a stale artifact until the explicit build refreshes it.
+
 ### 6.2 Validation
 
-Build and load validation requires:
+Output and runtime-load validation requires:
 
 - unique chunk IDs;
 - a one-to-one set match between current chunks and vector records;
@@ -341,6 +346,13 @@ Each evaluation case records:
 - expected chunk IDs;
 - expected entity IDs where applicable;
 - whether all or any expected items are required.
+
+The product-category overview case is represented by four explicit relevance
+groups, one per category, because Day 3 preserves category identity in product
+chunk metadata but has no dedicated category chunk. Each group contains the
+sorted acceptable chunk IDs for that category; evaluation requires at least
+one retrieved chunk from every group instead of choosing arbitrary
+representative products.
 
 The evaluator calls the production retriever with K=5 and reports:
 
