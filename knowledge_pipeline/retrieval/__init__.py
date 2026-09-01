@@ -1,3 +1,5 @@
+"""Stable public surface for Day 4 embedding and semantic retrieval."""
+
 from .config import DashScopeCredentials, EmbeddingConfig, RetrievalConfig
 from .embedding import DashScopeEmbeddingProvider, EmbeddingProvider
 from .entities import ExactEntityResolver
