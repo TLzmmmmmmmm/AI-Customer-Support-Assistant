@@ -1,7 +1,11 @@
 import json
+import io
+import os
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from knowledge_pipeline.chunking import compute_chunk_content_hash
 from knowledge_pipeline.models import KnowledgeChunk
@@ -292,6 +296,78 @@ class VectorRecordPersistenceTests(unittest.TestCase):
 
             with self.assertRaises(VectorRecordValidationError):
                 write_vector_records(output, [record, record])
+
+
+class BuildEmbeddingsCliTests(unittest.TestCase):
+    def _write_chunks(self, path: Path) -> None:
+        chunk = make_chunk()
+        path.write_text(
+            json.dumps(chunk.model_dump(mode="json"), ensure_ascii=False) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+    def _run(self, argv, provider=None):
+        from scripts import build_embeddings
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        environment = {
+            "EMBEDDING_DIMENSIONS": "3",
+            "DASHSCOPE_API_KEY": "test-key",
+            "DASHSCOPE_WORKSPACE_ID": "test-workspace",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            with patch.object(
+                build_embeddings,
+                "create_embedding_provider",
+                return_value=provider,
+            ) as factory:
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = build_embeddings.main(argv)
+        return code, stdout.getvalue(), stderr.getvalue(), factory
+
+    def test_build_cli_defaults_to_plan_only_without_provider(self):
+        with tempfile.TemporaryDirectory() as directory:
+            chunks = Path(directory) / "chunks.jsonl"
+            output = Path(directory) / "vectors.jsonl"
+            self._write_chunks(chunks)
+
+            code, stdout, stderr, factory = self._run([
+                "--chunks", str(chunks),
+                "--output", str(output),
+            ])
+            exists_during_context = output.exists()
+
+        self.assertEqual(code, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("Mode: plan only", stdout)
+        self.assertIn("To embed: 1", stdout)
+        self.assertIn("Estimated cost (CNY):", stdout)
+        factory.assert_not_called()
+        self.assertFalse(exists_during_context)
+
+    def test_build_cli_execute_calls_provider_and_writes_output(self):
+        provider = FakeProvider(embedding_config())
+        with tempfile.TemporaryDirectory() as directory:
+            chunks = Path(directory) / "chunks.jsonl"
+            output = Path(directory) / "vectors.jsonl"
+            self._write_chunks(chunks)
+
+            code, stdout, stderr, factory = self._run([
+                "--chunks", str(chunks),
+                "--output", str(output),
+                "--execute",
+            ], provider=provider)
+            exists_during_context = output.is_file()
+
+        self.assertEqual(code, 0)
+        self.assertEqual(stderr, "")
+        self.assertTrue(exists_during_context)
+        self.assertIn("Mode: execute", stdout)
+        self.assertIn("Actual input tokens: 10", stdout)
+        self.assertEqual(len(provider.document_calls), 1)
+        factory.assert_called_once()
 
 
 if __name__ == "__main__":
