@@ -22,6 +22,10 @@ dist/
 .coverage
 htmlcov/
 
+# Local retrieval artifacts
+knowledge/vector_records.jsonl
+knowledge/.vector_records.jsonl.*.tmp
+
 # Editor and operating-system files
 .vscode/
 .idea/
