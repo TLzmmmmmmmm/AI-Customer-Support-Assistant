@@ -299,6 +299,17 @@ def _join_context(*parts: str) -> str:
 
 _LIST_ITEM = re.compile(r"^(?:[-+*]|\d+[.)])\s+")
 _MARKDOWN_SUBHEADING = re.compile(r"^(#{3,6}) .+$")
+_FENCED_CODE_OPEN = re.compile(
+    r"^(?:(?P<backtick>`{3,})[^`]*|(?P<tilde>~{3,}).*)$"
+)
+
+
+def _fenced_code_end(line: str, opening_fence: str) -> bool:
+    marker = re.escape(opening_fence[0])
+    return bool(re.fullmatch(
+        rf" {{0,3}}{marker}{{{len(opening_fence)},}}[ \t]*",
+        line,
+    ))
 
 
 def _natural_units(text: str) -> list[str]:
@@ -314,6 +325,21 @@ def _natural_units(text: str) -> list[str]:
             index += 1
             continue
 
+        fence_match = _FENCED_CODE_OPEN.fullmatch(lines[index])
+        if fence_match:
+            opening_fence = (
+                fence_match.group("backtick") or fence_match.group("tilde")
+            )
+            fenced_lines = [lines[index]]
+            index += 1
+            while index < len(lines):
+                fenced_lines.append(lines[index])
+                index += 1
+                if _fenced_code_end(fenced_lines[-1], opening_fence):
+                    break
+            units.append("\n".join(fenced_lines))
+            continue
+
         if _MARKDOWN_SUBHEADING.fullmatch(lines[index]):
             units.append(lines[index])
             index += 1
@@ -324,6 +350,11 @@ def _natural_units(text: str) -> list[str]:
             index += 1
             while index < len(lines):
                 if _LIST_ITEM.match(lines[index]):
+                    break
+                if (
+                    _MARKDOWN_SUBHEADING.fullmatch(lines[index])
+                    or _FENCED_CODE_OPEN.fullmatch(lines[index])
+                ):
                     break
                 if lines[index].strip():
                     item_lines.append(lines[index])
@@ -351,6 +382,7 @@ def _natural_units(text: str) -> list[str]:
             and lines[index].strip()
             and not _LIST_ITEM.match(lines[index])
             and not _MARKDOWN_SUBHEADING.fullmatch(lines[index])
+            and not _FENCED_CODE_OPEN.fullmatch(lines[index])
         ):
             paragraph.append(lines[index])
             index += 1

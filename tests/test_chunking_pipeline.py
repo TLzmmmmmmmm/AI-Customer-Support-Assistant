@@ -16,7 +16,9 @@ from knowledge_pipeline.chunking import (
     SOLUTION_BODY_SECTION_SLUGS,
     ChunkCandidate,
     SemanticUnit,
+    _natural_units,
     _parse_markdown,
+    _semantic_blocks,
     _split_h3,
     _validate_coverage,
     build_and_write_chunks,
@@ -710,6 +712,220 @@ class OtherTypeChunkingTests(unittest.TestCase):
 
 
 class NaturalSplitAndCoverageTests(unittest.TestCase):
+
+    def test_only_unindented_nested_heading_terminates_list_item(self):
+        text = (
+            "- previous fact\n"
+            "  ### indented continuation\n"
+            "  continuation fact\n"
+            "### document heading\n"
+            "heading fact"
+        )
+
+        self.assertEqual(
+            _natural_units(text),
+            [
+                (
+                    "- previous fact\n"
+                    "  ### indented continuation\n"
+                    "  continuation fact"
+                ),
+                "### document heading",
+                "heading fact",
+            ],
+        )
+
+    def test_fenced_code_heading_does_not_terminate_or_reset_hierarchy(self):
+        text = (
+            "### active heading\n\n"
+            "- previous fact\n"
+            "```md\n"
+            "### code sample heading\n"
+            "```\n"
+            "fact after fence"
+        )
+
+        blocks = _semantic_blocks(
+            text,
+            key_prefix="fenced",
+            ancestor_headings=("## parent",),
+        )
+
+        self.assertEqual(
+            [(block.unit.text, block.ancestor_headings) for block in blocks],
+            [
+                ("- previous fact", ("## parent", "### active heading")),
+                (
+                    "```md\n### code sample heading\n```",
+                    ("## parent", "### active heading"),
+                ),
+                ("fact after fence", ("## parent", "### active heading")),
+            ],
+        )
+
+    def test_fenced_code_interrupts_paragraph_without_blank_line(self):
+        text = (
+            "### active heading\n\n"
+            "intro\n"
+            "~~~md\n"
+            "### code sample heading\n"
+            "~~~\n"
+            "fact after fence"
+        )
+
+        blocks = _semantic_blocks(
+            text,
+            key_prefix="paragraph-fence",
+            ancestor_headings=("## parent",),
+        )
+
+        self.assertEqual(
+            [(block.unit.text, block.ancestor_headings) for block in blocks],
+            [
+                ("intro", ("## parent", "### active heading")),
+                (
+                    "~~~md\n### code sample heading\n~~~",
+                    ("## parent", "### active heading"),
+                ),
+                ("fact after fence", ("## parent", "### active heading")),
+            ],
+        )
+
+    def test_closing_fence_allows_up_to_three_leading_spaces(self):
+        for indentation in (0, 1, 2, 3):
+            with self.subTest(indentation=indentation):
+                closing_fence = " " * indentation + "~~~"
+                text = (
+                    "~~~md\n"
+                    "code fact\n"
+                    f"{closing_fence}\n"
+                    "### real heading\n"
+                    "real fact"
+                )
+
+                blocks = _semantic_blocks(
+                    text,
+                    key_prefix=f"closing-{indentation}",
+                    ancestor_headings=("## parent",),
+                )
+
+                self.assertEqual(
+                    [(block.unit.text, block.ancestor_headings) for block in blocks],
+                    [
+                        (
+                            f"~~~md\ncode fact\n{closing_fence}",
+                            ("## parent",),
+                        ),
+                        ("real fact", ("## parent", "### real heading")),
+                    ],
+                )
+
+    def test_four_space_closing_fence_remains_code_content(self):
+        text = (
+            "~~~md\n"
+            "code fact\n"
+            "    ~~~\n"
+            "### code sample heading\n"
+            "~~~\n"
+            "### real heading\n"
+            "real fact"
+        )
+
+        blocks = _semantic_blocks(
+            text,
+            key_prefix="four-space-closing",
+            ancestor_headings=("## parent",),
+        )
+
+        self.assertEqual(
+            [(block.unit.text, block.ancestor_headings) for block in blocks],
+            [
+                (
+                    "~~~md\ncode fact\n    ~~~\n### code sample heading\n~~~",
+                    ("## parent",),
+                ),
+                ("real fact", ("## parent", "### real heading")),
+            ],
+        )
+
+    def test_backtick_in_backtick_fence_info_is_not_an_opener(self):
+        text = (
+            "### active heading\n\n"
+            "```lang`invalid\n"
+            "### real heading\n"
+            "real fact"
+        )
+
+        blocks = _semantic_blocks(
+            text,
+            key_prefix="invalid-backtick-info",
+            ancestor_headings=("## parent",),
+        )
+
+        self.assertEqual(
+            [(block.unit.text, block.ancestor_headings) for block in blocks],
+            [
+                (
+                    "```lang`invalid",
+                    ("## parent", "### active heading"),
+                ),
+                ("real fact", ("## parent", "### real heading")),
+            ],
+        )
+
+    def test_backtick_in_tilde_fence_info_remains_valid(self):
+        text = (
+            "~~~lang`valid\n"
+            "### code sample heading\n"
+            "~~~\n"
+            "### real heading\n"
+            "real fact"
+        )
+
+        blocks = _semantic_blocks(
+            text,
+            key_prefix="valid-tilde-info",
+            ancestor_headings=("## parent",),
+        )
+
+        self.assertEqual(
+            [(block.unit.text, block.ancestor_headings) for block in blocks],
+            [
+                (
+                    "~~~lang`valid\n### code sample heading\n~~~",
+                    ("## parent",),
+                ),
+                ("real fact", ("## parent", "### real heading")),
+            ],
+        )
+
+    def test_same_level_heading_resets_deeper_heading_ancestry(self):
+        text = (
+            "### first heading\n\n"
+            "first fact\n\n"
+            "#### nested heading\n\n"
+            "nested fact\n\n"
+            "### second heading\n\n"
+            "second fact"
+        )
+
+        blocks = _semantic_blocks(
+            text,
+            key_prefix="hierarchy",
+            ancestor_headings=("## parent",),
+        )
+
+        self.assertEqual(
+            [(block.unit.text, block.ancestor_headings) for block in blocks],
+            [
+                ("first fact", ("## parent", "### first heading")),
+                (
+                    "nested fact",
+                    ("## parent", "### first heading", "#### nested heading"),
+                ),
+                ("second fact", ("## parent", "### second heading")),
+            ],
+        )
 
     def test_nested_h3_ancestry_repeats_across_splits_without_repeating_facts(self):
         facts = (
