@@ -40,9 +40,16 @@ def retrieval_result() -> RetrievalResult:
 
 
 class FakeRetriever:
-    def __init__(self, *, events: list[str], error: Exception | None = None):
+    def __init__(
+        self,
+        *,
+        events: list[str],
+        error: Exception | None = None,
+        results: list[RetrievalResult] | None = None,
+    ):
         self.events = events
         self.error = error
+        self.results = results if results is not None else [retrieval_result()]
         self.queries: list[str] = []
 
     def retrieve(self, query: str):
@@ -50,7 +57,7 @@ class FakeRetriever:
         self.queries.append(query)
         if self.error is not None:
             raise self.error
-        return [retrieval_result()]
+        return self.results
 
 
 async def consume_response(response) -> str:
@@ -82,8 +89,15 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
 
     def test_retrieves_latest_question_and_preserves_ndjson_stream(self):
         events: list[str] = []
-        retriever = FakeRetriever(events=events)
+        result = retrieval_result()
+        retriever = FakeRetriever(events=events, results=[result])
         captured_messages: list[dict[str, str]] = []
+        captured_results: list[RetrievalResult] = []
+        real_context_builder = chat.build_retrieved_context
+
+        def capture_context(results):
+            captured_results.extend(results)
+            return real_context_builder(results)
 
         def acquire() -> bool:
             events.append("acquire")
@@ -101,7 +115,12 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
             patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
             patch.object(chat, "open_chat_stream", side_effect=open_stream),
             patch.object(chat, "release_llm_slot", side_effect=release),
-            patch.object(chat, "log_request"),
+            patch.object(
+                chat,
+                "build_retrieved_context",
+                side_effect=capture_context,
+            ),
+            patch.object(chat, "log_request") as logged,
         ):
             try:
                 response = chat.chat_stream(
@@ -119,6 +138,27 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
             ["它的防护等级是什么？"],
         )
         self.assertEqual(events, ["acquire", "retrieve", "open", "release"])
+        self.assertEqual(len(captured_results), 1)
+        self.assertIs(captured_results[0], result)
+        self.assertEqual(captured_results[0].rank, 1)
+        self.assertEqual(captured_results[0].score, -0.25)
+        self.assertEqual(captured_results[0].match_origin, "exact_entity")
+        self.assertEqual(captured_results[0].matched_entity_ids, ["product:hp780"])
+        self.assertEqual(captured_results[0].chunk_id, "product:hp780:specifications")
+        self.assertEqual(captured_results[0].parent_document_id, "product:hp780")
+        self.assertEqual(captured_results[0].content_hash, "a" * 64)
+        self.assertEqual(captured_results[0].metadata.product_id, "hp780")
+        self.assertEqual(captured_results[0].source_url, "https://example.com/hp780/")
+        self.assertEqual(
+            captured_results[0].source_files,
+            ["src/content/products/hp780.json"],
+        )
+        logged.assert_called_once_with(
+            request_id="request-1",
+            http_status=200,
+            outcome="success",
+            started_at=1.0,
+        )
         self.assertEqual(response.media_type, "application/x-ndjson")
         self.assertEqual(
             [json.loads(line) for line in body.splitlines()],
