@@ -121,6 +121,7 @@ def _to_result(
         "matched_entity_ids": matched_entity_ids,
         "chunk_id": record.chunk_id,
         "parent_document_id": record.parent_document_id,
+        "type": record.type,
         "section": record.section,
         "text": record.text,
         "content_hash": record.content_hash,

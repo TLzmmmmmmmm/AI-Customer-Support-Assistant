@@ -9,7 +9,7 @@ from knowledge_pipeline.retrieval.config import (
     EmbeddingConfigurationError,
     RetrievalConfig,
 )
-from knowledge_pipeline.retrieval.models import VectorRecord
+from knowledge_pipeline.retrieval.models import RetrievalResult, VectorRecord
 
 
 def record_payload() -> dict:
@@ -38,6 +38,27 @@ def record_payload() -> dict:
         "embedding_text_type": "document",
         "embedding": [1.0, 0.0, 0.0],
     }
+
+
+def retrieval_result_payload() -> dict:
+    payload = record_payload()
+    for field in (
+        "schema_version",
+        "language",
+        "embedding_provider",
+        "embedding_model",
+        "embedding_dimensions",
+        "embedding_text_type",
+        "embedding",
+    ):
+        payload.pop(field)
+    payload.update({
+        "rank": 1,
+        "score": 0.95,
+        "match_origin": "exact_entity",
+        "matched_entity_ids": ["product:hp780"],
+    })
+    return payload
 
 
 class RetrievalConfigurationTests(unittest.TestCase):
@@ -94,6 +115,18 @@ class RetrievalConfigurationTests(unittest.TestCase):
         self.assertEqual(RetrievalConfig.from_mapping({}).top_k, 5)
         with self.assertRaises(EmbeddingConfigurationError):
             RetrievalConfig.from_mapping({"RETRIEVAL_TOP_K": "0"})
+
+
+class RetrievalResultTests(unittest.TestCase):
+    def test_retrieval_result_requires_explicit_knowledge_type(self):
+        payload = retrieval_result_payload()
+        result = RetrievalResult.model_validate(payload)
+
+        self.assertEqual(result.type, "product")
+
+        payload.pop("type")
+        with self.assertRaises(ValidationError):
+            RetrievalResult.model_validate(payload)
 
 
 class VectorRecordTests(unittest.TestCase):

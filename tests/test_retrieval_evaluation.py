@@ -72,6 +72,7 @@ def result(source: KnowledgeChunk, rank: int, *, entity: bool = False):
         ),
         "chunk_id": source.chunk_id,
         "parent_document_id": source.parent_document_id,
+        "type": source.type,
         "section": source.section,
         "text": source.text,
         "content_hash": source.content_hash,

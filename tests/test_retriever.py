@@ -132,6 +132,7 @@ class RetrieverTests(unittest.TestCase):
         )
 
         self.assertEqual(result.matched_entity_ids, ["product:hp790ex"])
+        self.assertEqual(result.model_dump(mode="json").get("type"), source.type)
         self.assertEqual(result.section, source.section)
         self.assertEqual(result.text, source.text)
         self.assertEqual(result.metadata, source.metadata)
@@ -277,6 +278,9 @@ class RetrieveCliTests(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "")
         self.assertEqual(provider.query_calls, ["HP780 参数"])
         self.assertEqual(payload[0]["chunk_id"], "product:hp780:content")
+        self.assertEqual(payload[0]["type"], "product")
+        self.assertEqual(payload[0]["parent_document_id"], "product:hp780")
+        self.assertEqual(payload[0]["source_url"], "https://example.com/hp780/")
         self.assertNotIn("answer", payload[0])
 
 

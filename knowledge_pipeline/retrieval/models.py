@@ -194,6 +194,9 @@ class RetrievalResult(StrictModel):
     matched_entity_ids: list[str]
     chunk_id: str = Field(min_length=1)
     parent_document_id: str = Field(min_length=1)
+    type: Literal[
+        "catalog", "product", "solution", "support", "company", "contact"
+    ]
     section: str = Field(min_length=1)
     text: str = Field(min_length=1)
     content_hash: str = Field(min_length=1)
