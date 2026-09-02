@@ -4,6 +4,7 @@ from collections.abc import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from knowledge_pipeline.retrieval import Retriever
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -11,6 +12,8 @@ from openai import (
 )
 from rate_limit import enforce_rate_limit
 from models import ChatRequest
+from prompts import build_rag_messages
+from rag_context import build_retrieved_context
 from services.llm import (
     iter_chat_content,
     open_chat_stream,
@@ -22,6 +25,11 @@ from concurrency import (
 from app_logging import log_request
 
 router = APIRouter()
+
+
+def get_retriever(request: Request) -> Retriever:
+    return request.app.state.retriever
+
 
 def encode_event(event: dict[str, object]) -> str:
     return json.dumps(
@@ -113,6 +121,7 @@ def chat_stream(
     payload: ChatRequest,
     request: Request,
     _: None = Depends(enforce_rate_limit),
+    retriever: Retriever = Depends(get_retriever),
 ):
     started_at = request.state.started_at
     request_id = request.state.request_id
@@ -127,7 +136,13 @@ def chat_stream(
         )
     
     try:
-        stream = open_chat_stream(payload.messages)
+        results = retriever.retrieve(payload.messages[-1].content)
+        retrieved_context = build_retrieved_context(results)
+        provider_messages = build_rag_messages(
+            payload.messages,
+            retrieved_context,
+        )
+        stream = open_chat_stream(provider_messages)
 
     except APITimeoutError as error:
         release_llm_slot()
@@ -164,6 +179,10 @@ def chat_stream(
                 "internal_error": type(error).__name__,
             },
         )
+
+    except Exception:
+        release_llm_slot()
+        raise
 
     return StreamingResponse(
         stream_events_with_slot(

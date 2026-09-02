@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 
 from openai import (
     APIConnectionError,
@@ -17,10 +17,6 @@ from config import (
     LLM_APP_MAX_RETRIES,
     LLM_RETRY_DELAY_SECONDS,
 )
-from models import ChatMessage
-from prompts import SYSTEM_PROMPT
-
-
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
     base_url=DEEPSEEK_BASE_URL,
@@ -31,14 +27,15 @@ client = OpenAI(
 def is_retryable_status(error: APIStatusError) -> bool:
     return error.status_code == 429 or error.status_code >= 500
 
-def open_chat_stream(messages: list[ChatMessage]):
-    conversation = [
-        {
-            "role": message.role,
-            "content": message.content,
-        }
-        for message in messages
-    ]
+
+def _copy_messages(
+    messages: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    return [dict(message) for message in messages]
+
+
+def open_chat_stream(messages: Sequence[Mapping[str, str]]):
+    provider_messages = _copy_messages(messages)
 
     attempt = 0
 
@@ -46,13 +43,7 @@ def open_chat_stream(messages: list[ChatMessage]):
         try:
             return client.chat.completions.create(
                 model=DEEPSEEK_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": SYSTEM_PROMPT,
-                    },
-                    *conversation,
-                ],
+                messages=provider_messages,
                 stream=True,
                 extra_body={
                     "thinking": {
@@ -88,14 +79,10 @@ def iter_chat_content(stream) -> Iterator[str]:
         if content:
             yield content
 
-def stream_chat(messages: list[ChatMessage]) -> Iterator[str]:
-    conversation = [
-        {
-            "role": message.role,
-            "content": message.content,
-        }
-        for message in messages
-    ]
+def stream_chat(
+    messages: Sequence[Mapping[str, str]],
+) -> Iterator[str]:
+    provider_messages = _copy_messages(messages)
 
     attempt = 0
 
@@ -105,13 +92,7 @@ def stream_chat(messages: list[ChatMessage]) -> Iterator[str]:
         try:
             stream = client.chat.completions.create(
                 model=DEEPSEEK_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": SYSTEM_PROMPT,
-                    },
-                    *conversation,
-                ],
+                messages=provider_messages,
                 stream=True,
                 extra_body={
                     "thinking": {

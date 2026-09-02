@@ -1,5 +1,7 @@
 import uuid
 import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -11,8 +13,19 @@ from error_handling import (
     unhandled_exception_handler,
     validation_exception_handler,
 )
+from services.retrieval import build_retriever
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.retriever = build_retriever()
+    try:
+        yield
+    finally:
+        del app.state.retriever
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_exception_handler(
     RequestValidationError,
