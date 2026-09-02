@@ -4,7 +4,14 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from knowledge_pipeline.retrieval.models import RetrievalResult
+from fastapi import HTTPException
+from knowledge_pipeline.retrieval.models import (
+    EmbeddingAPIError,
+    EntityCatalogError,
+    RetrievalError,
+    RetrievalResult,
+    VectorIndexNotReadyError,
+)
 from models import ChatMessage, ChatRequest
 from routes import chat
 
@@ -12,7 +19,7 @@ from routes import chat
 def retrieval_result() -> RetrievalResult:
     return RetrievalResult.model_validate({
         "rank": 1,
-        "score": 0.97,
+        "score": -0.25,
         "match_origin": "exact_entity",
         "matched_entity_ids": ["product:hp780"],
         "chunk_id": "product:hp780:specifications",
@@ -172,6 +179,58 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
         self.assertEqual(events, ["acquire", "retrieve", "release"])
         released.assert_called_once_with()
         open_stream.assert_not_called()
+
+    def test_known_retrieval_failures_return_503_without_generation(self):
+        for retrieval_error in (
+            EmbeddingAPIError("provider failed"),
+            VectorIndexNotReadyError("index failed"),
+            EntityCatalogError("entity resolver failed"),
+        ):
+            with self.subTest(error_type=type(retrieval_error).__name__):
+                events: list[str] = []
+                retriever = FakeRetriever(events=events, error=retrieval_error)
+
+                def acquire() -> bool:
+                    events.append("acquire")
+                    return True
+
+                def release() -> None:
+                    events.append("release")
+
+                with (
+                    patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
+                    patch.object(
+                        chat,
+                        "release_llm_slot",
+                        side_effect=release,
+                    ) as released,
+                    patch.object(chat, "open_chat_stream") as open_stream,
+                ):
+                    try:
+                        with self.assertRaises(HTTPException) as caught:
+                            chat.chat_stream(
+                                self.payload,
+                                self.request,
+                                None,
+                                retriever,
+                            )
+                    except RetrievalError:
+                        self.fail(
+                            "known retrieval failure was not mapped to HTTP 503"
+                        )
+
+                self.assertEqual(caught.exception.status_code, 503)
+                self.assertEqual(
+                    caught.exception.detail,
+                    {
+                        "code": "retrieval_unavailable",
+                        "message": "服务暂时不可用，请稍后再试。",
+                        "internal_error": type(retrieval_error).__name__,
+                    },
+                )
+                self.assertEqual(events, ["acquire", "retrieve", "release"])
+                released.assert_called_once_with()
+                open_stream.assert_not_called()
 
 
 if __name__ == "__main__":

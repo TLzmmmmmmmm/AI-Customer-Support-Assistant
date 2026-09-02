@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from knowledge_pipeline.retrieval import Retriever
+from knowledge_pipeline.retrieval import RetrievalError, Retriever
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -143,6 +143,18 @@ def chat_stream(
             retrieved_context,
         )
         stream = open_chat_stream(provider_messages)
+
+    except RetrievalError as error:
+        release_llm_slot()
+
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "retrieval_unavailable",
+                "message": "服务暂时不可用，请稍后再试。",
+                "internal_error": type(error).__name__,
+            },
+        )
 
     except APITimeoutError as error:
         release_llm_slot()
