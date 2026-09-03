@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 import config
 import main
+import prompts
 from knowledge_pipeline.retrieval import DashScopeEmbeddingProvider, EmbeddingConfig, RetrievalConfig
 from knowledge_pipeline.retrieval.models import RetrievalResult
 from services import llm
@@ -63,7 +64,11 @@ def synthetic_hit():
     })
 
 
-def run(execute=False):
+def run(execute=False, *, audit=AUDIT, cases=CASES):
+    # Keep each isolated process below the existing ten-requests/minute limit.
+    if not 1 <= len(cases) <= 8:
+        raise ValueError("evaluation batches must contain 1 to 8 cases")
+    embedding_allowance = sum(case_id != "injection" for case_id, _ in cases)
     embedding = EmbeddingConfig.from_mapping(os.environ)
     retrieval = RetrievalConfig.from_mapping(os.environ)
     if not (
@@ -80,7 +85,7 @@ def run(execute=False):
         "embedding_model": embedding.model, "dimensions": embedding.dimensions,
         "embedding_max_retries": embedding.max_retries, "top_k": retrieval.top_k,
         "generation_model": config.DEEPSEEK_MODEL, "max_output_tokens": 1024,
-        "approved_budget_yuan": 1, "case_count": len(CASES),
+        "case_count": len(cases),
     }), flush=True)
     if not execute:
         return
@@ -91,7 +96,7 @@ def run(execute=False):
     real_embed = DashScopeEmbeddingProvider.embed_query
 
     def observe_embedding(provider, query):
-        if totals["embedding_queries"] >= 3 or len(query.encode("utf-8")) > 500:
+        if totals["embedding_queries"] >= embedding_allowance or len(query.encode("utf-8")) > 500:
             raise RuntimeError("embedding allowance exceeded")
         totals["embedding_queries"] += 1
         batch = real_embed(provider, query)
@@ -100,7 +105,7 @@ def run(execute=False):
 
     def bounded_create(**kwargs):
         size = sum(len(message["content"].encode("utf-8")) for message in kwargs["messages"])
-        if size + 512 > 25000 or totals["generation_attempts"] >= 8:
+        if size + 512 > 30000 or totals["generation_attempts"] >= 2 * len(cases):
             raise RuntimeError("generation allowance exceeded")
         active["prompt_utf8_bytes"] = size
         totals["generation_attempts"] += 1
@@ -122,14 +127,21 @@ def run(execute=False):
 
         return observed_stream()
 
-    with AUDIT.open("x", encoding="utf-8", newline="\n") as output:
+    with audit.open("x", encoding="utf-8", newline="\n") as output:
         def emit(row):
             serialized = json.dumps(row, ensure_ascii=False)
             output.write(serialized + "\n")
             output.flush()
-            print(serialized, flush=True)
+            # Full evidence stays in the evaluation audit, not terminal logs.
+            print(json.dumps({key: row[key] for key in (
+                "event", "case_id", "status", "transport_ok", "error_type",
+                "generation_attempts", "embedding_queries", "artifacts_unchanged",
+            ) if key in row}), flush=True)
 
-        emit({"event": "start", "utc": datetime.now(timezone.utc).isoformat(), "artifacts_before": before})
+        emit({"event": "start", "utc": datetime.now(timezone.utc).isoformat(),
+              "system_prompt_sha256": hashlib.sha256(prompts.SYSTEM_PROMPT.encode()).hexdigest(),
+              "embedding_model": embedding.model, "generation_model": config.DEEPSEEK_MODEL,
+              "max_output_tokens": 1024, "artifacts_before": before})
         try:
             with ExitStack() as stack:
                 stack.enter_context(patch.object(DashScopeEmbeddingProvider, "embed_query", observe_embedding))
@@ -144,7 +156,7 @@ def run(execute=False):
                     return hits
 
                 stack.enter_context(patch.object(retriever, "retrieve", side_effect=observed_retrieve))
-                for case_id, query in CASES:
+                for case_id, query in cases:
                     active = {"event": "case", "case_id": case_id, "query": query}
                     started = time.monotonic()
                     response = client.post("/api/chat-stream", json={"messages": [{"role": "user", "content": query}]})
