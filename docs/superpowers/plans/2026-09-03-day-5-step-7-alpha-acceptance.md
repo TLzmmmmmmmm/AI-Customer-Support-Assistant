@@ -6,7 +6,7 @@
 
 **Architecture:** Exercise the real FastAPI application, Retriever, NumPy index, entity resolver, context/prompt builders, generation adapter, middleware, logging, and reliability controls using deterministic external-provider responses. Run the existing frontend suite unchanged. Keep live semantic evaluation separate from deterministic protocol/reliability evidence.
 
-**Tech Stack:** unittest, FastAPI TestClient, httpx, NumPy, Vitest, Astro, Playwright.
+**Tech Stack:** unittest, FastAPI TestClient, httpx2 (installed SDK transport), NumPy, Vitest, Astro, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-09-02-day-5-full-rag-pipeline-design.md`
 
