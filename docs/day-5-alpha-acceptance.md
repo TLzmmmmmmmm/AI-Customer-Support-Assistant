@@ -1,10 +1,32 @@
 # Day 5 Alpha Acceptance — Step 7
 
+Historical-output cleanup: with user approval, the old raw audits and Day 4 result
+summaries were moved to the Windows Recycle Bin during Day 6 Step 1. File names
+below refer to historical outputs no longer in this checkout, not current scores.
+See [the cleanup record](day-6-step-1-cleanup.md). V0 baseline originals are intact.
+
 Date: 2026-09-03 (Asia/Shanghai)
 
 ## Status
 
-**Deterministic/local acceptance passed. Approved live evaluation completed: transport passed 4/4, but cross-product grounding FAILED. Day 5 is NOT fully accepted.**
+**Day 5 is provisionally accepted by the user's explicit decision.** Automatic
+contact suggestions and repeated summaries are now acceptable if they introduce
+no incorrect or unsupported content. The old strict-scope 22/32 score below is
+historical, not a current acceptance failure or a newly recomputed accuracy score.
+No deployment is implied. Current evaluation policy is in
+[Day 6 Step 1](day-6-evaluation-contract.md); Day 6 will measure and diagnose
+remaining factual/policy issues on controlled evaluation data.
+
+Current follow-up: [owner-confirmed radio classification and concise answers](day-5-radio-policy.md).
+Ex, CQST and 防爆 suffixes now determine the company's walkie-talkie classification;
+other walkie-talkies are non-explosion-protected. This replaces the old unknown
+expectation for HP780/HP500, not the requirement to avoid invented design causes.
+At the time of that historical experiment, the user disallowed unsolicited
+commentary; the current relaxed scope policy is stated above. That run's backend
+verification passed 183 tests; frontend
+tests below are historical, not rerun for this prompt-only production change.
+No deployment was performed. Earlier [identity](day-5-company-identity.md) and
+[language/referral](day-5-language-referral-fix.md) experiments remain historical.
 
 Follow-up: the user approved partial-abstention repair and development API calls.
 See [the full experiment record](day-5-partial-abstention.md) for three prompt
@@ -13,7 +35,7 @@ as historical evidence; the final candidate improved the known/unknown boundary,
 but full semantic acceptance still has remaining issues. Abstention is now graded
 by clear inability to confirm and no speculation, **not exact sentence matching**.
 
-No production code or frontend source was changed in Step 7. After explicit approval of the RMB 1 evaluation budget, three query-embedding calls and four generation calls were made. No top-up, resource purchase, or vector rebuild was performed; ordinary API usage charges apply.
+In the original Step 7 run, no production code or frontend source was changed. After explicit approval of the RMB 1 evaluation budget, three query-embedding calls and four generation calls were made. Later prompt repairs and additional authorized usage are documented in the follow-up reports. No top-up, resource purchase, or vector rebuild was performed; ordinary API usage charges apply.
 
 ## Inspected implementation
 

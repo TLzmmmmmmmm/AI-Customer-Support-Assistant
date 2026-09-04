@@ -31,7 +31,6 @@ from knowledge_pipeline.retrieval.records import (
 ROOT = Path(__file__).resolve().parents[1]
 EVAL_PATH = ROOT / "eval" / "retrieval_v1_1.json"
 HISTORICAL_EVAL_PATH = ROOT / "eval" / "retrieval_v1.json"
-HISTORICAL_RESULT_PATH = ROOT / "eval" / "retrieval_v1_results.json"
 CHUNKS_PATH = ROOT / "knowledge" / "chunks.jsonl"
 
 
@@ -122,9 +121,8 @@ class FakeProvider:
 
 
 class RetrievalEvaluationFixtureTests(unittest.TestCase):
-    def test_historical_v1_suite_and_result_are_preserved(self):
+    def test_historical_v1_suite_is_preserved(self):
         self.assertTrue(HISTORICAL_EVAL_PATH.is_file())
-        self.assertTrue(HISTORICAL_RESULT_PATH.is_file())
 
     def test_suite_contains_exactly_the_approved_baseline_cases(self):
         suite = load_evaluation_suite(EVAL_PATH)

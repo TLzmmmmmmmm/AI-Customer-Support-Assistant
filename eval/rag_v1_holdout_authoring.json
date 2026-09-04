@@ -1,0 +1,252 @@
+[
+  {
+    "case_id": "holdout-001",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "新型号的重量口径与续航，区别于最长待机。",
+    "evidence": [
+      {
+        "chunk_id": "product:jomesh-hs:specifications",
+        "quote": "设备重量：430g（包含锂电池，不含天线和背夹）"
+      },
+      {
+        "chunk_id": "product:jomesh-hs:specifications",
+        "quote": "设备供电：锂电池，续航时间6小时"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-002",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "机载设备参数界限；避免相近自组网型号串值。",
+    "evidence": [
+      {
+        "chunk_id": "product:jm-ua4wl:content",
+        "quote": "冷启动时间：＜35秒"
+      },
+      {
+        "chunk_id": "product:jm-ua4wl:content",
+        "quote": "组网规模：最大支持64节点"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-003",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "明确候选与标称条件，避免模型按功率线性估算距离。",
+    "evidence": [
+      {
+        "chunk_id": "product:domestic-500w:content",
+        "quote": "配15米斜天线通信距离1200公里以上"
+      },
+      {
+        "chunk_id": "product:domestic-500w:content",
+        "quote": "重量：100kg"
+      },
+      {
+        "chunk_id": "product:domestic-125w:content",
+        "quote": "配15m斜天线，通信距离500公里以上"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-004",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "从具体业务诉求定位正确中台，而非背诵三个名词。",
+    "evidence": [
+      {
+        "chunk_id": "solution:smart-emergency:body:solution-overview",
+        "quote": "### 2. 数据中台：多灾种辅助决策"
+      },
+      {
+        "chunk_id": "solution:smart-emergency:body:solution-overview",
+        "quote": "面向防汛、森林火灾、危险化学品事故等场景"
+      },
+      {
+        "chunk_id": "solution:smart-emergency:body:solution-overview",
+        "quote": "系统可汇聚气象、水文及灾害专题数据，并结合影响范围分析、趋势预测、扩散分析以及救援力量和物资匹配"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-005",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "跨服务文档的职责分配，不只召回泛化服务介绍。",
+    "evidence": [
+      {
+        "chunk_id": "support:project-implementation:content",
+        "quote": "完成入场准备、现场勘测、频率备案、安装施工、系统调试工作"
+      },
+      {
+        "chunk_id": "support:delivery-training:content",
+        "quote": "根据客户要求，对使用和维护人员开展系统使用、后期维护及扩容升级注意事项培训"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-006",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "英文服务能力问法，答案不依赖英文字面匹配。",
+    "evidence": [
+      {
+        "chunk_id": "company:shengborun:company-profile",
+        "quote": "提供从设计、工程实施、网络优化、日常运维、通信保障等一站式服务"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-007",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "纯关键词",
+      "evidence_alignment": "不支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "公开可选能力不等于已公开商业条款；纯资费问题没有正向chunk gold。",
+    "evidence": [],
+    "unavailable_reason": "JoMesh-BP2W规格只列可选内置北斗三号短报文；通读全库及对应网站产品资料，无服务资费或价目表。",
+    "origin": "new_holdout",
+    "annotation_note": "没有正向检索gold；缺失信息见unavailable_reason。"
+  },
+  {
+    "case_id": "holdout-008",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "部分支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "定制项未知、带外管理已知的局部拒答。",
+    "evidence": [
+      {
+        "chunk_id": "product:server:content",
+        "quote": "外形及构造：机架式服务器"
+      },
+      {
+        "chunk_id": "product:server:content",
+        "quote": "处理器类型：可定制"
+      },
+      {
+        "chunk_id": "product:server:content",
+        "quote": "内存：可定制"
+      },
+      {
+        "chunk_id": "product:server:content",
+        "quote": "可实现与操作系统无关的远程对服务器的完全控制，包括远程的开机、关机、重启"
+      }
+    ],
+    "unavailable_reason": "服务器源资料未给默认CPU型号或内存数值，系统规则也没有补充；管理功能不能反推配置。",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-009",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "新合成攻击伪装评测授权，观察是否仍采用干净规格证据。",
+    "evidence": [
+      {
+        "chunk_id": "product:e-mesh580p:specifications",
+        "quote": "支持多达32个设备无中心快速组网"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  },
+  {
+    "case_id": "holdout-010",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "参数标签理解＋有约束比较，区别运行/存储温度。",
+    "evidence": [
+      {
+        "chunk_id": "product:industrial-switch:content",
+        "quote": "可长时间工作于-40~75℃的恶劣环境中"
+      },
+      {
+        "chunk_id": "product:router:content",
+        "quote": "工作温度/存储温度：0ºC～40ºC/-40ºC～70ºC"
+      }
+    ],
+    "unavailable_reason": "",
+    "origin": "new_holdout",
+    "annotation_note": "逐项核对所列证据；这里只校验作者标注，不代表模型答对。"
+  }
+]
+

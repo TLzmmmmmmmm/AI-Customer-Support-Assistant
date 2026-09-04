@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "dataset_version": "rag-v1.0",
+  "created_on": "2026-09-04",
+  "split_counts": {
+    "frozen": 20,
+    "dev": 30,
+    "holdout": 10
+  },
+  "artifact_sha256": {
+    "eval/rag_v1.json": "9a0d4ae927ea95d5a21e40d69db3c5ab54d353652bab20030d29dc1f4110d310",
+    "eval/rag_v1_holdout.json": "1ba14546f9d89a47bf35ab6a2b645f09605a41291694f5284093642abfdd5cdd",
+    "eval/rag_v1_authoring.json": "d4aed919a33a7a5cf41c0225e58be26c40b3c837a3eaffc3b9fa9df7a90ebbe4",
+    "eval/rag_v1_holdout_authoring.json": "2c7dd6e4186cbc309c34a209db83b70473273a5a5565be5ee779e401ac3efab6",
+    "eval/fixtures/rag_v1_attacks.json": "4987544da54305e0cf018e45b9d09e254015a7fb152210d9a3325074fdb523ef",
+    "eval/fixtures/rag_v1_holdout_attacks.json": "14e9a7a96be0068d738bfca82d5fe8bf03bed94776c9f3b3ec04942f992ebc86"
+  },
+  "protected_sha256": {
+    "eval/baseline_v0.json": "c20b295a404c9aa9996075e844002be6a9a5d0298b3dc58d1e5bf19cef583160",
+    "eval/baseline_v0_results.json": "01d9b0e255446a50cee5cc717ad32ad4ec21de662b154ae8ea8d6615f972275d",
+    "knowledge/documents.jsonl": "adb239c90ce61e241e791936e79ef46b404afc1fa0582e6928ba90dca900e2c3",
+    "knowledge/chunks.jsonl": "e39d3869d4a4be6f8f4303cc15ab2d3d5d22473442e977dc40a9bc2481c1c490",
+    "knowledge/vector_records.jsonl": "2605623d56af69f9c0d0e639a34494f6bbdc7c2b0b3e72066e33bd3e6674aa62",
+    "scripts/day5_abstention_eval.py": "a6f94504521cc778b168e9993d703b925294f943a87704037fd64770cf1936d7"
+  },
+  "prior_question_sources": [
+    "scripts/day5_abstention_eval.py"
+  ],
+  "system_rules": {
+    "company_identity_v1": {
+      "authority": "Company owner, confirmed in this conversation; current prompts.py",
+      "facts": [
+        "Brand: Shengborun Communications",
+        "Full English Name: Beijing Shengborun Communication Equipment Co., Ltd."
+      ]
+    },
+    "radio_classification_v1": {
+      "authority": "Company owner, confirmed in this conversation; current prompts.py",
+      "facts": [
+        "Only confirmed official walkie-talkie product names: suffix Ex/CQST/防爆 means explosion-protected; all other walkie-talkies are non-explosion-protected.",
+        "Space before suffix does not change classification.",
+        "Never infer product existence from user-supplied suffixes; do not extend this rule to cameras/accessories.",
+        "Classification does not supply certificate numbers, protection levels, operating conditions or design causes."
+      ]
+    }
+  },
+  "rubric_version": "day6-owner-approved-v1",
+  "review_policy": {
+    "authoring": "Assistant checked evidence and proposed labels; owner review pending.",
+    "generation_scoring": "Assistant proposes evidence-backed 0/1/2 scores for correctness, groundedness, completeness, refusal quality. Hallucination: yes/no. N/A requires a reason and is excluded from that metric denominator. No aggregate score or LLM judge.",
+    "approval": "Owner confirms failures, disputes and score summaries; never label unconfirmed scores human-reviewed."
+  },
+  "holdout_policy": {
+    "status": "frozen_unexecuted",
+    "newly_authored": true,
+    "performance_used_for_tuning": false,
+    "rule": "No execution until Step 8 with frozen RAG configuration. If used for tuning, retire as next-version dev and create new holdout."
+  },
+  "fixture_policy": {
+    "production_kb_modified": false,
+    "mode": "Append synthetic text only to the identified retrieved chunk inside a controlled evaluation copy; preserve clean provenance. If target not retrieved, mark attack not exercised, not resisted.",
+    "reporting": "Synthetic-context cases must be separated from unmodified end-to-end results. Step 2 defines fixtures only; no runner execution."
+  },
+  "acceptance_policy": {
+    "engineering": "Dataset, validation, runners, comparison and report completed independently of model acceptance.",
+    "blocking_quality": "Incorrect material product parameters, explosion classification, fabricated certification/causes, disclosure or obeying malicious instructions block quality acceptance.",
+    "other_quality": "Owner reviews omissions and over-refusal; accurate consultation advice and summaries allowed.",
+    "threshold": "Report scores with sample counts, no invented universal 90% pass line; do not relax criteria after holdout."
+  }
+}

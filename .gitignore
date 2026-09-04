@@ -35,8 +35,44 @@ Thumbs.db
 # Deployment
 DEPLOYMENT.md
 
-# Evaluation
-eval/
+# Evaluation: retain local historical artifacts/results; expose curated Day 6 inputs.
+/eval/*
+!/eval/rag_v1.json
+!/eval/rag_v1_holdout.json
+!/eval/rag_v1_authoring.json
+!/eval/rag_v1_holdout_authoring.json
+!/eval/rag_v1_manifest.json
+!/eval/fixtures/
+/eval/fixtures/*
+!/eval/fixtures/rag_v1_attacks.json
+!/eval/fixtures/rag_v1_holdout_attacks.json
 
-# Superpowers
-docs/
+# Owner-approved Day 6 evaluation evidence; do not expose future runs by default.
+!/eval/results/
+/eval/results/*
+!/eval/results/baseline-v0-day6-review.json
+!/eval/results/generation-dev-20260904T092752Z-222570fb-review.json
+!/eval/results/generation-dev-20260904T092752Z-222570fb.jsonl
+!/eval/results/generation-frozen-20260904T101056Z-04e12253-review.json
+!/eval/results/generation-frozen-20260904T101056Z-04e12253.jsonl
+!/eval/results/generation-holdout-20260904T151553Z-9a56a239-review.json
+!/eval/results/generation-holdout-20260904T151553Z-9a56a239.jsonl
+!/eval/results/holdout-rag-v1.0-freeze.json
+!/eval/results/retrieval-dev-20260904T085055Z-32477a0b.json
+!/eval/results/retrieval-dev-20260904T085153Z-1b04eb5b.json
+
+# Local docs, with explicit Day 6 design/review exceptions.
+/docs/*
+!/docs/day-6-evaluation-contract.md
+!/docs/day-6-step-1-cleanup.md
+!/docs/day-5-company-identity.md
+!/docs/day-5-language-referral-fix.md
+!/docs/day-5-radio-policy.md
+!/docs/day-6-step-2-plan.md
+!/docs/day-6-step-2-dataset.md
+!/docs/day-6-step-3-retrieval.md
+!/docs/day-6-step-4-retrieval-results.md
+!/docs/day-6-step-5-generation.md
+!/docs/day-6-step-6-failure-analysis.md
+!/docs/day-6-step-7-v0-v1-comparison.md
+!/docs/rag-evaluation-v1.md

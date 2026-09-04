@@ -1,2 +1,15 @@
 knowledge/documents.jsonl text eol=lf
 knowledge/source/**/*.json text eol=lf
+
+# Raw-byte Day 6 snapshot seals must survive Windows checkouts unchanged.
+eval/rag_v1.json text eol=lf
+eval/rag_v1_holdout.json text eol=lf
+eval/rag_v1_authoring.json text eol=lf
+eval/rag_v1_holdout_authoring.json text eol=lf
+eval/rag_v1_manifest.json text eol=lf
+eval/fixtures/rag_v1_attacks.json text eol=lf
+eval/fixtures/rag_v1_holdout_attacks.json text eol=lf
+scripts/day5_abstention_eval.py text eol=lf
+
+# Preserve recorded evidence byte-for-byte, including historical line endings.
+eval/results/* -text

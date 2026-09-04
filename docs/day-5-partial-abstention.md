@@ -1,6 +1,24 @@
 # Day 5 partial-abstention experiment
 
-Status: improved V3 candidate retained; full semantic acceptance NOT complete.
+Historical-output cleanup: with user approval, the old raw audits were moved to
+the Windows Recycle Bin during Day 6 Step 1. File names below refer to historical
+outputs no longer in this checkout, not current scores. See [the cleanup record](day-6-step-1-cleanup.md).
+The original Day 1 V0 baseline files are preserved unchanged.
+
+Current policy update: see [radio classification and concise scope](day-5-radio-policy.md).
+The owner now confirms Ex/CQST/防爆 suffixes as the rule for all company walkie-talkies;
+plain names such as HP780/HP500 are non-explosion-protected. Older unknown-based
+expectations below remain historical and must not be used to grade new runs.
+
+Historical status: improved V3 candidate retained; full semantic acceptance NOT complete.
+For the current candidate, see the language/referral follow-up linked below.
+
+Subsequent user clarification: the limited HP790Ex "corresponding explosion-
+protection scenarios" phrasing is acceptable. With that case reclassified, V3
+is **37/40** under the updated policy; the 36/40 assessment below records the
+earlier conservative policy. See [language/referral follow-up](day-5-language-referral-fix.md)
+for the authorized repair of the remaining three outcomes. Original audits are
+unchanged.
 
 ## Approved scope and fixed rubric
 
@@ -65,9 +83,10 @@ Original failing evidence is preserved in day-5-live-smoke.jsonl.
    question) and a numerical-bound example rejecting actual-power/constant-power
    inferences and unsupported premises. Do not change generation sampling/settings.
 
-V1 can be reconstructed from the final prompts.py by omitting section 15; baseline
+V3 is prompts.py at commit 6202ee4 (not the subsequently edited working file).
+V1 can be reconstructed from that version by omitting section 15; baseline
 is prompts.py at commit a5a6155. Audit start rows record system-prompt hashes.
-V2 is V3 without the final two paragraphs of section 15.
+V2 is that V3 without the final two paragraphs of section 15.
 
 ## Results and remaining failures
 

@@ -1,1 +1,0 @@
-{"failures":[],"metrics":{"complete_multi_source_recall":1.0,"entity_accuracy":1.0,"expected_chunk_recall_at_5":1.0,"expected_parent_recall_at_5":1.0,"hit_at_1":0.8888888888888888,"hit_at_3":1.0,"hit_at_5":1.0,"mean_reciprocal_rank":0.9444444444444444,"total_cases":18},"schema_version":"1.0","suite_id":"shengborun-semantic-retrieval-v1.1","top_k":5}
