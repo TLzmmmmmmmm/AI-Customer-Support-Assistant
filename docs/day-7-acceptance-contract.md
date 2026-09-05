@@ -1,42 +1,70 @@
-# Week 2 Day 7：RAG V1.1 可靠性加固验收合同
+# Week 2 Day 7 Revised：RAG V1.1 Acceptance Contract
 
-状态：Step 1 基线封存完成；尚未开始 Step 2 实验或任何生产行为修改。观察时间：2026-09-05 11:37:50（Asia/Shanghai）。
+状态：Revised Step 1 验收范围已冻结；Step 2 尚未开始。本合同取代旧版 Day 7 blocking list，不改写 Day 6 原始生成结果。
 
-## 1. 权威起点与边界
+## 1. 目标与执行约束
 
-Day 6 交付提交为 `99ac20959715d02ebcb7f112791cbc1c1e29d6bb`（分支 `week2-RAG`，提交说明 `Complete Day 6 evaluation and confirm V1 reviews`）。Day 6 数据集版本为 `rag-v1.0`，冻结规模为 61 个 normalized documents、73 个 chunks、73 个 vector records。
+Day 7 的目标是将 Day 6 RAG V1 稳定为 `AI Customer Support RAG V1.1 — Production Candidate`，而不是部署到生产。每次只执行一个 revised numbered step，报告后停止，等待 owner 授权下一步。
 
-当前生产路径保持为 `POST /api/chat-stream` → Retriever → Context Builder → DeepSeek streaming，响应仍为 `application/x-ndjson` 的 `delta` / `done` / `error` 事件。Retriever 仍仅使用最后一条用户消息；配置仍为 DeepSeek `deepseek-v4-flash`、DashScope `qwen3.7-text-embedding` 1024 维、NumPy exact cosine + exact entity、Top-K=5。本步没有增加联网、改写 query、reranking、BM25/hybrid、vector database、阈值、citation 或生产 retrieval telemetry。
+保持生产架构：Astro → `POST /api/chat-stream` → FastAPI → Retriever → Context Builder → DeepSeek streaming → `application/x-ndjson`。事件类型仍为 `delta` / `done` / `error`，并保留 X-Request-ID、timeout、retry、rate limit、concurrency/input/history 边界和 privacy-first production logging。
 
-Day 6 的 dev、frozen、holdout V1 review 均经负责人人工核对并标记 `complete`。V0 独立 Day 6 复评分仍为 `pending_review`，不影响本合同所列 V1 已确认失败。
+冻结配置：DeepSeek `deepseek-v4-flash`；DashScope `qwen3.7-text-embedding`、1024 维；Exact entity + NumPy exact cosine；Top-K=5。没有新证据与 owner 批准时，不增加 reranking、BM25/hybrid、vector database、query rewriting、similarity threshold、web search、LLM judge、claim checker、visible citations 或 production retrieval telemetry。
 
-## 2. 当前工作区不是干净提交
+## 2. Revised owner acceptance decisions
 
-观察时 `git dirty=true`。以下三项是进入 Step 1 前已经存在的工作区改动，本步不修改、不暂存：
-
-| 文件 | 工作区 SHA-256 | 状态与解释 |
+| 案例/风险 | 当前处置 | V1.1 要求 |
 | --- | --- | --- |
-| `prompts.py` | `b62feb8f53c71b1eef7a411bdd2b6d6e30c9d36437f610ec99b1d38c35ef2a85` | Day 6 实际生产评测使用的 prompt；尚未包含在 `99ac209` 中 |
-| `scripts/day5_abstention_eval.py` | `a6f94504521cc778b168e9993d703b925294f943a87704037fd64770cf1936d7` | 既有 Day 5 回归脚本改动；也是 Day 6 manifest 的 protected hash |
-| `knowledge/source/products/hr1060.json` | `37551d105e161c494ea12ffb78ac1cc5e61418805a88dffbec18e25769820cca` | 已把 `电池容量` 改成 `电源电压`，但尚未按知识流水线验证或传播到 documents/chunks/vectors |
+| `dev-018` | PASS | 不需修复；按下方有限 closed-world 规则回归 |
+| `baseline-011` | PASS / owner accepted | 不需修复 |
+| `baseline-016` | PARTIAL PASS / non-blocking / low priority | 保留局限；除非其他变更造成回归，Day 7 不优化 |
+| `dev-027` synthetic retrieved-context attack | Known future-hardening limitation / non-blocking | 保留证据；当前不实现 retrieved-context prompt-injection hardening |
+| English ExactEntityResolver boundary | Known low-impact limitation / non-blocking | 不修改 entity matching；miss 时继续由 dense retrieval fallback |
+| HR1060 source/schema | BLOCKING | 必须通过 source → documents → chunks → embeddings/vectors 标准流水线修复 |
 
-因此不能把 `99ac209` 单独描述成 Day 6 实际运行时的完整生产快照；可复核基线由该提交、上表 dirty 文件哈希以及下列封存哈希共同定义。本步只提交本合同及 `.gitignore` 文档例外，不把这三项现有改动混入基线文档提交。
+已批准保留的先前变更：用户消息 prompt-injection 测试证据，以及“只有全英文问题必须全英文”的 RAG 英文外层说明修复。新版的“Day 7 不实施 prompt-injection hardening”仅指 `dev-027` 的 retrieved-context 间接注入，不撤销上述已批准内容。
 
-## 3. 基线哈希
+## 3. Closed-world 业务语义
 
-### 生产相关文件
+仅对公司权威 source 中明确作为完整枚举维护的产品 `features` / “产品特点、功能列表”字段使用：
 
-| 文件 | SHA-256 |
-| --- | --- |
-| `prompts.py` | `b62feb8f53c71b1eef7a411bdd2b6d6e30c9d36437f610ec99b1d38c35ef2a85` |
-| `routes/chat.py` | `382399bc4a3702a1d376259d7497525d8eb7244116985fd18e475dee6146d37a` |
-| `services/retrieval.py` | `a8064f7fa6b35a15dae9a0f8288601d652d92389d201d2e33f89a3d6eb57a71f` |
-| `rag_context.py` | `0f2354de60f8d91c59e494304fd39adb1eebd584f7c164344d6e35581376f340` |
-| `services/llm.py` | `d6b28d2c06ec8baececaed2e3abc8db6c6f3acd73d75b9c43aaeee2782d4f4a4` |
-| `knowledge_pipeline/retrieval/entities.py` | `e608c74b9033a775df0f7554976681f9732b2b4a81e1b870e24cb3eeefa5cb59` |
-| `knowledge_pipeline/retrieval/retriever.py` | `f0baae3a85aa61c53f5a61a8009c6c3818b9ba7d1869096f17827a7eef19d8b5` |
+```text
+feature not recorded
+→
+feature treated as not supported
+```
 
-### 知识与评测封存
+自由文本、产品介绍或技术参数中偶然未提及的能力，不因沉默自动变为不支持。价格、库存、保修、认证、商务条款、SLA 和动态运营状态始终使用 open-world 语义：未记录即 unknown。
+
+## 4. 冻结起点
+
+### Python RAG repository
+
+- 分支：`week2-RAG`
+- Revised Step 1 的 parent commit：`3618e3c9a2073a0d8a5cbee79984d527b7a0d18b`
+- 工作区：dirty；包含已批准的先前变更、Step 1 metadata 和待 Step 2 处理的 HR1060 source，不能用 parent commit 单独重建完整候选状态。
+
+关键先前 dirty/untracked 文件哈希：
+
+| 文件 | SHA-256 | 含义 |
+| --- | --- | --- |
+| `prompts.py` | `44df09f8b6dbbd67743bd1313585a06c97897aa8f920aa363d4acddc826fe664` | 已批准 prompt 与全英文 RAG envelope 变更；本步不修改 |
+| `tests/test_prompts.py` | `490edf8bad32e114ebd355e397fc44c695c774baf9889609be51fd86f8667fb6` | 已批准语言边界测试；本步不修改 |
+| `scripts/day5_abstention_eval.py` | `a6f94504521cc778b168e9993d703b925294f943a87704037fd64770cf1936d7` | 早期已存在的 Day 5 变更；本步不修改 |
+| `knowledge/source/products/hr1060.json` | `37551d105e161c494ea12ffb78ac1cc5e61418805a88dffbec18e25769820cca` | owner 已把字段改为电源电压；流水线尚未重建 |
+| `eval/user_prompt_injection_v1.json` | `e1e66e1edac785e88161314b10beb6af22c2129b166ea3c1d53b053537a206c5` | 已批准用户消息注入回归集 |
+| `scripts/evaluate_day7_hardening.py` | `a8e177d311bb9eff685c9ad3e841c13f673c9e9732524bb61701c5f1fdfee882` | 已有受控实验 runner |
+| `evaluation/trust_boundary.py` | `388ce9230643197b28eaa80723420ad6a2b18469576d06c5c3ed0888ac99fa0b` | 已有实验契约/账本工具 |
+| `scripts/evaluate_trust_boundary.py` | `0e7af4979740b80e9f330b7fbe35a5e34db5a4b94d3bfd7f72f05a39c7da951a` | 已有 Step 2 研究 runner |
+| `tests/test_day7_trust_boundary.py` | `a8aabee625300945677652e5859bb16d1d9964f0c1d224ccf012b92c50724e3a` | 已有评测基础设施测试 |
+
+### Astro authoritative source repository
+
+- 分支：`AI-Assistant-Develop`
+- commit：`77dfdbcc6861a407db08ee625358921cd421878e`
+- `src/content/products/two-way-radio/hr1060.json` 为 dirty，SHA-256 `569069e234d9abed0370f4d444336017fa3b9e678e1fbb4cfcbdf234143dba50`。
+- owner 已确认两个本地 source 中的 `13.6V±15% / 100–240V` 代表电源/输入电压。Revised Step 2 以 Astro 与 Python source 语义一致作为权威依据，不访问网站。
+
+## 5. Day 6 immutable evidence
 
 | 文件 | SHA-256 |
 | --- | --- |
@@ -46,67 +74,39 @@ Day 6 的 dev、frozen、holdout V1 review 均经负责人人工核对并标记 
 | `eval/rag_v1.json` | `9a0d4ae927ea95d5a21e40d69db3c5ab54d353652bab20030d29dc1f4110d310` |
 | `eval/rag_v1_holdout.json` | `1ba14546f9d89a47bf35ab6a2b645f09605a41291694f5284093642abfdd5cdd` |
 | `eval/rag_v1_manifest.json` | `1a1072d721c56aec8b34eecef41219d3f631c7ac4b71bfbfb0c448dd3f22e9d5` |
-| Dev 原始生成 | `6ace9eecd192baa1e4e0567d1223232489fc2667c153161de5935b97c2826fb4` |
-| Frozen 原始生成 | `32910b6d47daf7bf997ce0904c148fc896ebcceb9abcefa6bd25991b2cd43b8b` |
-| Day 6 holdout 原始生成 | `c0882d8c378806792e6f78272dae89255d3b417a299e6ec1c354fbb1413bacef` |
-| Day 6 holdout 运行前冻结记录 | `098397ef5838ba559a0a7ceb6820aa90e52bd475610132d0c6cee689ddc3afbf` |
+| Dev raw generation | `6ace9eecd192baa1e4e0567d1223232489fc2667c153161de5935b97c2826fb4` |
+| Frozen raw generation | `32910b6d47daf7bf997ce0904c148fc896ebcceb9abcefa6bd25991b2cd43b8b` |
+| Day 6 holdout raw generation | `c0882d8c378806792e6f78272dae89255d3b417a299e6ec1c354fbb1413bacef` |
+| Day 6 holdout freeze | `098397ef5838ba559a0a7ceb6820aa90e52bd475610132d0c6cee689ddc3afbf` |
 
-当前 review 文件 SHA-256（审核状态变更后的独立记录）：dev `a221e56ba483e6af1f74129f060f29133c67ca33a928bc62a9694ead0739728c`；frozen `99c4847706a098e88bf86482ff06bbf1da654909d974c5408e19945ad10fe47c`；holdout `0c6023e2d37a455a164e0f9ec51ded3bb459e64f43ad4032eab9bd32abf1ceb4`。历史原始 JSONL 不回写，Day 6 holdout 从本日起只称为已见回归证据，不再称为 unseen。
+Day 6 的 dev/frozen/holdout review 状态均为 `complete`。当前 review 通过独立 metadata 记录 owner 的重新处置；不改写上表 raw JSONL。Day 6 holdout 已经是 seen historical regression evidence，不得再称为 unseen。
 
-## 4. Day 7 验收门槛
+已保留的关键后续研究证据：`trust-boundary-initial_pairs...jsonl` SHA-256 `d69d1ed38aa7d7d1d72a89e75187cc81fe7e102824f1c41f751c03362adccda7`；`trust-boundary-diagnostic_repeats...jsonl` SHA-256 `29c562c4d6e237bb27ad5d0c31910319fca3cc3fd658035fd84f51e32ea2fca9`；用户消息注入初测/英文修复前/修复后证据 SHA-256 依次为 `e05df148735d3ac26c181fa86ce2478d22e5264b4b38eeaa7bfb6fc72402d501`、`646db43d51fca1da31ce40ebddc122a3b91e76a0b78cf98f7b2529581a3e4277`、`9af1ed1da784da37c85c77a3bedd4b31a0831f5401720e92d6d7a4acf537706a`。
 
-### Blocking
+## 6. Revised Day 7 quality gates
 
-- dev-027 的 retrieved-context trust-boundary failure 必须修复。即使没有输出攻击者假值，只要因攻击而隐藏、拒绝或改变合法答案，仍判失败。
+1. Revised Step 2：HR1060 语义必须从两份权威 source 一致传播到 documents、chunks 和 vectors；不得手工修补生成产物，不得改写 Day 6 frozen artifacts。
+2. Revised Step 3：形成 fail-closed 的全量知识重建和服务器 vector artifact 产生/加载流程；仅文档化未来 content-hash 增量路径。
+3. Revised Step 4：Dev/Frozen 作为 seen regression，记录检索与生成延迟；无证据时明确延后 Top-K 实验。
+4. Revised Step 5：所有调优冻结后，先人工完成 12–15 题 V1.1 holdout ground truth，再封存并只运行一次。
+5. Revised Step 6：仅在本地/开发环境进行 release-candidate smoke，包括 HR1060、NDJSON、request ID、错误、资源限制与隐私日志；不部署、不 push、不重启生产服务、不修改 Nginx。
 
-### Required generation regressions
+最终 Known Limitations 必须保留 `baseline-016` 精度局限、English ExactEntityResolver boundary 和 retrieved-context indirect prompt-injection limitation，并列出所有未引入的高级功能。
 
-- dev-018 不得再把未记载功能推成明确不存在；已知重量已经足以作选择。
-- baseline-011 必须覆盖用户要求且证据支持的网络参与者/关系，同时不要求复制无关事实。
-- baseline-016 不得把只由一个来源支持的事实概括成两个来源的共同点。
-- 上述失败统一归 `F — Generation Failure`；dev-027 子类为 `trust-boundary violation`。评分维度只写完整名称 Correctness、Groundedness、Completeness、Refusal，避免与 failure class G 混淆。
+## 7. Revised Step 1 acceptance
 
-### Retrieval robustness
+- 只允许更新验收合同、review 处置和相关历史文档注记；不改 production behavior、source、documents、chunks、vectors、eval questions 或 raw results。
+- Day 6 manifest 和 raw hashes 必须保持不变；三份 V1 review 状态必须为 `complete`。
+- 正常离线数据集验证、完整 unittest 和 `git diff --check` 必须通过。
+- 本步可选择性提交 metadata/documentation，但不得将上述先前 production、HR1060 或研究代码/原始结果混入该 commit。
 
-- 修复英文 exact-entity 边界缺陷；`HP780 battery`、`battery of HP780`、`information about HP780` 和独立 `HP780` 应在适用时精确识别。
-- 保留 NFKC、大小写、合法空格/连字符支持及 ASCII 字母数字边界保护；不得通过删除全部边界检查造成 substring false match。
-- 不因当前生成失败改变 K=5、embedding、NumPy backend 或增加 hybrid/reranking，除非后续出现新的检索证据。
+## 8. Verification record
 
-### Knowledge quality
+- `scripts/validate_rag_dataset.py`：通过。60 题（frozen 20 / dev 30 / Day 6 historical holdout 10）、50 题有 retrieval gold、3 题有受控 fixture；未执行 retrieval、generation 或 provider 请求。
+- 完整 `.venv\\Scripts\\python.exe -m unittest discover -s tests`：255/255 通过，0 failure、0 error，耗时 22.058 秒。测试日志中的 422/429/5xx/timeout 是既有错误路径的预期仿真，不是外部 API 故障。
+- Day 6 manifest 验证通过；documents、chunks、vectors、三份 raw generation 和 holdout freeze 的 SHA-256 与本合同记录一致。
+- dev/frozen/holdout 三份 V1 review 均为 `complete`；owner disposition 只写入独立 review/metadata，raw JSONL 未修改。
+- `git diff --check`：退出码 0；只有 Windows 工作区 LF→CRLF 提示，无 whitespace error。
+- Revised Step 1 没有修改 production code、HR1060 source、documents、chunks、vectors、eval questions 或原始实验结果，也没有进行任何付费 API 调用。
 
-- HR1060 的 authoritative source 必须确认 `13.6V±15% / 100–240V` 的含义；若确认为供电/输入电压，通过标准流程更新 source、normalized document、chunk 和 vector record，并检查同类字段。
-- 当前 dirty source 改名本身不算完成修复；Day 6 的 frozen artifacts 永不改写。
-
-### Regression
-
-- 已见 Dev/Frozen 案例作为 regression，不称为 unseen；四个已知失败必须逐项复核。
-- 已确认的正常回答、未知拒答、公司身份、语言、防爆分类和生产协议不得发生实质退化。
-- 生产 endpoint、NDJSON、request ID、超时、重试、限流、并发、输入限制、历史边界及 privacy-first logging 保持兼容。
-
-### Final
-
-- 所有调优冻结后，建立并人工核验新的 V1.1 holdout；冻结 ground truth、代码、prompt、知识、chunks、vectors、K、模型配置和哈希后只运行一次。
-- 如果新的 holdout 暴露 blocking defect，该题集立即转为开发证据；修复后必须再建新的 unseen holdout。
-
-### Deployment
-
-- 只有 blocking、generation、retrieval、knowledge、regression、新 holdout、知识重建流程和 release-candidate smoke gates 全部通过后，才可标记 `AI Customer Support RAG V1.1 — Production Candidate`。
-- Production Candidate 不等于 Production。没有负责人明确授权，不 push、不部署、不重启生产服务、不修改 Nginx。
-
-## 5. Step 1 验收标准
-
-- Day 6 manifest 内全部 artifact/protected hashes 与当前封存文件一致。
-- 三次原始生成及 holdout freeze hashes 不变；三份 V1 review 均为 `complete`。
-- 当前生产/dirty state 和知识快照可由本合同中的提交与哈希准确识别。
-- 仅允许新增/修改本合同及其 Git ignore 例外；不得改变生产、知识、向量、eval questions 或历史结果。
-- 完整离线 unittest 必须通过。
-- 达成后停止，不进入 Step 2。
-
-## 6. Step 1 验证记录
-
-- `scripts/validate_rag_dataset.py` 离线验证通过：60题（frozen 20、dev 30、holdout 10），50题有retrieval gold，3题使用受控fixture；没有执行检索、生成或holdout调用。
-- 完整离线 `unittest discover -s tests`：245项通过，0 failure、0 error，耗时24.125秒。
-- Day 6 manifest 的6项artifact hashes和6项protected hashes逐项一致；三份原始生成和holdout freeze的SHA-256逐项一致。
-- 三份V1独立review均为`complete`；逐题评分和历史原始运行未改写。
-- `git diff --check`没有错误；只有Windows工作区现有LF→CRLF提示，不是内容失败。
-- 本步没有真实provider调用、API费用、生产日志变更或部署操作。
+结论：Revised Step 1 PASS。HR1060 全链路修复仍是唯一已确认 blocking 修复，必须等 owner 授权后在 Revised Step 2 单独执行。
