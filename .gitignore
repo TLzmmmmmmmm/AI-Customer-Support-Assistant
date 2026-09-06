@@ -101,6 +101,8 @@ DEPLOYMENT.md
 !/eval/results/holdout-rag-v1.1-freeze.json
 !/eval/results/generation-holdout-20260906T044338Z-1408f3a6.jsonl
 !/eval/results/generation-holdout-20260906T044338Z-1408f3a6-review.json
+!/eval/results/day7-step6-release-candidate-smoke.jsonl
+!/eval/results/day7-step6-release-candidate-smoke-attempt-2.jsonl
 
 # Local docs, with explicit Day 6 design/review exceptions.
 /docs/*
@@ -125,6 +127,7 @@ DEPLOYMENT.md
 !/docs/day-7-step-4-canonical-consolidation.md
 !/docs/day-7-step-5a-new-holdout.md
 !/docs/day-7-step-5b-holdout-report.md
+!/docs/day-7-step-6-release-candidate-smoke.md
 !/docs/superpowers/
 !/docs/superpowers/plans/
 !/docs/superpowers/plans/2026-09-06-bounded-prompt-rule-consolidation.md

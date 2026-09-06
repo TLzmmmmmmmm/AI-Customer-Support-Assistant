@@ -64,7 +64,13 @@ def synthetic_hit():
     })
 
 
-def run(execute=False, *, audit=AUDIT, cases=CASES):
+def run(
+    execute=False,
+    *,
+    audit=AUDIT,
+    cases=CASES,
+    max_prompt_utf8_bytes=30_000,
+):
     # Keep each isolated process below the existing ten-requests/minute limit.
     if not 1 <= len(cases) <= 8:
         raise ValueError("evaluation batches must contain 1 to 8 cases")
@@ -86,6 +92,7 @@ def run(execute=False, *, audit=AUDIT, cases=CASES):
         "embedding_max_retries": embedding.max_retries, "top_k": retrieval.top_k,
         "generation_model": config.DEEPSEEK_MODEL, "max_output_tokens": 1024,
         "case_count": len(cases),
+        "max_prompt_utf8_bytes": max_prompt_utf8_bytes,
     }), flush=True)
     if not execute:
         return
@@ -105,7 +112,10 @@ def run(execute=False, *, audit=AUDIT, cases=CASES):
 
     def bounded_create(**kwargs):
         size = sum(len(message["content"].encode("utf-8")) for message in kwargs["messages"])
-        if size + 512 > 30000 or totals["generation_attempts"] >= 2 * len(cases):
+        if (
+            size + 512 > max_prompt_utf8_bytes
+            or totals["generation_attempts"] >= 2 * len(cases)
+        ):
             raise RuntimeError("generation allowance exceeded")
         active["prompt_utf8_bytes"] = size
         totals["generation_attempts"] += 1
