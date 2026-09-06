@@ -2,9 +2,9 @@
 
 ## Status
 
-`assistant_evidence_review_complete / owner_review_pending / not_sealed / not_executed`
+`assistant_evidence_review_complete / owner_review_complete / sealed_unexecuted`
 
-This step prepares the new RAG V1.1 holdout but deliberately does not run retrieval, query embeddings, or generation. The holdout may be sealed only after the owner reviews the questions, expected answers, required facts, forbidden claims, and cited evidence.
+This step prepared the new RAG V1.1 holdout without running retrieval, query embeddings, or generation. The owner subsequently reviewed and approved the questions, expected answers, required facts, forbidden claims, and cited evidence, so the holdout is sealed for one execution.
 
 ## Candidate snapshot
 
@@ -74,9 +74,9 @@ The historical runner hard-coded `holdout-rag-v1.0-freeze.json`, which already e
 
 Candidate manifests with a holdout status other than `sealed_unexecuted` cannot execute. This prevents `owner_review_pending` data from being exposed to provider calls accidentally.
 
-## Owner review gate
+## Owner review gate — complete
 
-Before sealing, the owner should review:
+The owner approved the following review scope on 2026-09-06:
 
 1. whether each question resembles an acceptable customer question;
 2. whether each expected answer and required-fact list reflects company policy;
@@ -85,4 +85,4 @@ Before sealing, the owner should review:
 5. whether `v1.1-holdout-014` correctly treats official agency authorization as unknown;
 6. whether the 15-case coverage is sufficient for the V1.1 small-sample gate.
 
-After owner approval, update the manifest and authoring status to `sealed_unexecuted`, record the final clean commit/hash state, and only then authorize the one-time Step 5B run.
+The manifest status is `sealed_unexecuted`. Step 5B is authorized for one run; any interrupted or failed attempt remains an attempt and must not be automatically repeated.

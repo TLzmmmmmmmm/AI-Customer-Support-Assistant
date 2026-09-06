@@ -4,7 +4,9 @@
   "candidate_snapshot_version": "rag-v1.1",
   "created_on": "2026-09-06",
   "evaluation_role": "release_candidate_with_new_unseen_holdout",
-  "preparation_status": "owner_review_pending",
+  "preparation_status": "sealed_unexecuted",
+  "owner_review_completed_on": "2026-09-06",
+  "seal_parent_git_commit": "83ba100050fe394799da9d15235c13150998d723",
   "prepared_from_git_commit": "849957cd4719ce2bee41aa5f366b8a4908c23901",
   "git_worktree_dirty_at_preparation": true,
   "split_counts": {
@@ -122,12 +124,12 @@
   },
   "rubric_version": "day7-owner-approved-v1.1",
   "review_policy": {
-    "authoring": "Assistant evidence review complete; owner review pending before sealing.",
+    "authoring": "Assistant evidence review and owner review complete; holdout sealed before execution.",
     "generation_scoring": "Use explicit Correctness, Groundedness, Completeness and Refusal fields; no LLM judge and no aggregate score.",
     "approval": "Owner must confirm questions, ground truth and evidence before status changes to sealed_unexecuted."
   },
   "holdout_policy": {
-    "status": "owner_review_pending",
+    "status": "sealed_unexecuted",
     "newly_authored": true,
     "performance_used_for_tuning": false,
     "execution_count": 0,
