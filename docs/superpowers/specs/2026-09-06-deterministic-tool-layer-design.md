@@ -147,11 +147,14 @@ ProductSearchItem:
     sources: list[SourceRef]
 ```
 
-Each `product_id` appears at most once. `relevant_content` is the highest-ranked
-matching source chunk returned by the Retriever and is not rewritten or
-summarized by the tool. The public tool result does not expose cosine score;
-ordering expresses relative retrieval rank, while the underlying
-`RetrievalResult` retains its score for diagnostics.
+Each `product_id` appears at most once. For `search_products`, `top_k=5` means
+five final unique products, not five raw chunk hits before deduplication. If at
+least five distinct matching product parents are available, duplicate chunks
+from a highly ranked product must not reduce the result below five products.
+`relevant_content` is the highest-ranked matching source chunk returned for
+that product and is not rewritten or summarized by the tool. The public tool
+result does not expose cosine score; ordering expresses relative retrieval
+rank, while the underlying `RetrievalResult` retains its score for diagnostics.
 
 ## Error Contract
 
@@ -233,8 +236,10 @@ artifact.
 4. Call the Retriever with server-owned settings equivalent to
    `top_k=5`, `allowed_types={"product"}`, and
    `unique_parent_documents=True`.
-5. Return at most five unique products in Retriever order.
-6. Map each hit to structured source-owned identity/category fields, its raw
+5. Apply the limit after product-type filtering and unique-parent grouping, so
+   `top_k=5` counts final unique products rather than raw chunk hits.
+6. Return at most five unique products in Retriever order.
+7. Map each hit to structured source-owned identity/category fields, its raw
    relevant chunk, and `SourceRef`.
 
 The tool guarantees product-only, bounded, deduplicated candidates. It does not
@@ -252,9 +257,12 @@ unique_parent_documents: bool = False
 ```
 
 Type restriction is applied while selecting vector-index candidates, not by
-discarding an already truncated mixed-type result. Unique-parent selection
-keeps the highest-scoring chunk for each parent document so a product cannot
-consume more than one of the five result slots.
+discarding an already truncated mixed-type result. For unique-parent searches,
+the index first filters candidates by type, then scores raw chunks, groups them
+by `parent_document_id`, keeps the highest-scoring chunk in each group, ranks
+the groups, and only then applies `top_k`. A product therefore cannot consume
+more than one result slot, and duplicate chunks cannot cause a five-product
+request to return fewer than five when five distinct product parents exist.
 
 Both options default to the current behavior. Calls from `/api/chat-stream`
 continue to omit them, preserving general RAG retrieval, entity precedence,
@@ -320,7 +328,10 @@ real embedding provider.
 - Pass the stripped query directly to the fake Retriever once.
 - Reject blank, non-string, and overlength queries before retrieval.
 - Enforce product filtering, unique parents, and a maximum of five products.
-- Preserve ranking while removing duplicate products.
+- Prove that `top_k=5` yields five final unique products when the candidate set
+  contains at least five distinct products, even if the highest raw chunk hits
+  contain duplicates.
+- Preserve ranking while selecting each product's highest-scoring chunk.
 - Include provenance and omit score.
 - Map a missing Retriever and known retrieval availability failures to
   `TOOL_UNAVAILABLE`.
