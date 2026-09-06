@@ -1,4 +1,5 @@
 knowledge/documents.jsonl text eol=lf
+knowledge/chunks.jsonl text eol=lf
 knowledge/source/**/*.json text eol=lf
 
 # Raw-byte Day 6 snapshot seals must survive Windows checkouts unchanged.
