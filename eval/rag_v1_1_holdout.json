@@ -6,19 +6,18 @@
       "id": "v1.1-holdout-001",
       "category": "product_spec",
       "split": "holdout",
-      "question": "HR1060参数里的13.6V±15%和100–240V分别代表什么？资料有没有给出电池容量？",
-      "expected_behavior": "partial_answer",
-      "expected_answer": "13.6V±15%是直流电源电压，100–240V是交流电源电压；它们都不是电池容量。当前资料没有给出HR1060的电池容量，无法确认该数值。",
-      "expected_document_ids": ["product:hr1060"],
-      "expected_chunk_ids": ["product:hr1060:content"],
+      "question": "腔体合路器标注“连续功率：每信道不低于50W”，这里的50W是整台设备合计，还是每一路信道的指标？",
+      "expected_behavior": "answer",
+      "expected_answer": "50W是每一路信道的连续功率指标，不是整台设备所有信道合计50W；资料表述为每信道不低于50W。",
+      "expected_document_ids": ["product:cavity-combiner"],
+      "expected_chunk_ids": ["product:cavity-combiner:content"],
       "expected_system_rule_ids": [],
       "required_facts": [
-        "13.6V±15%对应直流电源电压。",
-        "100–240V对应交流电源电压。",
-        "资料未给出电池容量，无法确认。"
+        "50W是每信道的连续功率指标。",
+        "资料值为每信道不低于50W。"
       ],
       "forbidden_claims": [
-        "不得把电源电压解释为电池容量或编造mAh数值。"
+        "不得把每信道指标解释为整台设备所有信道合计50W。"
       ]
     },
     {
@@ -102,18 +101,18 @@
       "id": "v1.1-holdout-006",
       "category": "product_spec",
       "split": "holdout",
-      "question": "LY598能不能一键对频？它明确列出的提醒或语音辅助功能有哪些？",
+      "question": "防病毒网关生成的安全报告能不能直接导出成Excel的XLSX文件？资料明确支持哪些导出格式？",
       "expected_behavior": "answer",
-      "expected_answer": "LY598不具备一键对频功能。其公开资料明确列出了智能降噪、一键报警和电量播报。",
-      "expected_document_ids": ["product:ly598"],
-      "expected_chunk_ids": ["product:ly598:content"],
+      "expected_answer": "防病毒网关不具备XLSX格式的安全报告导出功能；资料明确列出的导出格式是doc、pdf和mht。",
+      "expected_document_ids": ["product:gateway"],
+      "expected_chunk_ids": ["product:gateway:content"],
       "expected_system_rule_ids": ["product_capability_closed_world_v1"],
       "required_facts": [
-        "LY598不具备一键对频功能。",
-        "明确列有智能降噪、一键报警和电量播报。"
+        "不具备XLSX格式导出功能。",
+        "明确支持doc、pdf和mht格式。"
       ],
       "forbidden_claims": [
-        "不得把一键报警误写成一键对频。"
+        "不得把doc、pdf或mht扩展成未列出的XLSX格式。"
       ]
     },
     {
@@ -139,7 +138,7 @@
       "id": "v1.1-holdout-008",
       "category": "product_recommendation",
       "split": "holdout",
-      "question": "我要把多台基地发射机接到同一根发射天线上，并尽量抑制带外噪声和互调；不是做收发信号隔离。应该进一步看合路器还是双工器？",
+      "question": "我要把多台基地发射机接到同一根发射天线上，并尽量抑制带外噪声和互调。应该进一步看合路器还是双工器？",
       "expected_behavior": "answer",
       "expected_answer": "应进一步看腔体合路器。它用于把多台基地发射机接入一根发射天线，并通过高Q腔体和环行隔离器等组件抑制带外噪声、高次谐波及互调干扰；双工器主要用于隔离发射和接收信号。",
       "expected_document_ids": ["product:cavity-combiner", "product:band-pass-duplexer"],
@@ -250,17 +249,18 @@
       "id": "v1.1-holdout-014",
       "category": "unknown",
       "split": "holdout",
-      "question": "盛博润是海能达的官方授权代理商吗？如果是，请给出授权范围。",
+      "question": "国产5W短波电台资料列了搭配3米、15米和44米天线时的通信距离，这是否表示三种天线都会作为免费标配随电台一起交付？",
       "expected_behavior": "abstain",
-      "expected_answer": "当前资料不能确认盛博润是海能达的官方授权代理商，也不能确认授权范围，因此不作推测。",
-      "expected_document_ids": [],
-      "expected_chunk_ids": [],
+      "expected_answer": "不能据此确认。资料只是给出搭配不同天线时的通信距离，没有说明这三种天线都会作为免费标准配置随电台交付，因此不作推测。",
+      "expected_document_ids": ["product:domestic-5w"],
+      "expected_chunk_ids": ["product:domestic-5w:content"],
       "expected_system_rule_ids": [],
       "required_facts": [
-        "明确说明无法确认官方代理关系及授权范围。"
+        "明确区分测试/搭配条件与标准随货配置。",
+        "说明无法确认三种天线是否免费标配交付。"
       ],
       "forbidden_claims": [
-        "不得由产品记录、业务往来或知识库收录推断官方代理关系。"
+        "不得由通信距离的天线条件推断三种天线免费附带或属于标准配置。"
       ]
     },
     {

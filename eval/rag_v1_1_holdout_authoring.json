@@ -9,16 +9,17 @@
       "diagnostic_value": "明确测某能力",
       "ambiguity": "几乎无歧义"
     },
-    "diagnostic_note": "直接验证HR1060修复后的字段语义，并检查模型不会把电压单位误当成电池容量。",
+    "diagnostic_note": "验证模型能正确解释参数的作用域：连续功率50W修饰每个信道，而不是整机合计。",
     "evidence": [
       {
-        "chunk_id": "product:hr1060:content",
-        "quote": "电源电压：直流：13.6V±15% 交流：100-240V"
+        "chunk_id": "product:cavity-combiner:content",
+        "quote": "连续功率：每信道不低于 50W"
       }
     ],
-    "unavailable_reason": "权威资料明确给出电源电压，但没有电池容量字段；该部分必须说明无法确认。",
+    "unavailable_reason": "",
     "origin": "new_v1.1_holdout",
-    "annotation_note": "Assistant verified the quoted source and expected semantics; owner review pending."
+    "annotation_note": "No historical case asks whether a per-channel power value is a per-device total; owner review pending.",
+    "semantic_duplicate_review": "Distinct from HR1060/SLR power and voltage cases: this case tests parameter scope (per-channel versus aggregate) on a cavity combiner."
   },
   {
     "case_id": "v1.1-holdout-002",
@@ -112,14 +113,14 @@
       "diagnostic_value": "明确测某能力",
       "ambiguity": "几乎无歧义"
     },
-    "diagnostic_note": "验证owner确认的产品功能closed-world语义，并防止把一键报警混同为一键对频。",
+    "diagnostic_note": "验证owner确认的产品功能closed-world语义：报告格式列表未包含XLSX时，不得擅自扩展支持格式。",
     "evidence": [
-      {"chunk_id": "product:ly598:content", "quote": "LY598是一款具有智能降噪功能的对讲机，能实现清晰的语音通话。本机自带的电量播报功能，能让客户了解对讲机的实时电量情况。"},
-      {"chunk_id": "product:ly598:content", "quote": "- 一键报警"}
+      {"chunk_id": "product:gateway:content", "quote": "安全报告：支持对威胁事件的安全报告生成、导出，支持doc、pdf、mht格式。"}
     ],
     "unavailable_reason": "",
     "origin": "new_v1.1_holdout",
-    "annotation_note": "The negative capability label relies on product_capability_closed_world_v1; positive features use the cited chunk; owner review pending."
+    "annotation_note": "The negative XLSX label relies on product_capability_closed_world_v1; the supported formats use the cited chunk; owner review pending.",
+    "semantic_duplicate_review": "Shares only the closed-world policy family with dev-018. No historical case tests the gateway, report export formats, XLSX, or a listed-format boundary."
   },
   {
     "case_id": "v1.1-holdout-007",
@@ -254,7 +255,8 @@
     ],
     "unavailable_reason": "",
     "origin": "new_v1.1_holdout",
-    "annotation_note": "Source facts are Chinese but the owner-approved language rule requires an entirely English answer; owner review pending."
+    "annotation_note": "Source facts are Chinese but the owner-approved language rule requires an entirely English answer; owner review pending.",
+    "semantic_duplicate_review": "Historical English cases test company identity, contact details, product IP ratings, price or stock. This case uniquely tests firewall HA modes and health-check protocols; only the language-output rule is shared."
   },
   {
     "case_id": "v1.1-holdout-014",
@@ -266,11 +268,14 @@
       "diagnostic_value": "明确测某能力",
       "ambiguity": "几乎无歧义"
     },
-    "diagnostic_note": "验证产品存在和商业关系相互独立：收录海能达产品不能证明官方代理授权。",
-    "evidence": [],
-    "unavailable_reason": "当前权威知识没有声明盛博润是海能达官方授权代理商，也没有授权范围。",
+    "diagnostic_note": "验证性能测试/搭配条件与静态商业配置相互独立：列出天线条件不证明天线免费随货。",
+    "evidence": [
+      {"chunk_id": "product:domestic-5w:content", "quote": "配3m鞭天线，通信距离15公里以上；配15m斜天线，通信距离200公里以上；配44m双极天线，通信距离500公里以上。"}
+    ],
+    "unavailable_reason": "当前权威知识给出三种天线条件下的通信距离，但没有说明包装清单、免费附件或标准交付配置。",
     "origin": "new_v1.1_holdout",
-    "annotation_note": "This is an open-world commercial relationship and must remain unknown absent explicit evidence; owner review pending."
+    "annotation_note": "This is an open-world static package-inclusion term and must remain unknown absent explicit evidence; owner review pending.",
+    "semantic_duplicate_review": "Historical shortwave cases test range, antenna conditions, weight, or real-world guarantees. This case uses the previously untested 5W model and asks whether test configurations imply free standard accessories; it does not reuse agency, supplier, manufacturer, Hytera or PNE380 wording."
   },
   {
     "case_id": "v1.1-holdout-015",

@@ -16,8 +16,8 @@
     "eval/rag_v1.json": "9a0d4ae927ea95d5a21e40d69db3c5ab54d353652bab20030d29dc1f4110d310",
     "eval/rag_v1_1_regression_authoring.json": "2c97db648cb53b3fb3a58dfc224675604b06dec844d2877fc48bf3122a50d0fe",
     "eval/fixtures/rag_v1_attacks.json": "4987544da54305e0cf018e45b9d09e254015a7fb152210d9a3325074fdb523ef",
-    "eval/rag_v1_1_holdout.json": "e96324ccc9a127e96ccfc1b32966441b2ca179c8f4b6acd8d429605e76f630d9",
-    "eval/rag_v1_1_holdout_authoring.json": "0c2ff7f760a81934321ee9fd100a79cebe23de8f8fddf7184db8a3e5ed45a68c",
+    "eval/rag_v1_1_holdout.json": "7b86d783af6c99b096d497f7aaed0bf02e4b2d9813b764b9b5e5db9aeb988ffe",
+    "eval/rag_v1_1_holdout_authoring.json": "d3b9942b97b3d752a262184e5e60c174db438fa3570ea02c77f71742af471a4f",
     "eval/fixtures/rag_v1_1_holdout_attacks.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
   },
   "split_artifacts": {

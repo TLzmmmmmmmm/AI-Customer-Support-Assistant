@@ -1,0 +1,191 @@
+{
+  "schema_version": "1.0",
+  "experiment_version": "day7-step3-v1",
+  "approved_maximum_provider_calls": 96,
+  "budget_amendment": "Step 3 owner-authorized diagnostic work: operational cap raised from 64 to 96 before v2 regression to reserve possible retries after the first filter exposed two failures. This is an operator cap, not a new owner-imposed spending limit.",
+  "runs": [
+    {
+      "reservation_id": "a403c5d51f6d4838ad04db66cef6fc9f",
+      "phase": "initial_pairs",
+      "case_ids": [
+        "structure-probe:tb-hide-value-attacked-r1",
+        "structure-probe:tb-force-refusal-attacked-r1"
+      ],
+      "reserved_provider_calls": 4,
+      "actual_provider_calls": 2,
+      "status": "completed",
+      "output": "eval/results/day7-step3-structure-probe-20260905T052726Z.jsonl",
+      "output_sha256": "2cbad24ce8a94c3333de7164e2bdfcdd143bf210731d5ce888a1337ae48c333a"
+    },
+    {
+      "reservation_id": "876c1054dfe54fbc8dbd50566d9dc417",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "procedure-probe:tb-hide-value-attacked-r1",
+        "procedure-probe:tb-force-refusal-attacked-r1"
+      ],
+      "reserved_provider_calls": 4,
+      "actual_provider_calls": 2,
+      "status": "completed",
+      "output": "eval/results/day7-step3-procedure-probe-20260905T052750Z.jsonl",
+      "output_sha256": "d54631578888d4df42dd0b80321c8b20e1d9ba2d2b48036c072bb383d6ec3815"
+    },
+    {
+      "reservation_id": "8a0bc652d3a0426caca63e2d82fc44f1",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "production-probe:tb-hide-value-attacked-r1",
+        "production-probe:tb-force-refusal-attacked-r1"
+      ],
+      "reserved_provider_calls": 4,
+      "actual_provider_calls": 2,
+      "status": "completed",
+      "output": "eval/results/day7-step3-production-probe-20260905T053224Z.jsonl",
+      "output_sha256": "8f1ae59d1f6b220f9f61fd0dddde958ddc72930b6fc08ee810457435f9e6f239"
+    },
+    {
+      "reservation_id": "1a272cec410b4f53a65d095309e79782",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "production-regression:tb-change-value-clean",
+        "production-regression:tb-change-value-attacked-r1",
+        "production-regression:tb-hide-value-clean",
+        "production-regression:tb-hide-value-attacked-r1",
+        "production-regression:tb-force-refusal-clean",
+        "production-regression:tb-force-refusal-attacked-r1",
+        "production-regression:tb-fake-authority-clean",
+        "production-regression:tb-fake-authority-attacked-r1",
+        "production-regression:tb-ignore-evidence-clean",
+        "production-regression:tb-ignore-evidence-attacked-r1",
+        "production-regression:tb-redirect-contact-clean",
+        "production-regression:tb-redirect-contact-attacked-r1",
+        "production-regression:dev-010",
+        "production-regression:dev-024",
+        "production-regression:dev-027",
+        "production-regression:dev-028",
+        "production-regression:dev-029",
+        "production-regression:dev-030",
+        "production-regression:private-config",
+        "production-regression:hidden-prompt"
+      ],
+      "reserved_provider_calls": 40,
+      "actual_provider_calls": 20,
+      "status": "completed",
+      "output": "eval/results/day7-step3-production-regression-20260905T053325Z.jsonl",
+      "output_sha256": "904bf8c5f0d9e01a512ea993c6a04fd0682010d3b1279daf1348f43b854288c4"
+    },
+    {
+      "reservation_id": "1b0496a908e24abc8bfd7349639796b0",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "production-v2-regression:tb-change-value-clean",
+        "production-v2-regression:tb-change-value-attacked-r1",
+        "production-v2-regression:tb-hide-value-clean",
+        "production-v2-regression:tb-hide-value-attacked-r1",
+        "production-v2-regression:tb-force-refusal-clean",
+        "production-v2-regression:tb-force-refusal-attacked-r1",
+        "production-v2-regression:tb-fake-authority-clean",
+        "production-v2-regression:tb-fake-authority-attacked-r1",
+        "production-v2-regression:tb-ignore-evidence-clean",
+        "production-v2-regression:tb-ignore-evidence-attacked-r1",
+        "production-v2-regression:tb-redirect-contact-clean",
+        "production-v2-regression:tb-redirect-contact-attacked-r1",
+        "production-v2-regression:dev-010",
+        "production-v2-regression:dev-024",
+        "production-v2-regression:dev-027",
+        "production-v2-regression:dev-028",
+        "production-v2-regression:dev-029",
+        "production-v2-regression:dev-030",
+        "production-v2-regression:private-config",
+        "production-v2-regression:hidden-prompt"
+      ],
+      "reserved_provider_calls": 40,
+      "actual_provider_calls": 20,
+      "status": "completed",
+      "output": "eval/results/day7-step3-production-v2-regression-20260905T054221Z.jsonl",
+      "output_sha256": "20902117b6b5fc95121e71fdadaafd0d78101af5e043f74423550de84c2ed801"
+    },
+    {
+      "reservation_id": "3db110163bdd4a638f957e7a1a254a16",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "production-v2-repeat:tb-change-value-attacked-r2",
+        "production-v2-repeat:tb-change-value-attacked-r3",
+        "production-v2-repeat:tb-hide-value-attacked-r2",
+        "production-v2-repeat:tb-hide-value-attacked-r3",
+        "production-v2-repeat:tb-force-refusal-attacked-r2",
+        "production-v2-repeat:tb-force-refusal-attacked-r3",
+        "production-v2-repeat:tb-redirect-contact-attacked-r2",
+        "production-v2-repeat:tb-redirect-contact-attacked-r3"
+      ],
+      "reserved_provider_calls": 16,
+      "actual_provider_calls": 8,
+      "status": "completed",
+      "output": "eval/results/day7-step3-production-v2-repeat-20260905T054515Z.jsonl",
+      "output_sha256": "09da8f7596d208fd6ff316530ec5481acb3ab1e3bab60868c493a154c6017a8e"
+    },
+    {
+      "reservation_id": "10fb82470d6a48a39d7e1c0657aa7151",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "current-review:hide-customer",
+        "current-review:must-reply",
+        "current-review:replace-answer",
+        "current-review:ignore-refuse",
+        "current-review:english-ignore",
+        "current-review:inline-heading"
+      ],
+      "reserved_provider_calls": 12,
+      "actual_provider_calls": 6,
+      "status": "completed",
+      "output": "eval/results/day7-step3-current-review-20260905T090444Z.jsonl",
+      "output_sha256": "0897671342bd1156d0a17682f6b7d2644240949aa1b183b110bc1153fc262b31"
+    },
+    {
+      "reservation_id": "22a9ec0d6c3a4f6ca94c0e3a755e3748",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "current-user-injection:upi-001",
+        "current-user-injection:upi-002",
+        "current-user-injection:upi-003",
+        "current-user-injection:upi-004",
+        "current-user-injection:upi-005",
+        "current-user-injection:upi-006",
+        "current-user-injection:upi-007",
+        "current-user-injection:upi-008",
+        "current-user-injection:upi-009",
+        "current-user-injection:upi-010"
+      ],
+      "reserved_provider_calls": 20,
+      "actual_provider_calls": 10,
+      "status": "completed",
+      "output": "eval/results/day7-step3-current-user-injection-20260905T094944Z.jsonl",
+      "output_sha256": "e05df148735d3ac26c181fa86ce2478d22e5264b4b38eeaa7bfb6fc72402d501"
+    },
+    {
+      "reservation_id": "55637c79da844b4d92b9078c7ecdd19c",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "current-user-injection-english-check:upi-008"
+      ],
+      "reserved_provider_calls": 2,
+      "actual_provider_calls": 1,
+      "status": "completed",
+      "output": "eval/results/day7-step3-current-user-injection-english-check-20260905T095844Z.jsonl",
+      "output_sha256": "646db43d51fca1da31ce40ebddc122a3b91e76a0b78cf98f7b2529581a3e4277"
+    },
+    {
+      "reservation_id": "aaa3696572b74b90b4332945a378571a",
+      "phase": "diagnostic_repeats",
+      "case_ids": [
+        "current-user-injection-english-envelope:upi-008"
+      ],
+      "reserved_provider_calls": 2,
+      "actual_provider_calls": 1,
+      "status": "completed",
+      "output": "eval/results/day7-step3-current-user-injection-english-envelope-20260905T100143Z.jsonl",
+      "output_sha256": "9af1ed1da784da37c85c77a3bedd4b31a0831f5401720e92d6d7a4acf537706a"
+    }
+  ],
+  "actual_provider_calls": 72
+}

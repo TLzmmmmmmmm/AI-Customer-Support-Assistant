@@ -28,12 +28,12 @@ The 15 cases are new and do not exactly duplicate the 50 Dev/Frozen questions, t
 
 | ID | Area | Primary diagnostic |
 | --- | --- | --- |
-| v1.1-holdout-001 | HR1060 | Supply-voltage semantics versus absent battery capacity |
+| v1.1-holdout-001 | Cavity combiner | Per-channel power versus aggregate-device power |
 | v1.1-holdout-002 | Wireless AP | PoE, wired-port and wireless-rate attribution |
 | v1.1-holdout-003 | AP controller | Multi-fact hardware coverage |
 | v1.1-holdout-004 | Duplexer | Correct slash-delimited parameter column |
 | v1.1-holdout-005 | JoMesh-OD10W | Alternative power inputs and environmental limits |
-| v1.1-holdout-006 | LY598 | Closed-world product capability semantics |
+| v1.1-holdout-006 | Antivirus gateway | Closed-world report export formats |
 | v1.1-holdout-007 | Optical repeaters | Comparison without invalid bound inference |
 | v1.1-holdout-008 | Combiner/duplexer | Semantic product recommendation by purpose |
 | v1.1-holdout-009 | Petrochemical solution | Channel allocation and IIB/IIC terminal planning |
@@ -41,10 +41,21 @@ The 15 cases are new and do not exactly duplicate the 50 Dev/Frozen questions, t
 | v1.1-holdout-011 | Solution design | Service-stage and planning-factor identification |
 | v1.1-holdout-012 | Company | Explicit self-developed/produced product scope |
 | v1.1-holdout-013 | Firewall | English-only response plus two product facts |
-| v1.1-holdout-014 | Unknown | Explicit open-world agency relationship |
+| v1.1-holdout-014 | Unknown | Antenna test conditions versus free standard accessories |
 | v1.1-holdout-015 | Unknown | Dynamic stock and transaction price |
 
-Category counts are 7 product-specification, 2 product-recommendation, 2 solution, 1 support, 1 company, and 2 unknown cases. Expected behaviors are 12 answers, 1 partial answer, and 2 abstentions. There are no synthetic-context fixtures because retrieved-context supply-chain injection is outside the current blocking threat model.
+Category counts are 7 product-specification, 2 product-recommendation, 2 solution, 1 support, 1 company, and 2 unknown cases. Expected behaviors are 13 answers and 2 abstentions. There are no synthetic-context fixtures because retrieved-context supply-chain injection is outside the current blocking threat model.
+
+## Semantic and intent duplicate review
+
+| Case | Dev/Frozen comparison | Day 6 holdout comparison | Day 5 comparison | Conclusion |
+| --- | --- | --- | --- | --- |
+| 001 | Historical parameter cases ask for values or upper-bound meaning, not whether a per-channel value is an aggregate-device value. | The prior temperature-semantics case concerns working versus storage temperature on different products. | Radio power qualifiers concern maximum versus constant output. | New product class, parameter and scope distinction; not an intent duplicate. |
+| 006 | `dev-018` exercises the same required closed-world policy family but uses LY198/LY598 and one-key pairing. | No prior holdout case tests gateway report export formats. | No Day 5 case tests gateways, report formats or XLSX. | Deliberately shares only the policy under test; product and feature are unseen. |
+| 013 | Prior English cases concern company identity/contact, product IP ratings, prices or stock. | The prior English holdout concerns company operations services. | Day 5 English cases concern identity, radio specifications and commercial unknowns. | Firewall HA modes and health-check protocols are new; only the English-output rule is shared. |
+| 014 | Prior shortwave cases test communication distance or real-world guarantees; commercial cases test price, stock, delivery, warranty or relationships. | The prior shortwave holdout compares 125W/500W range and weight, not the 5W model or package contents. | Day 5 has no packaging/accessory-inclusion question. | New product variant and static package-inclusion boundary; not an intent duplicate. |
+
+This review is manual and evidence-based; no embedding model, retrieval system, generation model or LLM judge was used for similarity checking.
 
 ## Offline validation
 
@@ -53,6 +64,7 @@ Category counts are 7 product-specification, 2 product-recommendation, 2 solutio
 - Authoring reviews: 15/15 present.
 - Evidence quotes: every quote exists verbatim in its referenced chunk and parent document.
 - Exact-question duplicate scan: no duplicate against Dev, Frozen, historical Day 6 holdout, or parsed Day 5 questions.
+- Semantic-intent duplicate review: cases 001, 006, 013 and 014 use new products/facts or new claim boundaries; details are recorded in their authoring entries.
 - Candidate generation preflight: passed with 15 planned query embeddings and 15 planned generations; no API was called.
 - Pending-review execution guard: passed; an attempted execution stopped before provider construction and created no V1.1 result or freeze file.
 

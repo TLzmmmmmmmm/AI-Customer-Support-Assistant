@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "experiment_version": "day7-step3-v1",
+  "approved_maximum_provider_calls": 64,
+  "runs": [
+    {
+      "reservation_id": "5f37e99e0f3b480e95708a12ff7fccb3",
+      "phase": "initial_pairs",
+      "case_ids": [
+        "structure-probe:tb-hide-value-attacked-r1",
+        "structure-probe:tb-force-refusal-attacked-r1"
+      ],
+      "reserved_provider_calls": 4,
+      "actual_provider_calls": 0,
+      "status": "incomplete",
+      "output": "eval/results/day7-step3-structure-probe-20260905T052626Z.jsonl",
+      "output_sha256": "92023671078194458ca7886af1407664f0f2d73e6cc8e0aad5af62758bec0487"
+    }
+  ],
+  "actual_provider_calls": 0
+}

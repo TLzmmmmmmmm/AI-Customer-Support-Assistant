@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "experiment_version": "day7-trust-boundary-v1",
+  "authority": "Day 7 Step 1 acceptance contract and Day 6 actual-run snapshots",
+  "step_1_commit": "3618e3c9a2073a0d8a5cbee79984d527b7a0d18b",
+  "sha256": {
+    "main.py": "61cb2de087dc4bfcb9cd3306a77723b3821f8909be6266a23b5699ee8a065024",
+    "config.py": "b86d089e4cd0bf97335bee750931fb27e73335e27adc3fc0f3835283d041613f",
+    "models.py": "58c67505852636e9f5fb500289fdb5827d2076e01fe08b0b1926fe4f5cb1773e",
+    "routes/chat.py": "382399bc4a3702a1d376259d7497525d8eb7244116985fd18e475dee6146d37a",
+    "services/retrieval.py": "a8064f7fa6b35a15dae9a0f8288601d652d92389d201d2e33f89a3d6eb57a71f",
+    "services/llm.py": "d6b28d2c06ec8baececaed2e3abc8db6c6f3acd73d75b9c43aaeee2782d4f4a4",
+    "rag_context.py": "0f2354de60f8d91c59e494304fd39adb1eebd584f7c164344d6e35581376f340",
+    "prompts.py": "b62feb8f53c71b1eef7a411bdd2b6d6e30c9d36437f610ec99b1d38c35ef2a85",
+    "rate_limit.py": "6e56ab445b4c8a813cac67c4f418c113369f3014e7105df15bd9c2f9a2dfd2a5",
+    "concurrency.py": "3b19d21bbda04f8bc978beebb24ff3ee01892b52ed48089b4041ead6dd1ea36c",
+    "app_logging.py": "38e425732b22845412c9eb83185405e19e5477f585e5876d6e70803fd3746121",
+    "error_handling.py": "06199501415ae2c9c05457ce701665be57d1e56fa670af32a916e9432845723d",
+    "knowledge_pipeline/retrieval/retriever.py": "f0baae3a85aa61c53f5a61a8009c6c3818b9ba7d1869096f17827a7eef19d8b5",
+    "knowledge_pipeline/retrieval/index.py": "a01971f943ab58f27f40a83a1275f47e138d46366efddb28da12c13ddbccab9c",
+    "knowledge_pipeline/retrieval/entities.py": "e608c74b9033a775df0f7554976681f9732b2b4a81e1b870e24cb3eeefa5cb59",
+    "knowledge_pipeline/retrieval/embedding.py": "dede345da0f279d6069fbfb72696bab201328ce2e60c270992a0d5e5140108f1",
+    "knowledge_pipeline/retrieval/config.py": "f79e5ae73d4891927626e7c4d7feec7490a7ade39d2731d846f38bdefd8eab37",
+    "knowledge_pipeline/retrieval/models.py": "602c065bd6bb2b3df014b2eac8d1d3e0e4f30f967423824717c457a1ab046005",
+    "knowledge_pipeline/retrieval/records.py": "191da3a7a0ec35529a6f630822240ef1071c017dfe45af0b7fc4358bbe322363",
+    "eval/trust_boundary_v1.json": "222e0d1fd1689b5d9b2a99b5dc9435bc5792f06760a21b4bf49723edfd741212",
+    "knowledge/documents.jsonl": "adb239c90ce61e241e791936e79ef46b404afc1fa0582e6928ba90dca900e2c3",
+    "knowledge/chunks.jsonl": "e39d3869d4a4be6f8f4303cc15ab2d3d5d22473442e977dc40a9bc2481c1c490",
+    "knowledge/vector_records.jsonl": "2605623d56af69f9c0d0e639a34494f6bbdc7c2b0b3e72066e33bd3e6674aa62"
+  }
+}
