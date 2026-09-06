@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from uuid import uuid4
 
@@ -19,8 +20,18 @@ if str(ROOT) not in sys.path:
 from evaluation.dataset import read_json
 from evaluation.generation import run_generation_cases
 from knowledge_pipeline.retrieval import EmbeddingConfig, RetrievalConfig, load_vector_records, validate_records_against_chunks
-from scripts.evaluate_rag_retrieval import _load_selected, _sha256, _git_state, EvaluationInputError
+from scripts.evaluate_rag_retrieval import (
+    _git_state, _load_selected, _manifest_label, _resolve_manifest, _sha256, _split_paths,
+    EvaluationInputError,
+)
 from services.retrieval import build_retriever
+
+
+def _holdout_freeze_path(root: Path, manifest: dict) -> Path:
+    candidate = manifest.get("candidate_snapshot_version", manifest.get("dataset_version"))
+    if not isinstance(candidate, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", candidate) is None:
+        raise EvaluationInputError("invalid candidate snapshot identifier")
+    return root / "eval/results" / f"holdout-{candidate}-freeze.json"
 
 
 def main(argv=None):
@@ -28,6 +39,8 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--split", choices=("dev", "frozen", "holdout"), default="dev")
     parser.add_argument("--allow-holdout", action="store_true", help="Step 8 only; freeze and run holdout once")
+    parser.add_argument("--manifest", type=Path, help="Manifest .json inside eval (defaults to Day 6 manifest)")
+    parser.add_argument("--case-id", action="append", dest="case_ids", help="Run only this case ID; repeatable")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--output", type=Path, help="New .jsonl under eval/results")
     args = parser.parse_args(argv)
@@ -35,15 +48,29 @@ def main(argv=None):
         if args.split == "holdout" and not args.allow_holdout:
             raise EvaluationInputError("holdout requires --allow-holdout")
         root = args.root.resolve()
-        cases, chunks, manifest, snapshots = _load_selected(root, args.split)
+        manifest_path = _resolve_manifest(root, args.manifest)
+        cases, chunks, manifest, snapshots = _load_selected(root, args.split, manifest_path)
+        if (args.split == "holdout" and args.execute
+            and manifest.get("candidate_snapshot_version")
+            and manifest.get("holdout_policy", {}).get("status") != "sealed_unexecuted"):
+            raise EvaluationInputError("candidate holdout must be owner-reviewed and sealed before execution")
+        if args.case_ids:
+            if len(args.case_ids) != len(set(args.case_ids)):
+                raise EvaluationInputError("case IDs must not be duplicated")
+            available = {case.id for case in cases}
+            missing = [case_id for case_id in args.case_ids if case_id not in available]
+            if missing:
+                raise EvaluationInputError("selected case ID is absent from the requested split")
+            requested = set(args.case_ids)
+            cases = [case for case in cases if case.id in requested]
         values = {key: value for key, value in dotenv_values(root / ".env").items() if value is not None}
         values.update(os.environ)
         embedding = EmbeddingConfig.from_mapping(values)
         retrieval = RetrievalConfig.from_mapping(values)
         validate_records_against_chunks(load_vector_records(root / "knowledge/vector_records.jsonl"), chunks, embedding)
         selected_fixtures = {case.fixture_id for case in cases if case.fixture_id}
-        fixture_name = "rag_v1_holdout_attacks.json" if args.split == "holdout" else "rag_v1_attacks.json"
-        fixtures = [row for row in read_json(root / "eval/fixtures" / fixture_name) if row["id"] in selected_fixtures]
+        fixture_path = _split_paths(manifest, args.split)[2]
+        fixtures = [row for row in read_json(root / fixture_path) if row["id"] in selected_fixtures]
         # Production configuration, never a separate generation model or parameter set.
         import config
         plan = {"mode": "execute" if args.execute else "preflight", "split": args.split,
@@ -52,7 +79,9 @@ def main(argv=None):
                 "top_k": retrieval.top_k, "embedding_model": embedding.model,
                 "embedding_dimensions": embedding.dimensions, "generation_model": config.DEEPSEEK_MODEL,
                 "generation_parameters": "unchanged_production", "history_mode": "single_turn",
-                "request_interval_seconds": config.RATE_LIMIT_WINDOW_SECONDS / config.RATE_LIMIT_REQUESTS + 0.1}
+                "request_interval_seconds": config.RATE_LIMIT_WINDOW_SECONDS / config.RATE_LIMIT_REQUESTS + 0.1,
+                "manifest": _manifest_label(root, manifest_path),
+                "selected_case_ids": [case.id for case in cases]}
         if not args.execute:
             print(json.dumps(plan, ensure_ascii=False, indent=2))
             return 0
@@ -74,7 +103,7 @@ def main(argv=None):
             "knowledge_pipeline/retrieval/embedding.py", "knowledge_pipeline/retrieval/config.py",
         )
         code_hashes = {path: _sha256(ROOT / path) for path in code_paths}
-        manifest_hash = _sha256(root / "eval/rag_v1_manifest.json")
+        manifest_hash = _sha256(manifest_path)
         metadata = {**plan, "run_id": uuid4().hex, "dataset_version": manifest["dataset_version"],
                     "rubric_version": manifest.get("rubric_version"), "snapshot_sha256": snapshots,
                     "manifest_sha256": manifest_hash, "system_rules": manifest["system_rules"],
@@ -88,7 +117,7 @@ def main(argv=None):
         if args.split == "holdout":
             # Exclusive creation also blocks concurrent/repeated attempts, even
             # after interruption. Never delete this record to call results unseen.
-            freeze_path = directory / "holdout-rag-v1.0-freeze.json"
+            freeze_path = _holdout_freeze_path(root, manifest)
             if freeze_path.exists():
                 raise EvaluationInputError("holdout attempt already reserved; inspect its saved results, do not rerun")
             freeze = {"schema_version": "1.0", "status": "reserved_before_api",
@@ -125,7 +154,7 @@ def main(argv=None):
                 summary["not_attempted_cases"] = len(cases) - counts["attempted_cases"]
                 try:
                     unchanged = (all(_sha256(root / path) == digest for path, digest in snapshots.items())
-                                 and _sha256(root / "eval/rag_v1_manifest.json") == manifest_hash
+                                 and _sha256(manifest_path) == manifest_hash
                                  and all(_sha256(ROOT / path) == digest for path, digest in code_hashes.items()))
                 except Exception:
                     unchanged = None

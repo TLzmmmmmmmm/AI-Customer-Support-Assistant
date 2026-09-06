@@ -43,6 +43,26 @@ class GenerationCliTests(unittest.TestCase):
         self.assertEqual(plan["planned_generations"], 2)
         self.assertFalse((self.root / "eval/results").exists())
 
+    def test_preflight_can_select_an_exact_case_subset(self):
+        with patch("services.retrieval.create_embedding_provider", side_effect=AssertionError("No API")):
+            code, out, err = self.invoke("--case-id", "dev-unknown")
+        self.assertEqual(code, 0, err)
+        plan = json.loads(out)
+        self.assertEqual(plan["case_count"], 1)
+        self.assertEqual(plan["selected_case_ids"], ["dev-unknown"])
+        self.assertEqual(plan["planned_query_embeddings"], 1)
+        self.assertEqual(plan["planned_generations"], 1)
+
+    def test_preflight_uses_explicit_manifest_instead_of_day6_default(self):
+        alternate = self.root / "eval/rag_v1_1_regression_manifest.json"
+        alternate.write_text(json.dumps(self.fixture.manifest), encoding="utf-8")
+        default = self.root / "eval/rag_v1_manifest.json"
+        default.write_text(json.dumps({**self.fixture.manifest, "schema_version": "invalid"}), encoding="utf-8")
+        with patch("services.retrieval.create_embedding_provider", side_effect=AssertionError("No API")):
+            code, out, err = self.invoke("--manifest", "eval/rag_v1_1_regression_manifest.json")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["manifest"], "eval/rag_v1_1_regression_manifest.json")
+
     def test_execute_persists_start_each_case_and_end_without_extra_parameters(self):
         from services import llm
         provider = ControlledQueryProvider()
@@ -84,6 +104,29 @@ class GenerationCliTests(unittest.TestCase):
         code, _, err = self.invoke("--split", "holdout", "--execute")
         self.assertEqual(code, 1)
         self.assertIn("allow-holdout", err)
+        self.assertFalse((self.root / "eval/results").exists())
+
+    def test_holdout_freeze_path_is_scoped_to_candidate_snapshot(self):
+        path = self.command._holdout_freeze_path(
+            self.root, {"dataset_version": "rag-v1.0", "candidate_snapshot_version": "rag-v1.1"}
+        )
+        self.assertEqual(path, self.root / "eval/results/holdout-rag-v1.1-freeze.json")
+
+    def test_holdout_freeze_path_rejects_unsafe_candidate_identifier(self):
+        with self.assertRaisesRegex(self.command.EvaluationInputError, "candidate snapshot"):
+            self.command._holdout_freeze_path(
+                self.root, {"dataset_version": "rag-v1.0", "candidate_snapshot_version": "../escape"}
+            )
+
+    def test_v1_1_holdout_cannot_execute_while_owner_review_is_pending(self):
+        self.install_holdout_fixture()
+        self.fixture.manifest["candidate_snapshot_version"] = "rag-v1.1"
+        self.fixture.manifest["holdout_policy"] = {"status": "owner_review_pending"}
+        self.fixture.write_manifest()
+        with patch("services.retrieval.create_embedding_provider", side_effect=AssertionError("No API")):
+            code, _, err = self.invoke("--split", "holdout", "--allow-holdout", "--execute")
+        self.assertEqual(code, 1)
+        self.assertIn("sealed", err)
         self.assertFalse((self.root / "eval/results").exists())
 
     def install_holdout_fixture(self):

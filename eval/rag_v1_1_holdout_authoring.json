@@ -1,0 +1,291 @@
+[
+  {
+    "case_id": "v1.1-holdout-001",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "直接验证HR1060修复后的字段语义，并检查模型不会把电压单位误当成电池容量。",
+    "evidence": [
+      {
+        "chunk_id": "product:hr1060:content",
+        "quote": "电源电压：直流：13.6V±15% 交流：100-240V"
+      }
+    ],
+    "unavailable_reason": "权威资料明确给出电源电压，但没有电池容量字段；该部分必须说明无法确认。",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Assistant verified the quoted source and expected semantics; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-002",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证同一产品中PoE标准、有线端口和无线速率三个相邻但不可混淆的参数。",
+    "evidence": [
+      {"chunk_id": "product:ap:content", "quote": "固定端口：1个10/100/1000Mbps自协商以太网口"},
+      {"chunk_id": "product:ap:content", "quote": "无线速率：450 Mbps"},
+      {"chunk_id": "product:ap:content", "quote": "供电方式：支持POE供电（支持802.3af/802.3at标准）"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Assistant verified every requested value against the product chunk; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-003",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证管理器硬件、散热方式和功耗上限的多事实覆盖。",
+    "evidence": [
+      {"chunk_id": "product:ap-controller:content", "quote": "处理器（CPU）：专业的双核64位网络处理器"},
+      {"chunk_id": "product:ap-controller:content", "quote": "常规内存：DDRIII 256M"},
+      {"chunk_id": "product:ap-controller:content", "quote": "工作风扇：无风扇，自然散热"},
+      {"chunk_id": "product:ap-controller:content", "quote": "整机功耗：≤25W"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Assistant checked all four facts in one authoritative product record; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-004",
+    "dimensions": {
+      "naturalness": "尚可",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "技术表格以斜杠并列两个频段，本题验证模型能选中400～527MHz对应列。",
+    "evidence": [
+      {"chunk_id": "product:band-pass-duplexer:content", "quote": "频率范围：136～174MHz / 400～527MHz"},
+      {"chunk_id": "product:band-pass-duplexer:content", "quote": "收/发频率间隔 (MHz)：5.7 / 10"},
+      {"chunk_id": "product:band-pass-duplexer:content", "quote": "Rx--Tx 隔离度 (dB)：≥80 / ≥75"},
+      {"chunk_id": "product:band-pass-duplexer:content", "quote": "最大输入功率(W)：200 / 200"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Expected values follow the second slash-delimited column; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-005",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证室外设备的供电选择、环境范围和防护等级。",
+    "evidence": [
+      {"chunk_id": "product:jomesh-od10w:specifications", "quote": "供电：AC220V/DC+48V(交流/直流供电，二选一)"},
+      {"chunk_id": "product:jomesh-od10w:specifications", "quote": "工作温度：-40℃～+65℃"},
+      {"chunk_id": "product:jomesh-od10w:specifications", "quote": "防护等级：IP67"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Assistant verified that the source explicitly says the two supplies are alternatives; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-006",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证owner确认的产品功能closed-world语义，并防止把一键报警混同为一键对频。",
+    "evidence": [
+      {"chunk_id": "product:ly598:content", "quote": "LY598是一款具有智能降噪功能的对讲机，能实现清晰的语音通话。本机自带的电量播报功能，能让客户了解对讲机的实时电量情况。"},
+      {"chunk_id": "product:ly598:content", "quote": "- 一键报警"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "The negative capability label relies on product_capability_closed_world_v1; positive features use the cited chunk; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-007",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "比较两个相近产品的共同频段与不同重量上界，并检查不从＜20kg推导＜10kg。",
+    "evidence": [
+      {"chunk_id": "product:optic-repeater-near:content", "quote": "频率范围：136-174MHz；350-400MHz；400-470MHz"},
+      {"chunk_id": "product:optic-repeater-near:content", "quote": "机箱重量：＜5kg"},
+      {"chunk_id": "product:optic-repeater-remote:content", "quote": "频率范围：136-174MHz；350-400MHz；400-470MHz"},
+      {"chunk_id": "product:optic-repeater-remote:content", "quote": "机箱重量：＜20kg"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "The recommendation is determined only by the published upper bounds; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-008",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "通过用户目标区分合路器与双工器，验证跨产品用途归属。",
+    "evidence": [
+      {"chunk_id": "product:cavity-combiner:content", "quote": "发射机腔体合路器可将多台基地发射机接入一根发射天线上"},
+      {"chunk_id": "product:cavity-combiner:content", "quote": "由于本产品采用了高Q腔体和环行隔离器等组件，就能更好的抑制发射机的带外噪声和高次谐波，提高了发射频谱的纯度，从根本上改善了多天线架设中难以解决的互调干扰问题。"},
+      {"chunk_id": "product:band-pass-duplexer:content", "quote": "其作用是将发射和接收讯号相隔离，保证接收和发射都能同时正常工作。"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Both source roles are quoted so the recommendation does not rely on product-name keywords alone; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-009",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "把信道资源和分区防爆两项现场问题映射到石油石化方案中的两条独立措施。",
+    "evidence": [
+      {"chunk_id": "solution:petrochemical:body:solution", "quote": "根据厂区使用对讲机数量来确定集群系统载频数量，信道动态分配，各班组共用。"},
+      {"chunk_id": "solution:petrochemical:body:solution", "quote": "根据厂区环境和人数，合理配置 IIC 防爆和 IIB 防爆终端数量，节省投资。"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Assistant checked both requested measures in the same solution section; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-010",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "根据能力描述识别技术中台，区别于已测试的数据中台和业务中台。",
+    "evidence": [
+      {"chunk_id": "solution:smart-emergency:body:solution-overview", "quote": "### 3. 技术中台：物联服务与视频解析"},
+      {"chunk_id": "solution:smart-emergency:body:solution-overview", "quote": "通过物联网、大数据和人工智能能力统一接入前端感知设备、视频资源及其他业务系统，形成面向应急管理的基础技术能力。"},
+      {"chunk_id": "solution:smart-emergency:body:solution-overview", "quote": "结合视频智能分析、设备状态监测和多源信息汇聚"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "The question avoids naming the middle platform and requires semantic mapping; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-011",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "从项目阶段和规划因素识别方案设计服务，避免误归为现场实施。",
+    "evidence": [
+      {"chunk_id": "support:solution-design:content", "quote": "我公司在充分了解客户需求的基础上，结合新技术趋势、行业应用及专业通信实践，围绕覆盖范围、信号质量、系统容量和资源投入提供网络规划方案"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Assistant checked the service stage and all four requested planning dimensions; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-012",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证公司自研自产范围，防止把知识库收录的第三方产品扩大归属。",
+    "evidence": [
+      {"chunk_id": "company:shengborun:company-profile", "quote": "主要研发生产无线对讲机、宽带自组网、及其相关周边产品。"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "The expected answer stays within the explicitly published production scope; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-013",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "全英文产品问题同时验证高可用模式、健康检查协议和纯英文输出。",
+    "evidence": [
+      {"chunk_id": "product:firewall:content", "quote": "健康性检测算法：ICMP、TCP、HTTP、FTP"},
+      {"chunk_id": "product:firewall:content", "quote": "双机状态热备：Active/Active和Active/Passive两种工作模式，支持负载分担和业务备份"}
+    ],
+    "unavailable_reason": "",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "Source facts are Chinese but the owner-approved language rule requires an entirely English answer; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-014",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "真正语义改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证产品存在和商业关系相互独立：收录海能达产品不能证明官方代理授权。",
+    "evidence": [],
+    "unavailable_reason": "当前权威知识没有声明盛博润是海能达官方授权代理商，也没有授权范围。",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "This is an open-world commercial relationship and must remain unknown absent explicit evidence; owner review pending."
+  },
+  {
+    "case_id": "v1.1-holdout-015",
+    "dimensions": {
+      "naturalness": "很像真实用户",
+      "ground_truth": "非常明确",
+      "retrieval_value": "有少量改写",
+      "evidence_alignment": "明确支持",
+      "diagnostic_value": "明确测某能力",
+      "ambiguity": "几乎无歧义"
+    },
+    "diagnostic_note": "验证已存在产品上的实时库存与交易价格仍属于不可确认的动态信息。",
+    "evidence": [],
+    "unavailable_reason": "当前权威知识没有无线AP的实时库存、成交价格或安装费用。",
+    "origin": "new_v1.1_holdout",
+    "annotation_note": "The product record establishes existence but supplies no dynamic stock or pricing data; owner review pending."
+  }
+]

@@ -92,6 +92,48 @@ class RetrievalCliTests(unittest.TestCase):
         self.assertEqual(plan["top_k"], 1)
         self.assertFalse((self.root / "eval/results").exists())
 
+    def test_preflight_uses_explicit_manifest_instead_of_day6_default(self):
+        custom_review = self.root / "eval/rag_v1_1_regression_authoring.json"
+        custom_review.write_bytes((self.root / "eval/rag_v1_authoring.json").read_bytes())
+        alternate_manifest = json.loads(json.dumps(self.manifest))
+        alternate_manifest["artifact_sha256"]["eval/rag_v1_1_regression_authoring.json"] = hashlib.sha256(
+            custom_review.read_bytes()
+        ).hexdigest()
+        alternate_manifest["split_artifacts"] = {
+            "dev": {
+                "dataset": "eval/rag_v1.json",
+                "review": "eval/rag_v1_1_regression_authoring.json",
+                "fixtures": "eval/fixtures/rag_v1_attacks.json",
+            }
+        }
+        alternate = self.root / "eval/rag_v1_1_regression_manifest.json"
+        alternate.write_text(json.dumps(alternate_manifest), encoding="utf-8")
+        (self.root / "eval/rag_v1_authoring.json").write_text("NOT JSON", encoding="utf-8")
+        default = self.root / "eval/rag_v1_manifest.json"
+        default.write_text(json.dumps({**self.manifest, "schema_version": "invalid"}), encoding="utf-8")
+        with patch("services.retrieval.create_embedding_provider", side_effect=AssertionError("API must not be built")):
+            code, out, err = self.invoke("--manifest", "eval/rag_v1_1_regression_manifest.json")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["manifest"], "eval/rag_v1_1_regression_manifest.json")
+
+    def test_preflight_accepts_v1_1_candidate_manifest(self):
+        dataset_path = self.root / "eval/rag_v1.json"
+        dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+        dataset["dataset_version"] = "rag-v1.1"
+        dataset_path.write_text(json.dumps(dataset), encoding="utf-8")
+        candidate = json.loads(json.dumps(self.manifest))
+        candidate["dataset_version"] = "rag-v1.1"
+        candidate["candidate_snapshot_version"] = "rag-v1.1"
+        candidate["artifact_sha256"]["eval/rag_v1.json"] = hashlib.sha256(
+            dataset_path.read_bytes()
+        ).hexdigest()
+        candidate_path = self.root / "eval/rag_v1_1_candidate_manifest.json"
+        candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+        with patch("services.retrieval.create_embedding_provider", side_effect=AssertionError("No API")):
+            code, out, err = self.invoke("--manifest", "eval/rag_v1_1_candidate_manifest.json")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["manifest"], "eval/rag_v1_1_candidate_manifest.json")
+
     def test_execute_uses_real_service_and_writes_only_controlled_results(self):
         provider = ControlledQueryProvider()
         with patch("services.retrieval.create_embedding_provider", return_value=provider):
@@ -105,6 +147,7 @@ class RetrievalCliTests(unittest.TestCase):
         self.assertEqual(report["metadata"]["split"], "dev")
         self.assertEqual(report["metadata"]["embedding_dimensions"], 2)
         self.assertEqual(report["cases"][0]["hits"][0]["match_origin"], "exact_entity")
+        self.assertGreaterEqual(report["cases"][0]["retrieval_latency_seconds"], 0)
         self.assertEqual(report["summary"]["excluded_no_gold_cases"], 1)
         self.assertNotIn("test-only-key", files[0].read_text(encoding="utf-8") + out + err)
 

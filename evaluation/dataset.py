@@ -55,7 +55,7 @@ class EvaluationCase(BaseModel):
 class CaseFile(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     schema_version: Literal["1.0"]
-    dataset_version: Literal["rag-v1.0"]
+    dataset_version: Literal["rag-v1.0", "rag-v1.1"]
     cases: list[EvaluationCase] = Field(min_length=1)
 
 

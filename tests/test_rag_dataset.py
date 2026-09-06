@@ -138,6 +138,14 @@ class CaseValidationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_cases(path)
 
+    def test_loader_accepts_v1_1_candidate_dataset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cases.json"
+            payload = {"schema_version": "1.0", "dataset_version": "rag-v1.1",
+                       "cases": [sample_case(split="holdout").model_dump()]}
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertEqual([case.id for case in load_cases(path)], ["dev-001"])
+
 
 class BundleValidationTests(unittest.TestCase):
     def setUp(self):

@@ -36,15 +36,44 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _load_selected(root: Path, split: str):
-    """Read only the requested split's file/review/fixtures, never all holdout data."""
-    manifest = read_json(root / "eval/rag_v1_manifest.json")
-    if manifest.get("schema_version") != "1.0" or manifest.get("dataset_version") != "rag-v1.0":
-        raise EvaluationInputError("unsupported dataset manifest version")
+def _resolve_manifest(root: Path, requested: Path | None) -> Path:
+    eval_directory = (root / "eval").resolve()
+    path = ((root / "eval/rag_v1_manifest.json") if requested is None else
+            (requested if requested.is_absolute() else root / requested)).resolve()
+    if not path.is_relative_to(eval_directory) or path.suffix != ".json":
+        raise EvaluationInputError("manifest must be a .json file inside eval")
+    if not path.is_file():
+        raise EvaluationInputError("manifest does not exist")
+    return path
+
+
+def _manifest_label(root: Path, manifest_path: Path) -> str:
+    return manifest_path.relative_to(root).as_posix()
+
+
+def _split_paths(manifest: dict, split: str) -> tuple[str, str, str]:
     stem = "rag_v1_holdout" if split == "holdout" else "rag_v1"
-    dataset_path = f"eval/{stem}.json"
-    review_path = f"eval/{stem}_authoring.json"
-    fixture_path = f"eval/fixtures/{stem}_attacks.json"
+    defaults = {
+        "dataset": f"eval/{stem}.json",
+        "review": f"eval/{stem}_authoring.json",
+        "fixtures": f"eval/fixtures/{stem}_attacks.json",
+    }
+    selected = {**defaults, **manifest.get("split_artifacts", {}).get(split, {})}
+    paths = tuple(selected[key] for key in ("dataset", "review", "fixtures"))
+    if any(not isinstance(path, str) or not path.startswith("eval/") or Path(path).suffix != ".json"
+           for path in paths):
+        raise EvaluationInputError("split artifact paths must be .json files inside eval")
+    return paths
+
+
+def _load_selected(root: Path, split: str, manifest_path: Path | None = None):
+    """Read only the requested split's file/review/fixtures, never all holdout data."""
+    manifest_path = _resolve_manifest(root, manifest_path)
+    manifest = read_json(manifest_path)
+    if (manifest.get("schema_version") != "1.0"
+        or manifest.get("dataset_version") not in {"rag-v1.0", "rag-v1.1"}):
+        raise EvaluationInputError("unsupported dataset manifest version")
+    dataset_path, review_path, fixture_path = _split_paths(manifest, split)
     protected = ["knowledge/documents.jsonl", "knowledge/chunks.jsonl", "knowledge/vector_records.jsonl"]
     snapshots = {}
     for relative, group in [(p, "artifact_sha256") for p in (dataset_path, review_path, fixture_path)] + [
@@ -99,6 +128,7 @@ def main(argv=None) -> int:
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--split", choices=("dev", "frozen", "holdout"), default="dev")
     parser.add_argument("--top-k", type=int, help="Override RETRIEVAL_TOP_K (default 5)")
+    parser.add_argument("--manifest", type=Path, help="Manifest .json inside eval (defaults to Day 6 manifest)")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--allow-holdout", action="store_true", help="Only use after Step 8 configuration freeze")
     parser.add_argument("--output", type=Path, help="New path under eval/results; existing files are never overwritten")
@@ -107,6 +137,7 @@ def main(argv=None) -> int:
         if args.split == "holdout" and not args.allow_holdout:
             raise EvaluationInputError("holdout is locked; --allow-holdout is reserved for Step 8")
         root = args.root.resolve()
+        manifest_path = _resolve_manifest(root, args.manifest)
         # Read config without exporting values into process-wide production state.
         values = {key: value for key, value in dotenv_values(root / ".env").items() if value is not None}
         values.update(os.environ)
@@ -114,7 +145,7 @@ def main(argv=None) -> int:
         top_k = RetrievalConfig.from_mapping(values).top_k if args.top_k is None else args.top_k
         if top_k <= 0:
             raise EvaluationInputError("top_k must be positive")
-        cases, chunks, manifest, snapshots = _load_selected(root, args.split)
+        cases, chunks, manifest, snapshots = _load_selected(root, args.split, manifest_path)
         records = load_vector_records(root / "knowledge/vector_records.jsonl")
         validate_records_against_chunks(records, chunks, config)
         calls = sum(bool(case.expected_chunk_ids) for case in cases)
@@ -122,7 +153,8 @@ def main(argv=None) -> int:
                 "selected_cases": len(cases), "query_embedding_calls": calls,
                 "excluded_no_gold_cases": len(cases) - calls, "top_k": top_k,
                 "embedding_provider": config.provider, "embedding_model": config.model,
-                "embedding_dimensions": config.dimensions, "generation_called": False}
+                "embedding_dimensions": config.dimensions, "generation_called": False,
+                "manifest": _manifest_label(root, manifest_path)}
         if not args.execute:
             print(json.dumps(plan, ensure_ascii=False, indent=2))
             return 0
@@ -135,7 +167,8 @@ def main(argv=None) -> int:
             "embedding_timeout_seconds": config.timeout_seconds,
             "embedding_max_retries": config.max_retries,
             "retrieval_backend": "numpy_exact_cosine", "snapshot_sha256": snapshots,
-            "manifest_sha256": _sha256(root / "eval/rag_v1_manifest.json"),
+            "manifest": _manifest_label(root, manifest_path),
+            "manifest_sha256": _sha256(manifest_path),
             "generation_called": False, "fixture_application": "none_retrieval_only",
             "prompt_sha256_not_used_for_retrieval": _sha256(ROOT / "prompts.py"),
             "code_sha256": {relative: _sha256(ROOT / relative) for relative in (

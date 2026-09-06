@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime, timezone
+import time
 
 from evaluation.dataset import EvaluationCase
 from knowledge_pipeline.retrieval.models import RetrievalResult
@@ -66,12 +67,14 @@ def run_retrieval_evaluation(
             "expected_system_rule_ids": list(case.expected_system_rule_ids),
             "fixture_id": case.fixture_id, "fixture_applied": False,
             "retrieval_executed": False, "retrieved_chunk_ids": [], "hits": [],
+            "retrieval_latency_seconds": None,
             "metrics": dict(empty_metrics), "error_type": None,
         }
         if not case.expected_chunk_ids:
             row["status"] = "excluded_no_gold"
         else:
             row["retrieval_executed"] = True
+            retrieval_started = time.monotonic()
             try:
                 hits = retriever.retrieve(case.question, top_k=top_k)[:top_k]
                 row["metrics"] = score_hits(case.expected_chunk_ids, hits, top_k=top_k)
@@ -87,6 +90,8 @@ def run_retrieval_evaluation(
                 row["retrieved_chunk_ids"] = []
                 row["hits"] = []
                 row["error_type"] = type(error).__name__
+            finally:
+                row["retrieval_latency_seconds"] = round(time.monotonic() - retrieval_started, 6)
         rows.append(row)
 
     scored = [row for row in rows if row["status"] == "evaluated"]

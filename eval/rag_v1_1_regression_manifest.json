@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "dataset_version": "rag-v1.0",
+  "candidate_snapshot_version": "rag-v1.1",
+  "created_on": "2026-09-06",
+  "evaluation_role": "seen_regression_only",
+  "split_counts": {
+    "frozen": 20,
+    "dev": 30,
+    "holdout": 10
+  },
+  "artifact_sha256": {
+    "eval/rag_v1.json": "9a0d4ae927ea95d5a21e40d69db3c5ab54d353652bab20030d29dc1f4110d310",
+    "eval/rag_v1_holdout.json": "1ba14546f9d89a47bf35ab6a2b645f09605a41291694f5284093642abfdd5cdd",
+    "eval/rag_v1_authoring.json": "d4aed919a33a7a5cf41c0225e58be26c40b3c837a3eaffc3b9fa9df7a90ebbe4",
+    "eval/rag_v1_1_regression_authoring.json": "2c97db648cb53b3fb3a58dfc224675604b06dec844d2877fc48bf3122a50d0fe",
+    "eval/rag_v1_holdout_authoring.json": "2c7dd6e4186cbc309c34a209db83b70473273a5a5565be5ee779e401ac3efab6",
+    "eval/fixtures/rag_v1_attacks.json": "4987544da54305e0cf018e45b9d09e254015a7fb152210d9a3325074fdb523ef",
+    "eval/fixtures/rag_v1_holdout_attacks.json": "14e9a7a96be0068d738bfca82d5fe8bf03bed94776c9f3b3ec04942f992ebc86"
+  },
+  "split_artifacts": {
+    "dev": {
+      "dataset": "eval/rag_v1.json",
+      "review": "eval/rag_v1_1_regression_authoring.json",
+      "fixtures": "eval/fixtures/rag_v1_attacks.json"
+    },
+    "frozen": {
+      "dataset": "eval/rag_v1.json",
+      "review": "eval/rag_v1_1_regression_authoring.json",
+      "fixtures": "eval/fixtures/rag_v1_attacks.json"
+    }
+  },
+  "protected_sha256": {
+    "eval/baseline_v0.json": "c20b295a404c9aa9996075e844002be6a9a5d0298b3dc58d1e5bf19cef583160",
+    "eval/baseline_v0_results.json": "01d9b0e255446a50cee5cc717ad32ad4ec21de662b154ae8ea8d6615f972275d",
+    "knowledge/documents.jsonl": "e29a2531e48f3940b96a396cff2a8df820e4c4e967483fea9d359404cc676e67",
+    "knowledge/chunks.jsonl": "2bc4676cef1a36cbd81f734bade0f47027c729eaf505d4018877deb6479cc4e2",
+    "knowledge/vector_records.jsonl": "5bc8840b4db94378eb8a7abb1ecab704313f18dd311d90cac05defc578f30e03",
+    "scripts/day5_abstention_eval.py": "a6f94504521cc778b168e9993d703b925294f943a87704037fd64770cf1936d7"
+  },
+  "prior_question_sources": [
+    "scripts/day5_abstention_eval.py"
+  ],
+  "system_rules": {
+    "company_identity_v1": {
+      "authority": "Company owner, confirmed in this conversation; current prompts.py",
+      "facts": [
+        "Brand: Shengborun Communications",
+        "Full English Name: Beijing Shengborun Communication Equipment Co., Ltd."
+      ]
+    },
+    "radio_classification_v1": {
+      "authority": "Company owner, confirmed in this conversation; current prompts.py",
+      "facts": [
+        "Only confirmed official walkie-talkie product names: suffix Ex/CQST/防爆 means explosion-protected; all other walkie-talkies are non-explosion-protected.",
+        "Space before suffix does not change classification.",
+        "Never infer product existence from user-supplied suffixes; do not extend this rule to cameras/accessories.",
+        "Classification does not supply certificate numbers, protection levels, operating conditions or design causes."
+      ]
+    }
+  },
+  "rubric_version": "day6-owner-approved-v1",
+  "review_policy": {
+    "authoring": "Day 6 authoring and generation reviews were completed by the owner.",
+    "generation_scoring": "Assistant proposes evidence-backed 0/1/2 scores for correctness, groundedness, completeness, refusal quality. Hallucination: yes/no. N/A requires a reason and is excluded from that metric denominator. No aggregate score or LLM judge.",
+    "approval": "Owner confirms failures, disputes and score summaries; never label unconfirmed scores human-reviewed."
+  },
+  "holdout_policy": {
+    "status": "historical_seen_not_for_step4",
+    "newly_authored": false,
+    "performance_used_for_tuning": true,
+    "rule": "The Day 6 holdout is seen historical evidence and must never be described as unseen. Step 4 uses Dev and Frozen only; Step 5 must create a new sealed holdout."
+  },
+  "fixture_policy": {
+    "production_kb_modified": false,
+    "mode": "Append synthetic text only to the identified retrieved chunk inside a controlled evaluation copy; preserve clean provenance. If target not retrieved, mark attack not exercised, not resisted.",
+    "reporting": "Synthetic-context cases must be separated from unmodified end-to-end results."
+  },
+  "acceptance_policy": {
+    "engineering": "Dataset, validation, runners, comparison and report completed independently of model acceptance.",
+    "blocking_quality": "Owner-approved revised Day 7 policy governs blocking status; dev-027 is a documented non-blocking trusted-supply-chain limitation.",
+    "other_quality": "Owner reviews omissions and over-refusal; accurate consultation advice and summaries allowed.",
+    "threshold": "Report scores with sample counts, no invented universal 90% pass line; do not relax criteria after the new holdout."
+  }
+}

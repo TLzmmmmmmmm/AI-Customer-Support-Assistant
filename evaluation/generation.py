@@ -62,9 +62,18 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
     def observe_create(**kwargs):
         # Capture exactly what is sent; no max_tokens, usage options or judge.
         active["provider_requests"].append(deepcopy(kwargs))
+        active["provider_input_characters"] = sum(
+            len(message.get("content", ""))
+            for message in kwargs.get("messages", [])
+            if isinstance(message.get("content", ""), str)
+        )
+        generation_started = time.monotonic()
         try:
             stream = real_create(**kwargs)
         except Exception as error:
+            elapsed = round(time.monotonic() - generation_started, 6)
+            active["generation_latency_seconds"] = elapsed
+            active["llm_total_latency_seconds"] = elapsed
             active["provider_errors"].append(type(error).__name__)
             raise
 
@@ -74,6 +83,8 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
                     active["provider_model"] = getattr(item, "model", None)
                     for choice in item.choices:
                         if choice.delta.content:
+                            if active["llm_ttft_seconds"] is None:
+                                active["llm_ttft_seconds"] = round(time.monotonic() - generation_started, 6)
                             active["provider_partial_answer"] += choice.delta.content
                         if choice.finish_reason:
                             active["finish_reasons"].append(choice.finish_reason)
@@ -82,12 +93,22 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
                 active["provider_errors"].append(type(error).__name__)
                 raise
             finally:
+                elapsed = round(time.monotonic() - generation_started, 6)
+                active["generation_latency_seconds"] = elapsed
+                active["llm_total_latency_seconds"] = elapsed
+                if active["llm_ttft_seconds"] is not None:
+                    active["llm_streaming_latency_seconds"] = round(
+                        max(0.0, elapsed - active["llm_ttft_seconds"]), 6
+                    )
                 stream.close()
         return observed_stream()
 
     def observe_context(hits):
         context = real_context(hits)
         active["context"] = deepcopy(context)
+        active["retrieved_context_characters"] = len(json.dumps(
+            context, ensure_ascii=False, separators=(",", ":")
+        ))
         return context
 
     completed = attempted = 0
@@ -102,12 +123,16 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
         real_retrieve = retriever.retrieve
 
         def observe_retrieve(query):
+            retrieval_started = time.monotonic()
             try:
                 clean = real_retrieve(query)
             except Exception as error:
                 active["retrieval_error_type"] = type(error).__name__
                 raise
+            finally:
+                active["retrieval_latency_seconds"] = round(time.monotonic() - retrieval_started, 6)
             active["clean_hits"] = [hit.model_dump(mode="json") for hit in clean]
+            active["retrieved_chunk_count"] = len(clean)
             fixture = fixture_map.get(active["fixture_id"])
             effective, applied = apply_fixture(clean, fixture)
             active["fixture_applied"] = applied
@@ -139,8 +164,14 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
                 "finish_reasons": [], "provider_model": None, "retrieval_error_type": None,
                 "answer": "", "provider_partial_answer": "", "event_types": [], "http_status": None,
                 "status": "incomplete", "error_type": None, "review_status": "pending_review",
+                "retrieval_latency_seconds": None, "llm_ttft_seconds": None,
+                "generation_latency_seconds": None, "llm_total_latency_seconds": None,
+                "llm_streaming_latency_seconds": None, "total_request_latency_seconds": None,
+                "retrieved_chunk_count": 0, "retrieved_context_characters": 0,
+                "provider_input_characters": 0,
             }
             attempted += 1
+            request_started = time.monotonic()
             try:
                 response = client.post("/api/chat-stream", json={
                     "messages": [{"role": "user", "content": case.question}],
@@ -172,7 +203,9 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
                 active["error_type"] = "KeyboardInterrupt"
                 raise
             finally:
-                active["latency_seconds"] = round(time.monotonic() - last_start, 3)
+                active["total_request_latency_seconds"] = round(time.monotonic() - request_started, 6)
+                # Compatibility alias retained for existing Day 6 result readers.
+                active["latency_seconds"] = active["total_request_latency_seconds"]
                 emit(deepcopy(active))
             if active["status"] != "completed":
                 break

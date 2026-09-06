@@ -42,10 +42,19 @@ DEPLOYMENT.md
 !/eval/rag_v1_authoring.json
 !/eval/rag_v1_holdout_authoring.json
 !/eval/rag_v1_manifest.json
+!/eval/rag_v1_1_regression_manifest.json
+!/eval/rag_v1_1_regression_authoring.json
+!/eval/rag_v1_1_candidate_manifest.json
+!/eval/rag_v1_1_holdout.json
+!/eval/rag_v1_1_holdout_authoring.json
+!/eval/trust_boundary_v1.json
+!/eval/trust_boundary_v1_baseline.json
+!/eval/user_prompt_injection_v1.json
 !/eval/fixtures/
 /eval/fixtures/*
 !/eval/fixtures/rag_v1_attacks.json
 !/eval/fixtures/rag_v1_holdout_attacks.json
+!/eval/fixtures/rag_v1_1_holdout_attacks.json
 
 # Owner-approved Day 6 evaluation evidence; do not expose future runs by default.
 !/eval/results/
@@ -60,6 +69,35 @@ DEPLOYMENT.md
 !/eval/results/holdout-rag-v1.0-freeze.json
 !/eval/results/retrieval-dev-20260904T085055Z-32477a0b.json
 !/eval/results/retrieval-dev-20260904T085153Z-1b04eb5b.json
+!/eval/results/trust-boundary-initial_pairs-20260905T040707Z-882dd7bf.jsonl
+!/eval/results/trust-boundary-diagnostic_repeats-20260905T040913Z-aecebb55.jsonl
+!/eval/results/trust-boundary-day7-step2-review.json
+!/eval/results/trust-boundary-day7-step2-ledger.json
+!/eval/results/day7-step3-ledger.json
+!/eval/results/day7-step3-provider-ledger.json
+!/eval/results/day7-step3-structure-probe-20260905T052626Z.jsonl
+!/eval/results/day7-step3-structure-probe-20260905T052726Z.jsonl
+!/eval/results/day7-step3-procedure-probe-20260905T052750Z.jsonl
+!/eval/results/day7-step3-production-probe-20260905T053224Z.jsonl
+!/eval/results/day7-step3-production-regression-20260905T053325Z.jsonl
+!/eval/results/day7-step3-production-v2-regression-20260905T054221Z.jsonl
+!/eval/results/day7-step3-production-v2-repeat-20260905T054515Z.jsonl
+!/eval/results/day7-step3-review.json
+!/eval/results/day7-step3-current-review-20260905T090444Z.jsonl
+!/eval/results/day7-step3-current-user-injection-20260905T094944Z.jsonl
+!/eval/results/day7-step3-current-user-injection-english-check-20260905T095844Z.jsonl
+!/eval/results/day7-step3-current-user-injection-english-envelope-20260905T100143Z.jsonl
+!/eval/results/generation-dev-20260905T162822Z-ff714268.jsonl
+!/eval/results/generation-frozen-20260905T163204Z-6f155037.jsonl
+!/eval/results/day7-step4-regression-review.json
+!/eval/results/generation-dev-20260905T171335Z-77747bd1.jsonl
+!/eval/results/generation-frozen-20260905T171453Z-1dc63d12.jsonl
+!/eval/results/day7-step4-baseline007-targeted-review.json
+!/eval/results/generation-dev-20260905T180000Z-canonical.jsonl
+!/eval/results/generation-frozen-20260905T180100Z-canonical.jsonl
+!/eval/results/generation-dev-20260905T180300Z-canonical-full.jsonl
+!/eval/results/generation-frozen-20260905T180700Z-canonical-full.jsonl
+!/eval/results/day7-step4-canonical-consolidation-review.json
 
 # Local docs, with explicit Day 6 design/review exceptions.
 /docs/*
@@ -77,3 +115,12 @@ DEPLOYMENT.md
 !/docs/day-6-step-7-v0-v1-comparison.md
 !/docs/rag-evaluation-v1.md
 !/docs/day-7-acceptance-contract.md
+!/docs/day-7-step-2-trust-boundary.md
+!/docs/day-7-step-3-trust-boundary.md
+!/docs/day-7-step-4-regression-latency.md
+!/docs/day-7-step-4-rule-conflict-map.md
+!/docs/day-7-step-4-canonical-consolidation.md
+!/docs/day-7-step-5a-new-holdout.md
+!/docs/superpowers/
+!/docs/superpowers/plans/
+!/docs/superpowers/plans/2026-09-06-bounded-prompt-rule-consolidation.md

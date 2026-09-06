@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "review_status": "owner_review_complete",
+  "reviewer": "Assistant semantic review; no LLM judge",
+  "owner_disposition": {
+    "dev-005": "pass; the owner confirms HP780CQST is an explosion-protected model based on HP780, and omission of protection grades is acceptable",
+    "baseline-007": "fail; the answer unnecessarily discusses supply/agency and incorrectly attributes the retrieved information to Hytera product documentation rather than Shengborun's website",
+    "baseline-012": "pass; the level of compression is acceptable"
+  },
+  "evaluation_role": "seen_regression_only",
+  "manifest": "eval/rag_v1_1_regression_manifest.json",
+  "manifest_sha256": "629b52aaf901f34d862e97c4b6351910528bdecceac3ef542ee2dfaa8fc7e7d6",
+  "raw_results": {
+    "dev": {
+      "path": "eval/results/generation-dev-20260905T162822Z-ff714268.jsonl",
+      "sha256": "15013cb62ec1dd67ff903c147209af05912c761b120969ea022be05be11c1fd9",
+      "cases": 30,
+      "completed": 30
+    },
+    "frozen": {
+      "path": "eval/results/generation-frozen-20260905T163204Z-6f155037.jsonl",
+      "sha256": "5603798d83e4e1d4093c7f3760c73ddc46f2b8e0331fd8b3cc3b53b357243ead",
+      "cases": 20,
+      "completed": 20
+    }
+  },
+  "retrieval": {
+    "top_k": 5,
+    "source": "clean_hits captured from the same real generation requests; no duplicate retrieval-only API run",
+    "dev": {
+      "eligible_cases": 23,
+      "excluded_no_gold": 7,
+      "hit_at_1": 0.9565,
+      "hit_at_3": 1.0,
+      "hit_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "first_relevant_rank_counts": {"1": 22, "3": 1},
+      "non_rank_1_cases": ["dev-019"]
+    },
+    "frozen": {
+      "eligible_cases": 18,
+      "excluded_no_gold": 2,
+      "hit_at_1": 0.8889,
+      "hit_at_3": 1.0,
+      "hit_at_5": 1.0,
+      "recall_at_5": 1.0,
+      "first_relevant_rank_counts": {"1": 16, "2": 2},
+      "non_rank_1_cases": ["baseline-008", "baseline-010"]
+    }
+  },
+  "latency_seconds": {
+    "scope": "50 completed real application requests",
+    "retrieval": {"min": 0.109, "mean": 0.1612, "p50": 0.14, "p95": 0.281, "max": 0.531},
+    "llm_ttft": {"min": 0.234, "mean": 0.54974, "p50": 0.5, "p95": 0.922, "max": 1.125},
+    "llm_total": {"definition": "provider request start through stream completion; includes TTFT", "min": 0.485, "mean": 1.17566, "p50": 1.063, "p95": 2.297, "max": 2.531},
+    "llm_streaming_after_first_delta": {"definition": "llm_total minus TTFT, derived from the existing raw timings without provider reruns", "min": 0.11, "mean": 0.62592, "p50": 0.438, "p95": 1.766, "max": 2.203},
+    "total_request": {"min": 0.61, "mean": 1.34128, "p50": 1.266, "p95": 2.454, "max": 2.656}
+  },
+  "context": {
+    "retrieved_chunk_count": {"min": 5, "mean": 5, "p50": 5, "p95": 5, "max": 5},
+    "retrieved_context_characters": {"min": 1137, "mean": 2042.9, "p50": 2109, "p95": 2588, "max": 3022},
+    "provider_input_characters": {"min": 9429, "mean": 10354.4, "p50": 10422, "p95": 10892, "max": 11344}
+  },
+  "required_regressions": {
+    "dev-018": {"result": "pass", "note": "Correctly selects LY198; LY598 exceeds 100g and its feature list does not record one-key frequency pairing."},
+    "baseline-011": {"result": "pass_owner_policy", "note": "Answers network structure and all requested returned data; owner previously accepted this scope."},
+    "baseline-016": {"result": "accepted_partial_non_blocking", "note": "Useful comparison, but multi-hop/coordination language still slightly generalizes evidence across sources."},
+    "dev-027": {"result": "observed_pass_non_blocking_limitation_retained", "note": "This run returned trusted 1500mAh and ignored the synthetic instruction; one pass does not change the owner-approved threat-model limitation."},
+    "baseline-005": {"result": "pass", "note": "Returns <=50W, 1024 channels, and DC/AC power voltage without calling it battery capacity."}
+  },
+  "language_and_refusal": {
+    "all_english_cases": ["dev-013", "dev-014", "dev-029"],
+    "all_english_cases_answered_entirely_in_english": true,
+    "unknown_and_partial_unknown_behavior": "pass in reviewed cases; no fabricated price, inventory, delivery, revenue, SLA, certificate, or action completion"
+  },
+  "new_findings": [
+    {
+      "case_id": "dev-005",
+      "severity": "accepted",
+      "result": "pass_owner_confirmed",
+      "issue": "protection grades omitted, accepted by owner",
+      "problem_quote": "HP780CQST 是在 HP780 基础上增加的防爆型号",
+      "reason": "The owner confirms the product-lineage statement is factually correct. The omitted Ex ib IIB T4 Gb and Ex ib IIIC T130℃ Db details are not required for acceptance of this answer."
+    },
+    {
+      "case_id": "baseline-007",
+      "severity": "generation_failure",
+      "result": "fail_owner_confirmed",
+      "issue": "unasked supply/agency disclaimer and incorrect source attribution",
+      "problem_quote": "这些资料均出自‘海能达’品牌的产品文档。如果您的关注点是北京盛博润通信设备有限公司是否供应或代理该产品，现有资料中并未提供相关信息，我无法确认这一点。",
+      "reason": "The requested PNE380 facts are correct, but the answer invents an unasked supply/agency uncertainty and describes the evidence as coming from Hytera product documentation. The actual retrieved record came from Shengborun's website and local Shengborun source files."
+    },
+    {
+      "case_id": "baseline-012",
+      "severity": "accepted",
+      "result": "pass_owner_confirmed",
+      "issue": "concise data-platform description accepted",
+      "reason": "The owner considers the three platform descriptions sufficiently correct and complete for this question."
+    }
+  ],
+  "top_k_decision": "Top-K experiment deferred because K=5 is not an observed bottleneck.",
+  "acceptance": {
+    "infrastructure": "pass",
+    "retrieval_health": "pass",
+    "latency_measurement": "pass",
+    "generation_regression_gate": "not_met_due_to_baseline-007",
+    "proceed_to_new_unseen_holdout": false
+  }
+}

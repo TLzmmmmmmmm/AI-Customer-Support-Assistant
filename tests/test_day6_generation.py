@@ -88,6 +88,20 @@ class GenerationTests(unittest.TestCase):
         self.assertNotIn("expected_answer", json.dumps(received[0]))
         self.assertEqual(row["review_status"], "pending_review")
         self.assertTrue(stream.closed)
+        self.assertGreaterEqual(row["retrieval_latency_seconds"], 0)
+        self.assertGreaterEqual(row["llm_ttft_seconds"], 0)
+        self.assertGreaterEqual(row["generation_latency_seconds"], row["llm_ttft_seconds"])
+        self.assertEqual(row["llm_total_latency_seconds"], row["generation_latency_seconds"])
+        self.assertAlmostEqual(
+            row["llm_streaming_latency_seconds"],
+            row["llm_total_latency_seconds"] - row["llm_ttft_seconds"],
+            places=6,
+        )
+        self.assertGreaterEqual(row["total_request_latency_seconds"], row["generation_latency_seconds"])
+        self.assertEqual(row["latency_seconds"], row["total_request_latency_seconds"])
+        self.assertEqual(row["retrieved_chunk_count"], len(row["clean_hits"]))
+        self.assertGreater(row["retrieved_context_characters"], 0)
+        self.assertGreaterEqual(row["provider_input_characters"], row["retrieved_context_characters"])
 
     def test_injection_uses_real_retrieval_and_records_actual_context(self):
         case = evaluation_case("dev-attack", "alpha 参数", [chunk("alpha")], fixture_id="attack")

@@ -1,0 +1,284 @@
+{
+  "schema_version": "1.0",
+  "dataset_version": "rag-v1.1",
+  "cases": [
+    {
+      "id": "v1.1-holdout-001",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "HR1060参数里的13.6V±15%和100–240V分别代表什么？资料有没有给出电池容量？",
+      "expected_behavior": "partial_answer",
+      "expected_answer": "13.6V±15%是直流电源电压，100–240V是交流电源电压；它们都不是电池容量。当前资料没有给出HR1060的电池容量，无法确认该数值。",
+      "expected_document_ids": ["product:hr1060"],
+      "expected_chunk_ids": ["product:hr1060:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "13.6V±15%对应直流电源电压。",
+        "100–240V对应交流电源电压。",
+        "资料未给出电池容量，无法确认。"
+      ],
+      "forbidden_claims": [
+        "不得把电源电压解释为电池容量或编造mAh数值。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-002",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "办公室的无线AP想直接用网线供电。它支持哪些PoE标准，有线口和无线速率各是多少？",
+      "expected_behavior": "answer",
+      "expected_answer": "无线AP支持符合802.3af/802.3at标准的PoE供电；配有1个10/100/1000Mbps自协商以太网口，无线速率为450Mbps。",
+      "expected_document_ids": ["product:ap"],
+      "expected_chunk_ids": ["product:ap:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "支持802.3af/802.3at PoE供电。",
+        "1个10/100/1000Mbps自协商以太网口。",
+        "无线速率450Mbps。"
+      ],
+      "forbidden_claims": [
+        "不得把450Mbps说成有线端口速率或承诺实际吞吐恒为450Mbps。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-003",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "无线AP管理器用什么处理器和内存？机身有没有风扇，功耗上限是多少？",
+      "expected_behavior": "answer",
+      "expected_answer": "无线AP管理器采用专业的双核64位网络处理器和DDRIII 256M内存；无风扇、自然散热，整机功耗不超过25W。",
+      "expected_document_ids": ["product:ap-controller"],
+      "expected_chunk_ids": ["product:ap-controller:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "专业的双核64位网络处理器。",
+        "DDRIII 256M内存。",
+        "无风扇、自然散热。",
+        "整机功耗≤25W。"
+      ],
+      "forbidden_claims": [
+        "不得把256M写成256GB或声称具有主动风冷。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-004",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "看400～527MHz这一档带通双工器：收发频率间隔、隔离度和最大输入功率分别是多少？",
+      "expected_behavior": "answer",
+      "expected_answer": "400～527MHz这一档的收发频率间隔为10MHz，Rx–Tx隔离度不低于75dB，最大输入功率为200W。",
+      "expected_document_ids": ["product:band-pass-duplexer"],
+      "expected_chunk_ids": ["product:band-pass-duplexer:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "收发频率间隔10MHz。",
+        "Rx–Tx隔离度≥75dB。",
+        "最大输入功率200W。"
+      ],
+      "forbidden_claims": [
+        "不得误用136～174MHz档对应的5.7MHz或≥80dB参数。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-005",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "JoMesh-OD10W装在室外时可以怎么供电？它的工作温度和防护等级是多少？",
+      "expected_behavior": "answer",
+      "expected_answer": "JoMesh-OD10W可在AC220V交流供电和DC+48V直流供电之间二选一；工作温度为-40℃～+65℃，防护等级为IP67。",
+      "expected_document_ids": ["product:jomesh-od10w"],
+      "expected_chunk_ids": ["product:jomesh-od10w:specifications"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "AC220V或DC+48V二选一供电。",
+        "工作温度-40℃～+65℃。",
+        "防护等级IP67。"
+      ],
+      "forbidden_claims": [
+        "不得说成交流和直流必须同时接入。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-006",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "LY598能不能一键对频？它明确列出的提醒或语音辅助功能有哪些？",
+      "expected_behavior": "answer",
+      "expected_answer": "LY598不具备一键对频功能。其公开资料明确列出了智能降噪、一键报警和电量播报。",
+      "expected_document_ids": ["product:ly598"],
+      "expected_chunk_ids": ["product:ly598:content"],
+      "expected_system_rule_ids": ["product_capability_closed_world_v1"],
+      "required_facts": [
+        "LY598不具备一键对频功能。",
+        "明确列有智能降噪、一键报警和电量播报。"
+      ],
+      "forbidden_claims": [
+        "不得把一键报警误写成一键对频。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-007",
+      "category": "product_recommendation",
+      "split": "holdout",
+      "question": "同样是光纤直放站，近端机和远端机公开频段是否一样？如果机箱要求低于10kg，哪一端符合？",
+      "expected_behavior": "answer",
+      "expected_answer": "两者公开频段相同，均为136–174MHz、350–400MHz和400–470MHz。近端机机箱重量＜5kg，符合低于10kg的要求；远端机仅标注＜20kg，不能据此认定低于10kg。",
+      "expected_document_ids": ["product:optic-repeater-near", "product:optic-repeater-remote"],
+      "expected_chunk_ids": ["product:optic-repeater-near:content", "product:optic-repeater-remote:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "两者公开频段相同。",
+        "近端机＜5kg，符合低于10kg。",
+        "远端机仅标注＜20kg，不能确认低于10kg。"
+      ],
+      "forbidden_claims": [
+        "不得把远端机的＜20kg推断为＜10kg。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-008",
+      "category": "product_recommendation",
+      "split": "holdout",
+      "question": "我要把多台基地发射机接到同一根发射天线上，并尽量抑制带外噪声和互调；不是做收发信号隔离。应该进一步看合路器还是双工器？",
+      "expected_behavior": "answer",
+      "expected_answer": "应进一步看腔体合路器。它用于把多台基地发射机接入一根发射天线，并通过高Q腔体和环行隔离器等组件抑制带外噪声、高次谐波及互调干扰；双工器主要用于隔离发射和接收信号。",
+      "expected_document_ids": ["product:cavity-combiner", "product:band-pass-duplexer"],
+      "expected_chunk_ids": ["product:cavity-combiner:content", "product:band-pass-duplexer:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "应进一步看腔体合路器。",
+        "合路器可让多台基地发射机共用一根发射天线并抑制相关干扰。",
+        "双工器主要隔离发射与接收信号。"
+      ],
+      "forbidden_claims": [
+        "不得把合路器和双工器的用途颠倒。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-009",
+      "category": "solution",
+      "split": "holdout",
+      "question": "化工厂几个班组的信道有的很忙、有的空闲，而且不同区域防爆要求不同。石油石化方案如何处理这两件事？",
+      "expected_behavior": "answer",
+      "expected_answer": "方案按对讲机数量确定集群载频数量，让信道动态分配、各班组共用；同时根据厂区环境和人数合理配置IIC与IIB防爆终端数量。",
+      "expected_document_ids": ["solution:petrochemical"],
+      "expected_chunk_ids": ["solution:petrochemical:body:solution"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "信道动态分配并由各班组共用。",
+        "按厂区环境和人数配置IIC与IIB防爆终端。"
+      ],
+      "forbidden_claims": [
+        "不得声称所有区域统一只需IIB或只需IIC设备。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-010",
+      "category": "solution",
+      "split": "holdout",
+      "question": "应急平台要统一接入前端感知设备和视频资源，还要做视频分析、设备状态监测。这主要由三大中台中的哪一个支撑？",
+      "expected_behavior": "answer",
+      "expected_answer": "主要由技术中台支撑。技术中台通过物联网、大数据和人工智能能力统一接入前端感知设备、视频资源及其他业务系统，并提供视频智能分析和设备状态监测等能力。",
+      "expected_document_ids": ["solution:smart-emergency"],
+      "expected_chunk_ids": ["solution:smart-emergency:body:solution-overview"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "主要由技术中台支撑。",
+        "统一接入感知设备、视频资源及其他业务系统。",
+        "支持视频智能分析和设备状态监测。"
+      ],
+      "forbidden_claims": [
+        "不得误归为业务中台的地理信息服务或数据中台的多灾种辅助决策。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-011",
+      "category": "support",
+      "split": "holdout",
+      "question": "项目还没进场，我们想先把覆盖范围、信号质量、容量和投入一起规划清楚。这属于哪项服务，依据什么来设计？",
+      "expected_behavior": "answer",
+      "expected_answer": "这属于方案设计服务。公司会先充分了解客户需求，并结合新技术趋势、行业应用和专业通信实践，围绕覆盖范围、信号质量、系统容量及资源投入提供网络规划方案。",
+      "expected_document_ids": ["support:solution-design"],
+      "expected_chunk_ids": ["support:solution-design:content"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "属于方案设计服务。",
+        "先了解客户需求。",
+        "结合技术趋势、行业应用和通信实践规划覆盖、质量、容量与投入。"
+      ],
+      "forbidden_claims": [
+        "不得说成已经进入现场施工或已经替客户确定最终预算。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-012",
+      "category": "company",
+      "split": "holdout",
+      "question": "盛博润自己主要研发生产哪几类产品？",
+      "expected_behavior": "answer",
+      "expected_answer": "盛博润主要研发生产无线对讲机、宽带自组网及其相关周边产品。",
+      "expected_document_ids": ["company:shengborun"],
+      "expected_chunk_ids": ["company:shengborun:company-profile"],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "主要研发生产无线对讲机、宽带自组网及相关周边产品。"
+      ],
+      "forbidden_claims": [
+        "不得把知识库内所有第三方品牌产品都说成盛博润自主生产。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-013",
+      "category": "product_spec",
+      "split": "holdout",
+      "question": "Which high-availability modes does the firewall support, and which protocols can it use for health checks?",
+      "expected_behavior": "answer",
+      "expected_answer": "The firewall supports Active/Active and Active/Passive high-availability modes. Its health checks support ICMP, TCP, HTTP, and FTP.",
+      "expected_document_ids": ["product:firewall"],
+      "expected_chunk_ids": ["product:firewall:content"],
+      "expected_system_rule_ids": ["language_policy_v1"],
+      "required_facts": [
+        "Answer entirely in English.",
+        "Active/Active and Active/Passive modes.",
+        "ICMP, TCP, HTTP, and FTP health checks."
+      ],
+      "forbidden_claims": [
+        "Do not mix Chinese into the answer or add unsupported availability guarantees."
+      ]
+    },
+    {
+      "id": "v1.1-holdout-014",
+      "category": "unknown",
+      "split": "holdout",
+      "question": "盛博润是海能达的官方授权代理商吗？如果是，请给出授权范围。",
+      "expected_behavior": "abstain",
+      "expected_answer": "当前资料不能确认盛博润是海能达的官方授权代理商，也不能确认授权范围，因此不作推测。",
+      "expected_document_ids": [],
+      "expected_chunk_ids": [],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "明确说明无法确认官方代理关系及授权范围。"
+      ],
+      "forbidden_claims": [
+        "不得由产品记录、业务往来或知识库收录推断官方代理关系。"
+      ]
+    },
+    {
+      "id": "v1.1-holdout-015",
+      "category": "unknown",
+      "split": "holdout",
+      "question": "无线AP现在有多少台库存？含安装的成交价是多少？",
+      "expected_behavior": "abstain",
+      "expected_answer": "当前资料没有无线AP的实时库存和含安装成交价，无法确认这些信息，也不作估价。",
+      "expected_document_ids": [],
+      "expected_chunk_ids": [],
+      "expected_system_rule_ids": [],
+      "required_facts": [
+        "明确说明无法确认实时库存和含安装成交价。"
+      ],
+      "forbidden_claims": [
+        "不得编造库存、报价、折扣或安装费用。"
+      ]
+    }
+  ]
+}
