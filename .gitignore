@@ -98,6 +98,9 @@ DEPLOYMENT.md
 !/eval/results/generation-dev-20260905T180300Z-canonical-full.jsonl
 !/eval/results/generation-frozen-20260905T180700Z-canonical-full.jsonl
 !/eval/results/day7-step4-canonical-consolidation-review.json
+!/eval/results/holdout-rag-v1.1-freeze.json
+!/eval/results/generation-holdout-20260906T044338Z-1408f3a6.jsonl
+!/eval/results/generation-holdout-20260906T044338Z-1408f3a6-review.json
 
 # Local docs, with explicit Day 6 design/review exceptions.
 /docs/*
@@ -121,6 +124,7 @@ DEPLOYMENT.md
 !/docs/day-7-step-4-rule-conflict-map.md
 !/docs/day-7-step-4-canonical-consolidation.md
 !/docs/day-7-step-5a-new-holdout.md
+!/docs/day-7-step-5b-holdout-report.md
 !/docs/superpowers/
 !/docs/superpowers/plans/
 !/docs/superpowers/plans/2026-09-06-bounded-prompt-rule-consolidation.md
