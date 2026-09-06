@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "dataset_version": "rag-v1.1",
+  "review_status": "owner_review_complete",
+  "execution": {
+    "cases": 15,
+    "completed": 15,
+    "runs": 1,
+    "reruns": 0,
+    "holdout_is_now_seen": true
+  },
+  "pre_sealed_rubric": {
+    "pass": 13,
+    "initially_flagged": 2,
+    "initially_flagged_case_ids": [
+      "v1.1-holdout-006",
+      "v1.1-holdout-007"
+    ]
+  },
+  "owner_disposition": {
+    "v1.1-holdout-006": "acceptable_non_blocking",
+    "v1.1-holdout-007": "acceptable_non_blocking",
+    "business_acceptance": "pass"
+  },
+  "retrieval": {
+    "eligible_cases": 14,
+    "top_k": 5,
+    "hit_at_1": 0.8571,
+    "hit_at_3": 1.0,
+    "hit_at_5": 1.0,
+    "recall_at_5": 1.0
+  },
+  "latency_seconds": {
+    "retrieval_mean": 0.174,
+    "llm_ttft_mean": 0.448,
+    "llm_total_mean": 0.957,
+    "total_request_mean": 1.135
+  },
+  "integrity": {
+    "raw_results_sha256": "bf9c2ccc158acbedc0537a1be0b265e41bd0e01a2dcc4c00cae0e9cc9a3d70a1",
+    "freeze_record_sha256": "650c72e8631fcc6cc203276e16a98aa5cf7e4efc49f4598010617d9f94972efc",
+    "system_change_after_review": false,
+    "rerun_after_review": false
+  },
+  "result": "Step 5B — Business Acceptance PASS after owner review"
+}

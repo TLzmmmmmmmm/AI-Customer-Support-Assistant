@@ -123,7 +123,7 @@ V1的prompts.py文件SHA-256为`b62feb8f53c71b1eef7a411bdd2b6d6e30c9d36437f610ec
 
 ## 7. 文件、验证与停止点
 
-- [原始V1运行](../eval/results/generation-frozen-20260904T101056Z-04e12253.jsonl)：20份回答、actual provider messages、Top-K provenance及运行元数据；SHA-256=`32910b6d47daf7bf997ce0904c148fc896ebcceb9abcefa6bd25991b2cd43b8b`。
+- 原始 V1 运行曾包含20份回答、actual provider messages、Top-K provenance及运行元数据；该大型 JSONL 已从当前工作树清理，可通过 Git 历史和 SHA-256 `32910b6d47daf7bf997ce0904c148fc896ebcceb9abcefa6bd25991b2cd43b8b` 审计。
 - [V0新复评](../eval/results/baseline-v0-day6-review.json)：独立20条评分，不改历史原件。
 - [V1新评分](../eval/results/generation-frozen-20260904T101056Z-04e12253-review.json)：20条理由、统计和同次检索指标。V1 review_status=complete；V0复评分未包含在本次指定确认范围，仍为pending_review。
 - 评测入口仅新增`--split frozen`，默认仍dev，holdout无入口，混合split拒绝。新增4项测试，完整244项unittest通过；测试只隔离外部provider，真实评测没有替换retriever或模型。

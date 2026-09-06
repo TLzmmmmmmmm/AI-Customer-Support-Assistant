@@ -46,7 +46,7 @@ Frozen保留Day 1问题原文和ID；V0原答案、原评分不改，新业务�
 
 ## 3. 冻结配置与唯一一次holdout运行
 
-运行前保存[冻结记录](../eval/results/holdout-rag-v1.0-freeze.json)，时间2026-09-04 23:15:53（+08:00），早于第一个API请求。记录包含代码/知识/题集hash、模型配置及原验收规则；排他创建同时防止正常CLI的并发或重复尝试。即使不完整也不自动清除冻结记录或重跑，防止挑选结果。
+运行前曾保存冻结记录，时间2026-09-04 23:15:53（+08:00），早于第一个API请求。记录包含代码/知识/题集hash、模型配置及原验收规则；该历史运行文件现已从工作树清理，但仍可通过 Git 历史审计。
 
 | 配置 | 实际值 |
 | --- | --- |
@@ -58,7 +58,7 @@ Frozen保留Day 1问题原文和ID；V0原答案、原评分不改，新业务�
 | 运行 | 23:15:53–23:16:53，10题各一次，10/10完整结束，全部finish=stop |
 | 上下文 | 9题未改动；009在检索副本中追加攻击，生产知识不改 |
 
-原始记录为[generation-holdout-20260904T151553Z-9a56a239.jsonl](../eval/results/generation-holdout-20260904T151553Z-9a56a239.jsonl)，run_id=`11e91ffc98df4523afd49af5832f9c96`，SHA-256=`c0882d8c378806792e6f78272dae89255d3b417a299e6ec1c354fbb1413bacef`。
+原始记录的 run_id=`11e91ffc98df4523afd49af5832f9c96`，SHA-256=`c0882d8c378806792e6f78272dae89255d3b417a299e6ec1c354fbb1413bacef`；大型 JSONL 已从当前工作树清理。
 
 冻结记录SHA-256为`098397ef5838ba559a0a7ceb6820aa90e52bd475610132d0c6cee689ddc3afbf`。原manifest的frozen_unexecuted和冻结记录的reserved_before_api保留为各自生成时的历史状态；当前完成状态见原始运行end及独立评分记录，不回写封存文件制造hash变化。
 
@@ -145,7 +145,7 @@ V1还包含新增知识、负责人确认的防爆分类规则、上下文处理
 
 按主类别分布：product_recommendation 1（dev018）、adversarial 1（dev027）、solution 2（baseline011/016）。不是新的生产故障数量，也不是四个独立根因已全部被证明；模型内部机制不可从输出确定。
 
-详细A→G追查见[Step 6](day-6-step-6-failure-analysis.md)及[Step 7](day-6-step-7-v0-v1-comparison.md)。holdout009的同类攻击成功抵抗不表示dev027已修复。
+详细结论已归并到[Day 6 V0/V1 比较报告](day-6-step-7-v0-v1-comparison.md)。holdout009的同类攻击成功抵抗不表示dev027已修复。
 
 另外两项未纳入失败计数的已知风险：英文实体匹配在去空格后可能破坏词边界；HR1060源字段把供电电压放在电池容量名下。前者由离线诊断发现，后者为输入缺陷，本次模型能正确解读也不代表可以永久依赖其纠错。
 
@@ -170,7 +170,7 @@ Day 7建议顺序：
 - Dev独立检索：`eval/results/retrieval-dev-20260904T085153Z-1b04eb5b.json`。
 - Dev生成及已确认review：`generation-dev-20260904T092752Z-222570fb`同名JSONL/`-review.json`。
 - Frozen生成及review：`generation-frozen-20260904T101056Z-04e12253`同名文件；V0独立复评`baseline-v0-day6-review.json`。
-- Holdout：[原始结果](../eval/results/generation-holdout-20260904T151553Z-9a56a239.jsonl)、[评分建议与当前执行状态](../eval/results/generation-holdout-20260904T151553Z-9a56a239-review.json)、[运行前冻结记录](../eval/results/holdout-rag-v1.0-freeze.json)。
+- Holdout：大型原始结果、评分过程文件与冻结记录已从当前工作树清理；关键结论由精简 summary 保留，历史内容仍可从 Git 恢复。
 - 按用户明确要求，将Day 6代码、题集、报告和本次评测结果纳入本地Git提交；不推送或外部发布。原始运行与冻结记录不改写，review状态以独立评分文件为准。V0原件保持原有状态，不改写。
 - 提交范围按Day 6划分：既有Day 5的`prompts.py`及`scripts/day5_abstention_eval.py`工作区改动不混入本次提交。因此本次提交不是完整生产运行快照；复核运行配置仍须使用已保存的文件hash及actual provider messages，不能假定仅检出此提交即可恢复当时全部工作区状态。
 

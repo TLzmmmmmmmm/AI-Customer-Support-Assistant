@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "candidate": "AI Customer Support RAG V1.1",
+  "classification": "Production Candidate",
+  "production_deployed": false,
+  "owner_reviewed_holdout": "pass",
+  "release_candidate_smoke": {
+    "status": "pass",
+    "business_cases": 6,
+    "business_cases_passed": 6,
+    "http_contract": "pass",
+    "health": "pass",
+    "knowledge_snapshot": "pass"
+  },
+  "offline_tests": {
+    "passed": 277,
+    "failed": 0
+  },
+  "knowledge_snapshot": {
+    "documents": 61,
+    "chunks": 73,
+    "vectors": 73,
+    "embedding_provider": "dashscope",
+    "embedding_model": "qwen3.7-text-embedding",
+    "embedding_dimensions": 1024,
+    "documents_sha256": "e29a2531e48f3940b96a396cff2a8df820e4c4e967483fea9d359404cc676e67",
+    "chunks_sha256": "2bc4676cef1a36cbd81f734bade0f47027c729eaf505d4018877deb6479cc4e2",
+    "vectors_sha256": "5bc8840b4db94378eb8a7abb1ecab704313f18dd311d90cac05defc578f30e03"
+  },
+  "production_contract": {
+    "endpoint": "POST /api/chat-stream",
+    "content_type": "application/x-ndjson",
+    "event_types": ["delta", "done", "error"],
+    "top_k": 5,
+    "generation_model": "deepseek-v4-flash"
+  },
+  "commit": "89908ef5535195af8aafd7c2a0c9e47fd1798691"
+}

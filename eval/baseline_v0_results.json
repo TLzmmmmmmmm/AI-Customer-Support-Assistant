@@ -1,0 +1,229 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "shengborun-ai-assistant-baseline-v0",
+  "baseline_file": "eval/baseline_v0.json",
+  "generated_on": "2026-08-30T16:31:03+08:00",
+  "status": "completed",
+  "execution": {
+    "backend_commit": "81bd56e",
+    "endpoint": "/api/chat-stream",
+    "model": "deepseek-v4-flash",
+    "started_at": "2026-08-30T16:25:04+08:00",
+    "completed_at": "2026-08-30T16:27:36+08:00",
+    "duration_ms": 152000,
+    "sum_request_latency_ms": 33150.4,
+    "requested_cases": 20,
+    "completed_cases": 20,
+    "stream_failures": 0,
+    "runs_per_case": 1,
+    "history_reset_between_cases": true
+  },
+  "totals": {
+    "total": 20,
+    "correct": 2,
+    "incorrect": 18,
+    "hallucinated": 3,
+    "appropriate_refusal": 3,
+    "required_refusal_cases": 3,
+    "inappropriate_or_missing_refusal": 0,
+    "incorrect_refusal": 17
+  },
+  "scores": {
+    "points_earned": 44,
+    "points_available": 100,
+    "percentage": 44.0,
+    "mean_per_case": 2.2,
+    "answerable_cases_points": 31,
+    "answerable_cases_points_available": 85,
+    "answerable_cases_percentage": 36.47,
+    "boundary_cases_points": 13,
+    "boundary_cases_points_available": 15,
+    "boundary_cases_percentage": 86.67
+  },
+  "rates": {
+    "accuracy": 0.1,
+    "hallucination_rate": 0.15,
+    "appropriate_refusal_rate": 1.0,
+    "incorrect_refusal_rate_on_answerable_cases": 1.0,
+    "stream_success_rate": 1.0
+  },
+  "latency_ms": {
+    "mean": 1657.5,
+    "median": 1452.0,
+    "min": 928.5,
+    "max": 3525.8
+  },
+  "category_breakdown": {
+    "capability_boundary": {
+      "cases": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "points_earned": 5,
+      "points_available": 5,
+      "percentage": 100.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 0,
+      "appropriate_refusal": 1
+    },
+    "catalog_overview": {
+      "cases": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "points_earned": 2,
+      "points_available": 5,
+      "percentage": 40.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 1,
+      "appropriate_refusal": 0
+    },
+    "commercial_boundary": {
+      "cases": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "points_earned": 5,
+      "points_available": 5,
+      "percentage": 100.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 0,
+      "appropriate_refusal": 1
+    },
+    "cross_source_synthesis": {
+      "cases": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "points_earned": 2,
+      "points_available": 5,
+      "percentage": 40.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 1,
+      "appropriate_refusal": 0
+    },
+    "grounded_recommendation": {
+      "cases": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "points_earned": 1,
+      "points_available": 5,
+      "percentage": 20.0,
+      "hallucinated": 1,
+      "incorrect_refusal": 1,
+      "appropriate_refusal": 0
+    },
+    "product_capability": {
+      "cases": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "points_earned": 2,
+      "points_available": 5,
+      "percentage": 40.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 1,
+      "appropriate_refusal": 0
+    },
+    "product_comparison": {
+      "cases": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "points_earned": 1,
+      "points_available": 5,
+      "percentage": 20.0,
+      "hallucinated": 1,
+      "incorrect_refusal": 1,
+      "appropriate_refusal": 0
+    },
+    "product_spec": {
+      "cases": 4,
+      "correct": 0,
+      "incorrect": 4,
+      "points_earned": 7,
+      "points_available": 20,
+      "percentage": 35.0,
+      "hallucinated": 1,
+      "incorrect_refusal": 4,
+      "appropriate_refusal": 0
+    },
+    "solution_knowledge": {
+      "cases": 5,
+      "correct": 0,
+      "incorrect": 5,
+      "points_earned": 10,
+      "points_available": 25,
+      "percentage": 40.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 5,
+      "appropriate_refusal": 0
+    },
+    "support_service": {
+      "cases": 3,
+      "correct": 0,
+      "incorrect": 3,
+      "points_earned": 6,
+      "points_available": 15,
+      "percentage": 40.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 3,
+      "appropriate_refusal": 0
+    },
+    "uncertainty_boundary": {
+      "cases": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "points_earned": 3,
+      "points_available": 5,
+      "percentage": 60.0,
+      "hallucinated": 0,
+      "incorrect_refusal": 0,
+      "appropriate_refusal": 1
+    }
+  },
+  "incorrect_case_ids": [
+    "baseline-001",
+    "baseline-002",
+    "baseline-003",
+    "baseline-004",
+    "baseline-005",
+    "baseline-006",
+    "baseline-007",
+    "baseline-008",
+    "baseline-009",
+    "baseline-010",
+    "baseline-011",
+    "baseline-012",
+    "baseline-013",
+    "baseline-014",
+    "baseline-015",
+    "baseline-016",
+    "baseline-017",
+    "baseline-019"
+  ],
+  "hallucinated_case_ids": [
+    "baseline-004",
+    "baseline-006",
+    "baseline-017"
+  ],
+  "refusal_case_ids": [
+    "baseline-018",
+    "baseline-019",
+    "baseline-020"
+  ],
+  "incorrect_refusal_case_ids": [
+    "baseline-001",
+    "baseline-002",
+    "baseline-003",
+    "baseline-004",
+    "baseline-005",
+    "baseline-006",
+    "baseline-007",
+    "baseline-008",
+    "baseline-009",
+    "baseline-010",
+    "baseline-011",
+    "baseline-012",
+    "baseline-013",
+    "baseline-014",
+    "baseline-015",
+    "baseline-016",
+    "baseline-017"
+  ],
+  "summary_notes": "V0 completed all streams and preserved refusal safety, but it had no website knowledge context: all 17 answerable cases were incorrectly refused. Two boundary cases passed fully; the distance-guarantee case refused appropriately but missed the published reference value."
+}

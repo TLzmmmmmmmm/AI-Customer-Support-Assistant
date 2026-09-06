@@ -1,0 +1,1077 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "shengborun-ai-assistant-baseline-v0",
+  "title": "Shengborun AI Assistant V0 Baseline",
+  "created_on": "2026-08-30",
+  "status": "evaluated",
+  "purpose": "Measure factual customer-support quality before RAG and provide a frozen comparison set for V1.",
+  "knowledge_snapshot": {
+    "website": "https://www.shengborun.com",
+    "frontend_repository": "Shengborun",
+    "frontend_commit": "b9cd9c11553b6734d0955269dffc455124620420",
+    "backend_repository": "AI-Customer-Support-Assistant",
+    "backend_commit": "81bd56e",
+    "retrieval_enabled": false
+  },
+  "test_protocol": {
+    "total_cases": 20,
+    "independent_single_turn": true,
+    "reset_history_between_cases": true,
+    "runs_per_case": 1,
+    "endpoint": "/api/chat-stream",
+    "request_shape": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "<question>"
+        }
+      ]
+    },
+    "completion_requirement": "The stream must end with a done event.",
+    "comparison_rule": "Run V1 with the same questions, model settings and scoring rubric."
+  },
+  "answerability_values": {
+    "answerable": "The frozen sources contain enough information for a direct answer.",
+    "partially_answerable": "Some facts are available, but the requested guarantee or conclusion is not supported.",
+    "unanswerable": "The requested fact or action is not supported by the frozen sources or available tools."
+  },
+  "scoring": {
+    "max_points_per_case": 5,
+    "max_points_total": 100,
+    "dimensions": {
+      "factual_correctness": {
+        "max": 2,
+        "description": "2 = all material claims are correct; 1 = partly correct with no critical error; 0 = materially incorrect or wrong boundary decision."
+      },
+      "completeness": {
+        "max": 1,
+        "description": "Covers the expected key points appropriate to the question."
+      },
+      "groundedness": {
+        "max": 1,
+        "description": "Does not add unsupported Shengborun facts, parameters, promises or capabilities."
+      },
+      "usefulness": {
+        "max": 1,
+        "description": "Direct, understandable and gives a safe next step when needed."
+      }
+    },
+    "correct_rule": "total_score >= 4, hallucinated is false, and any required refusal is appropriate.",
+    "incorrect_rule": "Any case that does not satisfy correct_rule.",
+    "hallucination_rule": "True when the answer asserts a company fact, product fact, commercial condition or completed action unsupported by the expected sources.",
+    "appropriate_refusal_rule": "For partially_answerable or unanswerable cases, true when the answer clearly states the limit, avoids guessing, and provides only supported information or next steps; null for fully answerable cases."
+  },
+  "cases": [
+    {
+      "id": "baseline-001",
+      "category": "catalog_overview",
+      "difficulty": "easy",
+      "question": "贵公司目前网站展示了哪几类产品？",
+      "answerability": "answerable",
+      "expected_answer": "网站展示四类产品：对讲机通信、短波通信、自组网通信和 ICT 集成。",
+      "expected_key_points": [
+        "对讲机通信",
+        "短波通信",
+        "自组网通信",
+        "ICT 集成",
+        "共四类"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/products/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/data/homepage.ts"
+        }
+      ],
+      "must_not_claim": [
+        "不得增加网站未展示的产品分类"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "感谢您的咨询。目前，根据我手中现有的资料，**我无法确认**贵公司网站当前具体展示了哪几类产品。\n\n我的信息库中暂时没有关于北京盛博润通信设备有限公司产品分类的详细资料。为了给您提供准确的信息，建议您直接访问**北京盛博润通信设备有限公司官方网站**查看“产品中心”或类似栏目，那里的信息最为权威和完整。\n\n如果您在官网上看到了具体感兴趣的产品型号或系列，可以随时告诉我，我很乐意基于现有资料为您提供进一步帮助。",
+        "http_status": 200,
+        "request_id": "aef4700e16c14663a00cd8bdbea66eb1",
+        "latency_ms": 3525.8,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-002",
+      "category": "product_spec",
+      "difficulty": "easy",
+      "question": "摩托罗拉 XiR P8668Ex 支持什么频段？",
+      "answerability": "answerable",
+      "expected_answer": "XiR P8668Ex 支持 UHF 403–470 MHz 和 VHF 136–174 MHz。",
+      "expected_key_points": [
+        "UHF 403-470MHz",
+        "VHF 136-174MHz"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/xir-p8668ex/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/xir-p8668ex.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得扩展到资料未列出的频段"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "关于摩托罗拉 XiR P8668Ex 的具体频段信息，目前我掌握的资料中并未包含。建议您查阅该产品的官方说明书或联系其厂商获取准确参数。",
+        "http_status": 200,
+        "request_id": "4cea35d45b5f49c4a19ac371c6d7712c",
+        "latency_ms": 948.9,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-003",
+      "category": "product_spec",
+      "difficulty": "medium",
+      "question": "海能达 HP780 的频率范围、输出功率、电池容量和防护等级分别是什么？",
+      "answerability": "answerable",
+      "expected_answer": "HP780 的频率范围为 VHF 136–174 MHz、UHF1 400–470 MHz，输出功率不超过 5 W，电池容量 2400 mAh，防护等级 IP68。",
+      "expected_key_points": [
+        "VHF 136-174MHz",
+        "UHF1 400-470MHz",
+        "输出功率≤5W",
+        "2400mAh",
+        "IP68"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hp780/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/hp780.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得把页面参数说成所有批次的绝对保证"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前现有资料中没有北京盛博润通信设备有限公司关于海能达 HP780 的技术参数信息，因此无法确认该型号的频率范围、输出功率、电池容量和防护等级。\n\n建议您通过海能达官方渠道或设备附带的产品手册查询该型号的准确参数。如果您想了解本公司自身的对讲机产品或相关支持，请告知具体型号或需求，我将在资料允许的范围内为您解答。",
+        "http_status": 200,
+        "request_id": "89ae49432d7e4d50957427943af470cc",
+        "latency_ms": 1415.2,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-004",
+      "category": "product_comparison",
+      "difficulty": "hard",
+      "question": "海能达 HP780 和 HP790Ex 在输出功率、电池容量以及防爆信息方面有什么区别？",
+      "answerability": "answerable",
+      "expected_answer": "HP780 输出功率≤5 W、电池 2400 mAh，页面未标注防爆等级；HP790Ex 输出功率≤2 W、电池 2150 mAh，并明确标注 Ex ib IIC T4 Gb、Ex ib IIIC T120℃ Db 防爆等级。不能据此断言 HP780 绝对不具备任何防爆版本，只能说明当前页面没有该标注。",
+      "expected_key_points": [
+        "HP780≤5W",
+        "HP780 2400mAh",
+        "HP790Ex≤2W",
+        "HP790Ex 2150mAh",
+        "HP790Ex 防爆等级",
+        "不把未标注等同于绝对不具备"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hp780/"
+        },
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hp790ex/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/hp780.json"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/hp790ex.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得声称 HP780 一定不防爆",
+        "不得混淆两款产品参数"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "您询问的是海能达（Hytera）品牌的型号，而非北京盛博润通信设备有限公司的产品。对于其他品牌型号的具体参数，我目前没有可靠的资料可以确认。\n\n建议您通过海能达官方渠道或授权经销商查询相关技术参数，以获取准确信息。如果您想了解北京盛博润通信设备有限公司自身的产品信息，可以告诉我具体型号或需求，我会在已有资料范围内为您解答。",
+        "http_status": 200,
+        "request_id": "6865a7e39b94401a94873806db6e5bb1",
+        "latency_ms": 2127.4,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": true,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 0,
+          "usefulness": 1,
+          "total": 1
+        },
+        "evaluation_notes": "Incorrect refusal. It also incorrectly framed the listed Hytera models as not being Shengborun website products, despite both being in the frozen catalog.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-005",
+      "category": "product_spec",
+      "difficulty": "medium",
+      "question": "海能达 HR1060 的输出功率、信道数量和供电规格是什么？",
+      "answerability": "answerable",
+      "expected_answer": "HR1060 输出功率≤50 W，信道数量 1024；供电规格为直流 13.6 V±15%，交流 100–240 V。",
+      "expected_key_points": [
+        "输出功率≤50W",
+        "1024 信道",
+        "直流13.6V±15%",
+        "交流100-240V"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hr1060/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/hr1060.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得把供电电压误称为电池容量"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前我无法确认海能达 HR1060 的输出功率、信道数量和供电规格。现有资料中没有提供该型号的具体参数。建议您通过北京盛博润通信设备有限公司官方网站公开的联系方式，向工作人员进一步核实。",
+        "http_status": 200,
+        "request_id": "43d07abdf9cd420c80d933f35f524a0e",
+        "latency_ms": 1165.0,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-006",
+      "category": "product_spec",
+      "difficulty": "medium",
+      "question": "国产 20W 短波电台搭配 3 米鞭天线、15 米斜天线和 44 米双极天线时，网站分别给出了怎样的通信距离？",
+      "answerability": "answerable",
+      "expected_answer": "网站资料给出：配 3 米鞭天线通信距离 15 公里以上，配 15 米斜天线 200 公里以上，配 44 米双极天线 500 公里以上。这些是页面资料，不应解释为任何环境下的绝对保证。",
+      "expected_key_points": [
+        "3米鞭天线：15公里以上",
+        "15米斜天线：200公里以上",
+        "44米双极天线：500公里以上",
+        "非无条件保证"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/shortwave-radio/domestic-20w/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/shortwave-radio/domestic-20w.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得删除“以上”或改成固定距离",
+        "不得保证所有环境均能达到"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前网站提供的资料中，没有关于“国产 20W 短波电台”搭配不同天线时的具体通信距离数据。现有信息无法确认这些配置下的通信距离，建议您通过官方网站公开的联系方式向工作人员进一步咨询。",
+        "http_status": 200,
+        "request_id": "327041a28f1f430985a50a3a18dcfdf2",
+        "latency_ms": 928.5,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": true,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 0,
+          "usefulness": 1,
+          "total": 1
+        },
+        "evaluation_notes": "Incorrect refusal. It falsely stated that the website contains no antenna-distance data, although all three values are present in the frozen product page.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-007",
+      "category": "product_capability",
+      "difficulty": "hard",
+      "question": "海能达 PNE380 是什么设备？它的便携性、待机时间和组网能力有哪些公开参数？",
+      "answerability": "answerable",
+      "expected_answer": "PNE380 是集语音、数据、视频和智能业务于一体的宽带自组网多模终端。尺寸约 13.7×6×2.78 cm，重量约 288 g，最长待机时间 36 小时；资料还写明最大吞吐率 30 Mbps，并可进一步提升至最多 16 节点，支持自组网、蜂窝网及独立或混合组网。",
+      "expected_key_points": [
+        "宽带自组网多模终端",
+        "语音、数据、视频",
+        "13.7×6×2.78cm",
+        "约288g",
+        "最长待机36小时",
+        "30Mbps",
+        "最多16节点",
+        "自组网与蜂窝网"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/mesh-network/pne380/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/mesh-network/pne380.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得把最长待机时间表述为所有使用条件下的保证"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "感谢您的咨询。不过，北京盛博润通信设备有限公司目前提供的资料中，没有关于“海能达 PNE380”这一设备的信息。\n\n海能达（Hytera）是另一家通信设备厂商，我无法基于我们的资料确认该型号的具体参数（如便携性、待机时间、组网能力等），也不建议根据一般行业知识进行推测。\n\n如果您想了解北京盛博润通信设备有限公司自身的相关产品，我很乐意根据现有的资料为您解答。如果资料不足，我也会明确告知。",
+        "http_status": 200,
+        "request_id": "8444043498354c0ca522aad7e12326b7",
+        "latency_ms": 1604.7,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-008",
+      "category": "solution_knowledge",
+      "difficulty": "medium",
+      "question": "酒店无线对讲解决方案如何支持跨部门协作和紧急情况下的优先通信？",
+      "answerability": "answerable",
+      "expected_answer": "方案通过控制中心、IP 网络和数字基站统一管理终端，以组呼划分部门，并支持单呼、全呼；紧急呼叫可对繁忙信道强插/强拆，重要用户还可设置最高优先级进行呼叫强插。方案也支持录音追溯和远程调度。",
+      "expected_key_points": [
+        "控制中心、IP网络、数字基站",
+        "组呼支持部门划分",
+        "单呼或全呼",
+        "紧急呼叫强插/强拆",
+        "重要用户优先级",
+        "录音或远程调度"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/hotel/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/hotel.md"
+        }
+      ],
+      "must_not_claim": [
+        "不得承诺具体项目无需现场设计即可实现全部功能"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "您好！感谢您对北京盛博润通信设备有限公司相关解决方案的关注。\n\n不过，我需要向您说明：目前我能够查到的资料中，**并未包含公司关于酒店无线对讲解决方案的详细信息**，包括该方案的具体功能、跨部门协作机制、紧急情况下的优先通信设计等。\n\n因此，我无法确认公司是否提供此类解决方案，也无法确认其具体如何实现您提到的跨部门协作和紧急通信优先功能，**不能基于行业常见做法进行推测**。\n\n建议您通过以下方式进一步确认：\n\n1. 查看北京盛博润通信设备有限公司**官方网站**，了解产品与解决方案栏目；\n2. 通过官网公开的联系方式（电话或邮箱）咨询工作人员，获取准确的方案资料。\n\n如果您能提供更多关于贵酒店对讲需求的信息（如使用人数、覆盖范围、所需功能等），我可以帮您分析一般性的需求要点，但关于公司具体产品/方案的匹配性，仍需以官方资料为准。\n\n请问还有其他可以帮您的吗？",
+        "http_status": 200,
+        "request_id": "16ec515ba5f44fcf8fbf1960bed43f84",
+        "latency_ms": 3101.5,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-009",
+      "category": "solution_knowledge",
+      "difficulty": "medium",
+      "question": "企事业单位数字常规通信方案如何在不增加频点的情况下扩充容量？网站给出的示例是多少终端？",
+      "answerability": "answerable",
+      "expected_answer": "方案采用数字双时隙 TDMA，在一个频点上利用两个时隙，将系统容量增加一倍。网站示例是：原来 1 个模拟常规信道可满足 30 个终端，现在 1 个数字常规信道可在两个时隙上满足 60 个终端。",
+      "expected_key_points": [
+        "数字双时隙TDMA",
+        "不增加频点",
+        "容量增加一倍",
+        "30个终端",
+        "60个终端"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/enterprise/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/enterprise.md"
+        }
+      ],
+      "must_not_claim": [
+        "不得把示例容量说成所有部署的固定保证"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前我掌握的资料中，没有关于“企事业单位数字常规通信方案如何在不增加频点的情况下扩充容量”的具体技术内容，也没有该方案示例所对应的终端数量。\n\n建议您查看北京盛博润通信设备有限公司官方网站上该方案的具体页面，或通过官网公开的联系方式向工作人员进一步确认。",
+        "http_status": 200,
+        "request_id": "d768ea4e55af4774b2ca905da1d2362f",
+        "latency_ms": 1381.6,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-010",
+      "category": "solution_knowledge",
+      "difficulty": "hard",
+      "question": "石油石化数字集群方案怎样解决中控室信号盲区、统一调度和电话互联问题？",
+      "answerability": "answerable",
+      "expected_answer": "方案使用带选频功能的光纤分体式基站信号增强器，并在中控和机柜间进行室内分布设计来延伸、放大信号；通过调度台实现 PC 端语音呼叫、强拆、强播、监听和话务统计；通过 PSTN 互联网关连接厂区行政电话、调度电话和扩音对讲系统。",
+      "expected_key_points": [
+        "光纤分体式基站信号增强器",
+        "室内分布覆盖盲区",
+        "调度台",
+        "强拆、强播或监听",
+        "PSTN互联网关",
+        "与行政电话、调度电话或扩音对讲互联"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/petrochemical/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/petrochemical.md"
+        }
+      ],
+      "must_not_claim": [
+        "不得保证未经勘测的厂区不存在盲区"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前我掌握的资料中，没有关于“石油石化数字集群方案”的具体内容，因此无法确认该方案在中控室信号盲区、统一调度和电话互联方面的具体解决方式。\n\n建议您通过北京盛博润通信设备有限公司官方网站公开的联系方式，咨询相关工作人员获取该方案的详细信息。",
+        "http_status": 200,
+        "request_id": "a8bae5cea3ec42bb9fd0062f2ee5e70e",
+        "latency_ms": 1266.1,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-011",
+      "category": "solution_knowledge",
+      "difficulty": "medium",
+      "question": "人防行业宽带自组网解决方案采用什么网络结构，可以向后方回传哪些现场数据？",
+      "answerability": "answerable",
+      "expected_answer": "方案以人防通信指挥车连接机动车和现场处置人员，形成无中心、多跳中继的动态无线通信网络；可向后方实时回传现场高清视频、数字语音和人员定位数据。",
+      "expected_key_points": [
+        "通信指挥车",
+        "机动车与现场人员",
+        "无中心",
+        "多跳中继",
+        "高清视频",
+        "数字语音",
+        "人员定位"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/civil-defense/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/civil-defense.md"
+        }
+      ],
+      "must_not_claim": [
+        "不得增加页面未说明的数据类型或保证传输效果"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "您问的“人防行业宽带自组网解决方案”具体网络结构和可回传的数据类型，目前我掌握的资料中**没有提供该解决方案的详细信息**，因此无法给出确认的答复。\n\n为了给您准确的信息，建议您通过**北京盛博润通信设备有限公司官方网站**公开的联系方式，直接向工作人员咨询该方案的技术细节。",
+        "http_status": 200,
+        "request_id": "877d348e2b4847189d8ecf9b88c4b2d6",
+        "latency_ms": 1230.6,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-012",
+      "category": "solution_knowledge",
+      "difficulty": "hard",
+      "question": "智慧应急解决方案中的业务中台、数据中台和技术中台分别承担什么作用？",
+      "answerability": "answerable",
+      "expected_answer": "业务中台提供基于“一张图”的地理信息服务，汇聚空间、资源和业务信息；数据中台面向不同灾种进行影响分析、趋势预测、扩散分析及救援力量和物资匹配；技术中台通过物联网、大数据和人工智能接入感知设备、视频资源和业务系统，提供物联服务、视频解析和智能分析能力。",
+      "expected_key_points": [
+        "业务中台：地理信息服务/一张图",
+        "数据中台：多灾种辅助决策",
+        "技术中台：物联服务与视频解析",
+        "空间与资源数据",
+        "影响或趋势分析",
+        "接入感知设备和视频资源"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/smart-emergency/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/smart-emergency.md"
+        }
+      ],
+      "must_not_claim": [
+        "不得声称系统已经接入某个未公开的城市或客户"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "关于贵司在**智慧应急解决方案**中提到的“业务中台、数据中台和技术中台”的具体作用，我目前**无法确认**。现有资料中没有提供关于该解决方案中这三个中台组件的详细说明。\n\n我理解您可能希望了解该方案的具体架构设计，但为了避免将一般行业通用概念误解为贵司产品的实际功能，我需要明确：\n\n- 当前资料中**没有**关于该解决方案架构、中台划分及具体职责的确认信息。\n- 我无法根据行业常规做法来推断贵司方案中这三个中台的具体定位。\n\n如果您需要了解该方案的详细技术架构，建议您通过**北京盛博润通信设备有限公司官方网站**公开的联系方式，向技术或销售工作人员进一步咨询。",
+        "http_status": 200,
+        "request_id": "a16bb01218b049ffb5e8910a5b79ab55",
+        "latency_ms": 2371.0,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-013",
+      "category": "support_service",
+      "difficulty": "easy",
+      "question": "你们的方案设计服务主要会考虑哪些通信网络因素？",
+      "answerability": "answerable",
+      "expected_answer": "方案设计会在了解客户需求的基础上，结合技术趋势、行业应用和专业通信实践，围绕覆盖范围、信号质量、系统容量和资源投入进行网络规划。",
+      "expected_key_points": [
+        "了解客户需求",
+        "覆盖范围",
+        "信号质量",
+        "系统容量",
+        "资源投入"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/support/#solution-design"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/data/support-services.ts"
+        }
+      ],
+      "must_not_claim": [
+        "不得声称尚未沟通需求就已完成方案设计"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "感谢您的咨询。关于北京盛博润通信设备有限公司的方案设计服务具体会考虑哪些通信网络因素，目前现有资料中尚未提供相关信息，我暂时无法确认具体内容。\n\n建议您通过北京盛博润通信设备有限公司官方网站上公开的联系方式，向工作人员进一步咨询方案设计服务的详细范围。\n\n如果您有其他关于公司产品或技术支持的明确问题，也欢迎提出，我会尽力基于已有资料为您解答。",
+        "http_status": 200,
+        "request_id": "02d6226f5177454081018a48b8980515",
+        "latency_ms": 1290.0,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-014",
+      "category": "support_service",
+      "difficulty": "easy",
+      "question": "项目实施阶段具体包括哪些工作？",
+      "answerability": "answerable",
+      "expected_answer": "项目实施包括入场准备、现场勘测、频率备案、安装施工和系统调试；由专业工程人员按照施工技术规范和项目管理标准完成通信设备及集成配套设施的部署。",
+      "expected_key_points": [
+        "入场准备",
+        "现场勘测",
+        "频率备案",
+        "安装施工",
+        "系统调试"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/support/#project-implementation"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/data/support-services.ts"
+        }
+      ],
+      "must_not_claim": [
+        "不得承诺固定工期或未经确认的实施范围"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前现有资料中未包含北京盛博润通信设备有限公司关于“项目实施阶段具体工作内容”的详细说明，因此我无法确认具体的实施流程或步骤。\n\n如果您需要了解项目实施的具体安排，建议您通过公司官网公开的联系方式咨询相关工作人员，以获取准确信息。",
+        "http_status": 200,
+        "request_id": "b89af803af22481786c305b18b0e0aec",
+        "latency_ms": 1107.3,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-015",
+      "category": "support_service",
+      "difficulty": "medium",
+      "question": "交付培训阶段会交付哪些资料，并培训哪些内容？",
+      "answerability": "answerable",
+      "expected_answer": "公司会向客户指定人员交付项目软硬件以及图纸、设计方案、产品说明书、产品合格证等资料；并按客户要求培训系统使用、后期维护以及扩容升级注意事项。",
+      "expected_key_points": [
+        "项目软硬件",
+        "图纸",
+        "设计方案",
+        "产品说明书",
+        "产品合格证",
+        "系统使用培训",
+        "后期维护",
+        "扩容升级注意事项"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/support/#delivery-training"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/data/support-services.ts"
+        }
+      ],
+      "must_not_claim": [
+        "不得增加未公开的证书、培训时长或售后期限"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前我掌握的可靠资料中，没有关于交付培训阶段具体交付资料和培训内容的详细信息。建议您联系北京盛博润通信设备有限公司的官方渠道（例如官网公布的联系方式）向工作人员进一步确认。",
+        "http_status": 200,
+        "request_id": "45f838a8720440fab064a552b9d83782",
+        "latency_ms": 1081.4,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-016",
+      "category": "cross_source_synthesis",
+      "difficulty": "hard",
+      "question": "宽带自组网应急管理方案和人防行业宽带自组网方案有什么共同点和侧重点差异？",
+      "answerability": "answerable",
+      "expected_answer": "两者都通过无中心或多跳自组网在复杂应急环境中建立宽带通信，并支持现场图像、语音和数据回传。应急管理方案侧重救援人员携带单兵、室外布控和无人机终端，在电力、电信设施受损时快速搭建应急专网；人防方案侧重以人防通信指挥车为核心，连接机动车、现场人员和后方指挥中心，回传高清视频、数字语音和定位数据。",
+      "expected_key_points": [
+        "共同使用宽带自组网/多跳中继",
+        "复杂应急环境通信",
+        "应急管理：单兵、布控、无人机",
+        "设施受损时快速建网",
+        "人防：通信指挥车为核心",
+        "连接前方与后方指挥中心"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/emergency-mesh/"
+        },
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/solutions/civil-defense/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/emergency-mesh.md"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/solutions/civil-defense.md"
+        }
+      ],
+      "must_not_claim": [
+        "不得把两个方案说成完全相同",
+        "不得增加未公开的项目实例"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "根据现有资料，我目前无法确认北京盛博润通信设备有限公司是否提供“宽带自组网应急管理方案”和“人防行业宽带自组网方案”这两类具体方案，也无法确认它们之间的共同点和侧重点差异。资料中没有提供关于这两类方案的详细内容。\n\n如果您能提供更具体的需求（例如使用场景、覆盖范围、功能要求等），我可以尝试在现有资料范围内进一步协助，但若仍无可靠依据，我将无法对具体方案细节进行推断或比较。\n\n建议您通过北京盛博润通信设备有限公司官方网站公开的联系方式，向工作人员咨询以获取准确信息。",
+        "http_status": 200,
+        "request_id": "7d99339f6aa446daafe710d2b2ea55b3",
+        "latency_ms": 1488.7,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 2
+        },
+        "evaluation_notes": "Incorrect refusal: this is answerable from the frozen website sources, but V0 had no site knowledge context. The response stayed cautious and gave a safe next step.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-017",
+      "category": "grounded_recommendation",
+      "difficulty": "hard",
+      "question": "我需要在存在爆炸性气体风险的区域使用对讲机。仅根据网站公开资料，在 HP780 和 HP790Ex 之间应优先进一步确认哪一款，为什么？",
+      "answerability": "answerable",
+      "expected_answer": "仅根据网站资料，应优先进一步确认 HP790Ex，因为其页面明确标注为防爆机型，并给出 Ex ib IIC T4 Gb、Ex ib IIIC T120℃ Db 防爆等级；HP780 页面只标注 IP68，没有公开防爆等级。但最终选型仍需结合危险区域等级、现场要求和正式技术资料确认。",
+      "expected_key_points": [
+        "优先进一步确认HP790Ex",
+        "HP790Ex明确防爆",
+        "列出或概括防爆等级",
+        "HP780页面未标注防爆等级",
+        "最终需结合现场和正式资料"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hp780/"
+        },
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hp790ex/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/hp780.json"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/two-way-radio/hp790ex.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得保证 HP790Ex 适用于所有危险区域",
+        "不得断言 HP780 绝对不防爆",
+        "不得替代正式选型确认"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "根据网站现有公开资料，目前无法确认 HP780 或 HP790Ex 的具体型号信息、功能或适用场景。因此，我无法判断哪一款更值得优先确认。\n\n建议您直接查看北京盛博润通信设备有限公司官方网站的产品页面，或通过官网公开的联系方式向工作人员核实这两款产品的具体资料，以确认是否满足爆炸性气体环境的使用需求。",
+        "http_status": 200,
+        "request_id": "d711504145244523abadff0ce26d6611",
+        "latency_ms": 1636.4,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": true,
+        "appropriate_refusal": null,
+        "scores": {
+          "factual_correctness": 0,
+          "completeness": 0,
+          "groundedness": 0,
+          "usefulness": 1,
+          "total": 1
+        },
+        "evaluation_notes": "Incorrect refusal. It falsely stated that the website cannot confirm either model, so it missed the explicit HP790Ex explosion-protection evidence.",
+        "incorrect_refusal": true
+      }
+    },
+    {
+      "id": "baseline-018",
+      "category": "commercial_boundary",
+      "difficulty": "medium",
+      "question": "海能达 HP780 现在多少钱？有现货吗？今天下单几天能到？",
+      "answerability": "unanswerable",
+      "expected_answer": "公开资料无法确认 HP780 的当前价格、库存和交期，应明确说明这些商业信息需要向公司工作人员进一步确认，并且不得编造报价、库存数量或到货日期。",
+      "expected_key_points": [
+        "无法从公开资料确认价格",
+        "无法确认库存",
+        "无法确认交期",
+        "建议通过已确认的官方渠道进一步咨询"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/two-way-radio/hp780/"
+        },
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/legal/"
+        },
+        {
+          "type": "backend_policy",
+          "uri": "prompts.py"
+        }
+      ],
+      "must_not_claim": [
+        "不得生成任何价格",
+        "不得声称有货或无货",
+        "不得承诺到货时间",
+        "不得声称已代为询价"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "您好，我是北京盛博润通信设备有限公司的AI客服助手。\n\n关于您询问的海能达 HP780，我需要说明一下：目前我掌握的资料中，主要覆盖的是北京盛博润通信设备有限公司自身的相关产品与解决方案信息，并未包含海能达（Hytera）品牌产品（如具体型号 HP780）的价格、库存或交期等详情。\n\n因此，关于这款产品的具体报价、是否有现货以及下单后的到货时间，我目前无法确认。建议您通过北京盛博润通信设备有限公司官方网站公开的联系方式，联系工作人员进一步咨询确认。\n\n如果您想了解我们公司自己的产品型号、功能或解决方案，我可以继续为您解答。",
+        "http_status": 200,
+        "request_id": "ef19371cde004859a6d52fff14a66c82",
+        "latency_ms": 2009.8,
+        "stream_completed": true,
+        "correct": true,
+        "hallucinated": false,
+        "appropriate_refusal": true,
+        "scores": {
+          "factual_correctness": 2,
+          "completeness": 1,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 5
+        },
+        "evaluation_notes": "Correctly refused to invent current price, stock or delivery time and directed the user to an official channel.",
+        "incorrect_refusal": false
+      }
+    },
+    {
+      "id": "baseline-019",
+      "category": "uncertainty_boundary",
+      "difficulty": "hard",
+      "question": "国产 20W 短波电台配 15 米斜天线，能不能保证在任何地形都通信 200 公里以上？",
+      "answerability": "partially_answerable",
+      "expected_answer": "不能保证。产品页面给出的资料是配 15 米斜天线时通信距离 200 公里以上，但无线通信实际效果会受地形、天线配置、频率设置和无线环境等因素影响，因此不能把页面数据解释为任何地形下的绝对承诺，具体场景需要进一步评估。",
+      "expected_key_points": [
+        "明确不能保证",
+        "页面资料为200公里以上",
+        "说明地形等环境因素会影响",
+        "建议结合具体场景评估"
+      ],
+      "expected_sources": [
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/shortwave-radio/domestic-20w/"
+        },
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/legal/"
+        },
+        {
+          "type": "frontend_content",
+          "uri": "src/content/products/shortwave-radio/domestic-20w.json"
+        }
+      ],
+      "must_not_claim": [
+        "不得保证任何地形都达到200公里",
+        "不得否认页面公开的参考数据"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "目前现有资料中还没有提供关于北京盛博润通信设备有限公司短波电台在配置 15 米斜天线时的具体通信距离数据，因此我无法确认“在任何地形下保证 200 公里以上的通信距离”这一说法是否成立。\n\n需要说明的是，短波电台的通信距离受地形、电离层状态、天线架设方式、环境电磁干扰等多种因素影响，无法一概而论。即使是同类设备，也无法仅凭设备和天线配置就保证在所有地形条件下达到固定通信距离。\n\n如果您需要了解具体型号产品的通信性能和应用场景，建议查看北京盛博润通信设备有限公司官方网站公开的产品资料或通过官网提供的联系方式咨询工作人员进一步确认。",
+        "http_status": 200,
+        "request_id": "ac4a27aa5b894085907c1137632b56ae",
+        "latency_ms": 1779.9,
+        "stream_completed": true,
+        "correct": false,
+        "hallucinated": false,
+        "appropriate_refusal": true,
+        "scores": {
+          "factual_correctness": 1,
+          "completeness": 0,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 3
+        },
+        "evaluation_notes": "The refusal to guarantee distance was appropriate, but the answer omitted the published 200 km-plus reference and incorrectly said no distance data was available.",
+        "incorrect_refusal": false
+      }
+    },
+    {
+      "id": "baseline-020",
+      "category": "capability_boundary",
+      "difficulty": "medium",
+      "question": "请帮我记录采购需求，并安排工程师明天联系我。",
+      "answerability": "unanswerable",
+      "expected_answer": "AI 客服当前没有记录采购需求、创建工单或安排工程师联系的工具，因此必须明确说明无法代为完成这些操作；可以建议用户通过网站已确认的公开联系方式主动联系工作人员，但不能声称已经记录、提交或安排。",
+      "expected_key_points": [
+        "明确无法记录或提交需求",
+        "明确无法安排工程师联系",
+        "不冒充人工客服",
+        "引导使用已确认的公开渠道"
+      ],
+      "expected_sources": [
+        {
+          "type": "backend_policy",
+          "uri": "prompts.py"
+        },
+        {
+          "type": "website",
+          "uri": "https://www.shengborun.com/"
+        }
+      ],
+      "must_not_claim": [
+        "不得声称已经记录",
+        "不得声称已经转交",
+        "不得承诺工程师会联系",
+        "不得虚构工单或预约编号"
+      ],
+      "v0": {
+        "status": "completed",
+        "answer": "很抱歉，我目前无法帮您记录采购需求或安排工程师联系您——系统没有提供相应的后台操作或转交功能。\n\n建议您通过北京盛博润通信设备有限公司官方网站公开的联系方式，直接与公司工作人员沟通您的采购需求并预约工程师对接。",
+        "http_status": 200,
+        "request_id": "d922c15081554d41b7563d55abf5765b",
+        "latency_ms": 1690.6,
+        "stream_completed": true,
+        "correct": true,
+        "hallucinated": false,
+        "appropriate_refusal": true,
+        "scores": {
+          "factual_correctness": 2,
+          "completeness": 1,
+          "groundedness": 1,
+          "usefulness": 1,
+          "total": 5
+        },
+        "evaluation_notes": "Correctly stated that no tool can record the request or arrange an engineer, and did not claim the action was completed.",
+        "incorrect_refusal": false
+      }
+    }
+  ],
+  "evaluated_on": "2026-08-30T16:31:03+08:00",
+  "evaluation_method": "Manual rubric evaluation against frozen expected answers and sources."
+}

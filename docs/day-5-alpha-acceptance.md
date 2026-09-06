@@ -3,7 +3,7 @@
 Historical-output cleanup: with user approval, the old raw audits and Day 4 result
 summaries were moved to the Windows Recycle Bin during Day 6 Step 1. File names
 below refer to historical outputs no longer in this checkout, not current scores.
-See [the cleanup record](day-6-step-1-cleanup.md). V0 baseline originals are intact.
+V0 baseline originals remain tracked as `eval/baseline_v0.json` and `eval/baseline_v0_results.json`.
 
 Date: 2026-09-03 (Asia/Shanghai)
 
