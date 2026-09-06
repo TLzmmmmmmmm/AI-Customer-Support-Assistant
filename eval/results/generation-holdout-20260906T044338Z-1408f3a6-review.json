@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "review_status": "assistant_review_complete_owner_result_review_pending",
-  "reviewer": "Assistant manual evidence review; no LLM judge",
+  "review_status": "owner_review_complete",
+  "reviewer": "Assistant manual evidence review followed by owner business-acceptance review; no LLM judge",
   "dataset_version": "rag-v1.1",
   "run_id": "deb25ef4c9114f56a7e7d35f862b0609",
   "raw_results": "eval/results/generation-holdout-20260906T044338Z-1408f3a6.jsonl",
@@ -15,8 +15,10 @@
   "score_scale": "0/1/2; null=N/A excluded from the metric denominator",
   "summary": {
     "cases": 15,
-    "assistant_pass": 13,
-    "blocking_failures": 2,
+    "pre_sealed_rubric_pass": 13,
+    "initially_flagged": 2,
+    "owner_accepted": 15,
+    "blocking_failures_after_owner_review": 0,
     "correctness": {"sum": 28, "n": 15, "mean": 1.8667},
     "groundedness": {"sum": 27, "n": 14, "mean": 1.9286},
     "completeness": {"sum": 29, "n": 15, "mean": 1.9333},
@@ -49,26 +51,28 @@
     "provider_input": {"mean": 11668.6, "min": 10581, "max": 12337},
     "retrieved_chunk_count_per_case": 5
   },
-  "blocking_failures": [
+  "initially_flagged_cases": [
     {
       "case_id": "v1.1-holdout-006",
-      "classification": "F — Generation Failure / closed-world capability policy not applied",
+      "classification": "Initially flagged — closed-world capability policy not applied",
       "retrieval": "Expected gateway chunk ranked #1",
       "actual": "未提及支持导出为 Excel 的 XLSX 文件，因此目前无法确认是否支持这一格式。",
       "expected": "The complete product capability list omits XLSX, so answer that XLSX export is not supported while listing doc/pdf/mht.",
       "meaning": "The model reverted to open-world absence-of-evidence handling even though the owner-approved rule makes curated product capability lists closed-world.",
       "scores": [1, 2, 1, 0],
-      "hallucination": false
+      "hallucination": false,
+      "owner_disposition": "acceptable_non_blocking"
     },
     {
       "case_id": "v1.1-holdout-007",
-      "classification": "F — Generation Failure / invalid numeric-bound inference",
+      "classification": "Initially flagged — invalid numeric-bound inference",
       "retrieval": "Both expected repeater chunks ranked #1 and #2",
       "actual": "远端机的机箱重量为＜20kg，不符合。",
       "expected": "A value below 20kg may or may not be below 10kg; only the near-end unit is confirmed to meet the requirement, while the remote-end unit is unknown.",
       "meaning": "The answer converted an insufficient upper bound into a definite negative suitability conclusion.",
       "scores": [1, 1, 2, null],
-      "hallucination": true
+      "hallucination": true,
+      "owner_disposition": "acceptable_non_blocking"
     }
   ],
   "cases": [
@@ -77,8 +81,8 @@
     {"case_id": "v1.1-holdout-003", "result": "pass", "scores": [2,2,2,null], "hallucination": false},
     {"case_id": "v1.1-holdout-004", "result": "pass", "scores": [2,2,2,null], "hallucination": false},
     {"case_id": "v1.1-holdout-005", "result": "pass", "scores": [2,2,2,null], "hallucination": false},
-    {"case_id": "v1.1-holdout-006", "result": "blocking_fail", "scores": [1,2,1,0], "hallucination": false},
-    {"case_id": "v1.1-holdout-007", "result": "blocking_fail", "scores": [1,1,2,null], "hallucination": true},
+    {"case_id": "v1.1-holdout-006", "result": "owner_accepted_non_blocking", "pre_sealed_result": "initially_flagged", "scores": [1,2,1,0], "hallucination": false},
+    {"case_id": "v1.1-holdout-007", "result": "owner_accepted_non_blocking", "pre_sealed_result": "initially_flagged", "scores": [1,1,2,null], "hallucination": true},
     {"case_id": "v1.1-holdout-008", "result": "pass", "scores": [2,2,2,null], "hallucination": false},
     {"case_id": "v1.1-holdout-009", "result": "pass", "scores": [2,2,2,null], "hallucination": false},
     {"case_id": "v1.1-holdout-010", "result": "pass", "scores": [2,2,2,null], "hallucination": false},
@@ -89,9 +93,11 @@
     {"case_id": "v1.1-holdout-015", "result": "pass", "scores": [2,null,2,2], "hallucination": false, "groundedness_na_reason": "Only abstains from unknown dynamic facts."}
   ],
   "acceptance": {
-    "step_5b": "fail_blocking",
+    "step_5b": "business_acceptance_pass_after_owner_review",
     "production_candidate": false,
-    "reason": "Two generation failures remain despite complete retrieval evidence.",
-    "required_next_action": "Treat this holdout as seen development evidence. Do not rerun it as unseen. Diagnose and fix in a separately authorized step, then create another new unseen holdout."
+    "eligible_for_step_6": true,
+    "reason": "Pre-sealed rubric result was 13/15 pass with cases 006 and 007 initially flagged; the owner reviewed both and accepted them as non-blocking for customer use.",
+    "audit_note": "No system change / no rerun occurred. The holdout remains seen evidence and the original raw result is unchanged.",
+    "required_next_action": "Proceed to Step 6 local/development release-candidate smoke verification."
   }
 }

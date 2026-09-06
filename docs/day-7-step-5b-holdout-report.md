@@ -2,9 +2,9 @@
 
 ## Outcome
 
-`FAIL — two blocking generation failures`
+`Step 5B — Business Acceptance PASS after owner review`
 
-The sealed holdout ran exactly once from clean commit `191aae805856b7b3aabffdaefe5c8e01e306437c`. All 15 requests completed and all protected snapshots remained unchanged, but cases 006 and 007 failed the approved answer contract. The candidate is not a production candidate.
+The sealed holdout ran exactly once from clean commit `191aae805856b7b3aabffdaefe5c8e01e306437c`. The pre-sealed rubric result was **13/15 pass, 2/15 initially flagged**. After reviewing the actual customer impact, the owner accepted cases 006 and 007 as non-blocking; no system change and no rerun occurred.
 
 ## Execution integrity
 
@@ -18,7 +18,7 @@ The sealed holdout ran exactly once from clean commit `191aae805856b7b3aabffdaef
 - Freeze SHA-256: `650c72e8631fcc6cc203276e16a98aa5cf7e4efc49f4598010617d9f94972efc`
 - Snapshot verification: unchanged
 
-## Blocking failures
+## Initially flagged cases
 
 ### v1.1-holdout-006 — closed-world capability policy not applied
 
@@ -55,6 +55,8 @@ Both blocking failures had complete relevant evidence in the context. There is n
 
 Every case used five retrieved chunks. Mean retrieved context was 2,268.7 characters and mean total provider input was 11,668.6 characters.
 
-## Disposition
+## Owner disposition
 
-This holdout is now seen evidence and must never be run or described as unseen again. Fixing either failure requires a new, explicitly authorized development step; after tuning, another newly authored and sealed unseen holdout is required before release-candidate acceptance.
+Cases 006 and 007 are both accepted as usable and non-blocking. Step 5B therefore passes business acceptance and the candidate may proceed to Step 6; it is not yet classified as a production candidate until the Step 6 smoke gate passes.
+
+This holdout is now seen evidence and must never be run or described as unseen again. The original raw output, pre-sealed rubric scores, and initial flags remain preserved as an audit trail.
