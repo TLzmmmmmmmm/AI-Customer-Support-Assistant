@@ -125,6 +125,21 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(self.provider.query_calls, ["HP780 参数"])
         self.assertEqual(len(results), 5)
 
+    def test_unique_product_top_k_counts_final_parent_documents(self):
+        results = self.retriever.retrieve(
+            "推荐对讲机",
+            top_k=5,
+            allowed_types={"product"},
+            unique_parent_documents=True,
+        )
+
+        self.assertEqual(len(results), 5)
+        self.assertEqual(
+            len({item.parent_document_id for item in results}),
+            5,
+        )
+        self.assertTrue(all(item.type == "product" for item in results))
+
     def test_results_preserve_record_fields_and_entity_ids(self):
         result = self.retriever.retrieve("HP790Ex 参数", top_k=1)[0]
         source = next(

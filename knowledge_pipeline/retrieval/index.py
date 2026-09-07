@@ -17,6 +17,8 @@ class VectorIndex(Protocol):
         *,
         top_k: int,
         parent_document_ids: Collection[str] | None = None,
+        record_types: Collection[str] | None = None,
+        unique_parent_documents: bool = False,
     ) -> list[SearchHit]: ...
 
 
@@ -57,6 +59,8 @@ class NumpyExactVectorIndex:
         *,
         top_k: int,
         parent_document_ids: Collection[str] | None = None,
+        record_types: Collection[str] | None = None,
+        unique_parent_documents: bool = False,
     ) -> list[SearchHit]:
         if top_k <= 0:
             raise VectorIndexNotReadyError("top_k must be greater than zero")
@@ -73,16 +77,19 @@ class NumpyExactVectorIndex:
             raise VectorIndexNotReadyError("query vector must have non-zero norm")
         normalized_query = query / norm
 
-        if parent_document_ids is None:
-            candidate_indexes = range(len(self._records))
-        else:
-            allowed = set(parent_document_ids)
-            candidate_indexes = [
-                index
-                for index, record in enumerate(self._records)
-                if record.parent_document_id in allowed
-            ]
-        candidate_indexes = list(candidate_indexes)
+        allowed_parents = (
+            None if parent_document_ids is None else set(parent_document_ids)
+        )
+        allowed_types = None if record_types is None else set(record_types)
+        candidate_indexes = [
+            index
+            for index, record in enumerate(self._records)
+            if (
+                allowed_parents is None
+                or record.parent_document_id in allowed_parents
+            )
+            and (allowed_types is None or record.type in allowed_types)
+        ]
         if not candidate_indexes:
             return []
 
@@ -91,10 +98,20 @@ class NumpyExactVectorIndex:
             zip(candidate_indexes, scores, strict=True),
             key=lambda item: (-float(item[1]), self._records[item[0]].chunk_id),
         )
-        return [
-            SearchHit(record=self._records[index], score=float(score))
-            for index, score in ranked[:top_k]
-        ]
+        hits: list[SearchHit] = []
+        seen_parents: set[str] = set()
+        for index, score in ranked:
+            record = self._records[index]
+            if (
+                unique_parent_documents
+                and record.parent_document_id in seen_parents
+            ):
+                continue
+            seen_parents.add(record.parent_document_id)
+            hits.append(SearchHit(record=record, score=float(score)))
+            if len(hits) >= top_k:
+                break
+        return hits
 
 
 __all__ = ["NumpyExactVectorIndex", "VectorIndex"]
