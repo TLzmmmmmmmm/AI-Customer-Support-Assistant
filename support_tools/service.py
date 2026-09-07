@@ -65,62 +65,72 @@ class DeterministicTools:
 
     def get_product_details(self, product_id: str) -> ProductDetailsResult:
         tool_name = "get_product_details"
-        normalized_input = self._validate_string(
-            product_id,
-            maximum=MAX_PRODUCT_ID_CHARACTERS,
-            tool_name=tool_name,
-        )
-        matches = self._product_resolver.resolve_canonical_identifier(
-            normalized_input
-        )
-        if not matches:
-            raise ToolError(
-                code=ToolErrorCode.PRODUCT_NOT_FOUND,
-                message="No product matches the supplied canonical identifier.",
+        try:
+            normalized_input = self._validate_string(
+                product_id,
+                maximum=MAX_PRODUCT_ID_CHARACTERS,
                 tool_name=tool_name,
             )
-        if len(matches) > 1:
-            raise ToolError(
-                code=ToolErrorCode.AMBIGUOUS_PRODUCT,
-                message="The supplied canonical identifier is ambiguous.",
-                tool_name=tool_name,
+            matches = self._product_resolver.resolve_canonical_identifier(
+                normalized_input
             )
+            if not matches:
+                raise ToolError(
+                    code=ToolErrorCode.PRODUCT_NOT_FOUND,
+                    message="No product matches the supplied canonical identifier.",
+                    tool_name=tool_name,
+                )
+            if len(matches) > 1:
+                raise ToolError(
+                    code=ToolErrorCode.AMBIGUOUS_PRODUCT,
+                    message="The supplied canonical identifier is ambiguous.",
+                    tool_name=tool_name,
+                )
 
-        product_id = matches[0].removeprefix("product:")
-        product = self._inventory.products.get(product_id)
-        if product is None or not product.published:
-            raise self._unavailable(tool_name)
-        category = self._inventory.categories.get(product.category_id)
-        if category is None or not category.published:
-            raise self._unavailable(tool_name)
+            product_id = matches[0].removeprefix("product:")
+            product = self._inventory.products.get(product_id)
+            if product is None or not product.published:
+                raise self._unavailable(tool_name)
+            category = self._inventory.categories.get(product.category_id)
+            if category is None or not category.published:
+                raise self._unavailable(tool_name)
 
-        return ProductDetailsResult(
-            product_id=product.id,
-            name=product.name,
-            category_id=category.id,
-            category_name=category.name,
-            key_features=list(product.key_features),
-            product_features=product.product_features,
-            technical_parameters=list(product.technical_parameters),
-            sources=[self._source_ref(product.name, product)],
-        )
+            return ProductDetailsResult(
+                product_id=product.id,
+                name=product.name,
+                category_id=category.id,
+                category_name=category.name,
+                key_features=list(product.key_features),
+                product_features=product.product_features,
+                technical_parameters=list(product.technical_parameters),
+                sources=[self._source_ref(product.name, product)],
+            )
+        except ToolError:
+            raise
+        except Exception as error:
+            raise self._execution_error(tool_name) from error
 
     def get_contact_info(self) -> ContactInfoResult:
         tool_name = "get_contact_info"
-        contacts = [
-            contact
-            for contact in self._inventory.contacts.values()
-            if contact.published
-        ]
-        if len(contacts) != 1:
-            raise self._unavailable(tool_name)
-        contact = contacts[0]
-        return ContactInfoResult(
-            company_name=contact.company_name,
-            duty_phone=contact.duty_phone,
-            email=contact.email,
-            sources=[self._source_ref("联系我们", contact)],
-        )
+        try:
+            contacts = [
+                contact
+                for contact in self._inventory.contacts.values()
+                if contact.published
+            ]
+            if len(contacts) != 1:
+                raise self._unavailable(tool_name)
+            contact = contacts[0]
+            return ContactInfoResult(
+                company_name=contact.company_name,
+                duty_phone=contact.duty_phone,
+                email=contact.email,
+                sources=[self._source_ref("联系我们", contact)],
+            )
+        except ToolError:
+            raise
+        except Exception as error:
+            raise self._execution_error(tool_name) from error
 
     def search_products(self, query: str) -> ProductSearchResult:
         tool_name = "search_products"
@@ -217,6 +227,14 @@ class DeterministicTools:
         return ToolError(
             code=ToolErrorCode.TOOL_UNAVAILABLE,
             message="The tool dependency is unavailable.",
+            tool_name=tool_name,
+        )
+
+    @staticmethod
+    def _execution_error(tool_name: str) -> ToolError:
+        return ToolError(
+            code=ToolErrorCode.TOOL_EXECUTION_ERROR,
+            message="The tool could not complete safely.",
             tool_name=tool_name,
         )
 

@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from knowledge_pipeline.core import SourceInventory
 from knowledge_pipeline.models import (
@@ -322,6 +323,32 @@ class DeterministicToolTests(unittest.TestCase):
                     tools.search_products("酒店对讲机")
                 self.assertEqual(context.exception.code, code)
                 self.assertNotIn("secret", context.exception.message)
+
+    def test_exact_tools_redact_unexpected_internal_failures(self):
+        tools = DeterministicTools(
+            inventory=inventory(),
+            site_base_url="https://fixture.example",
+        )
+        with patch.object(
+            tools,
+            "_source_ref",
+            side_effect=RuntimeError("private source failure"),
+        ):
+            for operation in (
+                lambda: tools.get_product_details("LY198"),
+                tools.get_contact_info,
+            ):
+                with self.subTest(operation=operation):
+                    with self.assertRaises(ToolError) as context:
+                        operation()
+                    self.assertEqual(
+                        context.exception.code,
+                        ToolErrorCode.TOOL_EXECUTION_ERROR,
+                    )
+                    self.assertNotIn(
+                        "private source failure",
+                        context.exception.message,
+                    )
 
     def test_registry_is_immutable_and_contains_only_approved_tools(self):
         tools = DeterministicTools(
