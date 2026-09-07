@@ -139,6 +139,10 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(result.content_hash, source.content_hash)
         self.assertEqual(result.source_url, source.source_url)
         self.assertEqual(result.source_files, source.source_files)
+        self.assertEqual(
+            [item.model_dump(mode="json") for item in result.sources],
+            [{"title": "hp790ex", "url": source.source_url}],
+        )
 
     def test_blank_query_and_non_positive_k_are_rejected_before_embedding(self):
         for query, top_k in (("   ", 5), ("有效查询", 0)):

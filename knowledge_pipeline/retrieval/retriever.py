@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from knowledge_pipeline.models import source_ref_from_text
+
 from .embedding import EmbeddingProvider
 from .entities import ExactEntityResolver
 from .index import VectorIndex
-from .models import EmbeddingAPIError, RetrievalResult, SearchHit
+from .models import (
+    EmbeddingAPIError,
+    RetrievalResult,
+    SearchHit,
+    VectorRecordValidationError,
+)
 
 
 class Retriever:
@@ -114,6 +121,12 @@ def _to_result(
     matched_entity_ids: list[str],
 ) -> RetrievalResult:
     record = hit.record
+    try:
+        source = source_ref_from_text(record.text, record.source_url)
+    except ValueError as error:
+        raise VectorRecordValidationError(
+            f"record {record.chunk_id} has invalid source title provenance"
+        ) from error
     return RetrievalResult.model_validate({
         "rank": rank,
         "score": hit.score,
@@ -128,6 +141,7 @@ def _to_result(
         "metadata": record.metadata,
         "source_url": record.source_url,
         "source_files": list(record.source_files),
+        "sources": [source],
     })
 
 
