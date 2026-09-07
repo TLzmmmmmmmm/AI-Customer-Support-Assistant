@@ -3,6 +3,7 @@ from .core import (
     build_and_write,
     build_documents,
     compute_content_hash,
+    load_source_inventory,
     serialize_documents,
     validate_documents,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "build_chunks",
     "build_documents",
     "compute_content_hash",
+    "load_source_inventory",
     "load_documents",
     "serialize_documents",
     "serialize_chunks",

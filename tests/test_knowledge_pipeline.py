@@ -9,6 +9,7 @@ from knowledge_pipeline.core import (
     BuildError,
     build_documents,
     load_sources,
+    load_source_inventory,
     serialize_documents,
     validate_documents,
 )
@@ -134,6 +135,20 @@ class KnowledgeSchemaTests(unittest.TestCase):
 
 
 class KnowledgePipelineTests(unittest.TestCase):
+    def test_public_source_inventory_loader_applies_relationship_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_complete_fixture(root)
+
+            inventory = load_source_inventory(root)
+            self.assertIn("xir-p8668ex", inventory.products)
+
+            payload = valid_product()
+            payload["category_id"] = "missing-category"
+            write_json(root / "products" / "xir-p8668ex.json", payload)
+            with self.assertRaises(BuildError):
+                load_source_inventory(root)
+
     def test_curated_snapshot_builds_61_normalized_documents(self):
         source_root = Path(__file__).resolve().parents[1] / "knowledge" / "source"
 

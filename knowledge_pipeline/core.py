@@ -438,9 +438,16 @@ def _validate_source_relationships(inventory: SourceInventory) -> None:
         raise BuildError(sorted(errors))
 
 
-def build_documents(source_root: Path, base_url: str) -> list[KnowledgeDocument]:
+def load_source_inventory(source_root: Path) -> SourceInventory:
+    """Load authoritative structured sources with relationship validation."""
+
     inventory = load_sources(source_root)
     _validate_source_relationships(inventory)
+    return inventory
+
+
+def build_documents(source_root: Path, base_url: str) -> list[KnowledgeDocument]:
+    inventory = load_source_inventory(source_root)
     documents: list[KnowledgeDocument] = []
     documents.append(normalize_product_catalog(inventory.categories.values(), base_url))
     for source in inventory.products.values():

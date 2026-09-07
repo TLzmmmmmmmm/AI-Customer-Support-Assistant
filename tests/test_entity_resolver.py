@@ -1,5 +1,6 @@
 import unittest
 
+from knowledge_pipeline.models import ProductSource
 from knowledge_pipeline.retrieval.entities import ExactEntityResolver
 from knowledge_pipeline.retrieval.models import EntityCatalogError, VectorRecord
 
@@ -44,6 +45,32 @@ def records() -> list[VectorRecord]:
         product_record("xir-p8668ex", heading="摩托罗拉 XiR P8668Ex"),
         product_record("ap", heading="无线 AP"),
     ]
+
+
+def product_source(
+    product_id: str,
+    *,
+    slug: str | None = None,
+    name: str | None = None,
+) -> ProductSource:
+    return ProductSource.model_validate({
+        "id": product_id,
+        "name": name or f"产品 {product_id}",
+        "slug": slug or product_id,
+        "category_id": "two-way-radio",
+        "key_features": ["特点"],
+        "product_features": "产品说明",
+        "technical_parameters": [{
+            "group": "一般规格",
+            "items": [{"name": "功率", "value": "2W"}],
+        }],
+        "source_path": f"/two-way-radio/{slug or product_id}/",
+        "published": True,
+        "provenance": [{
+            "kind": "website_file",
+            "reference": f"src/content/products/{product_id}.json",
+        }],
+    })
 
 
 class EntityResolverTests(unittest.TestCase):
@@ -142,6 +169,36 @@ class EntityResolverTests(unittest.TestCase):
         resolver = ExactEntityResolver.from_records([non_product])
 
         self.assertEqual(resolver.resolve("HP780"), [])
+
+    def test_canonical_source_resolution_reuses_normalization_without_names(self):
+        resolver = ExactEntityResolver.from_product_sources([
+            product_source("ly198", name="润信达 LY198"),
+            product_source("xir-p8668ex", name="摩托罗拉 XiR P8668Ex"),
+        ])
+
+        for value, expected in (
+            ("LY198", ["product:ly198"]),
+            (" ly198 ", ["product:ly198"]),
+            ("XIR P8668EX", ["product:xir-p8668ex"]),
+            ("润信达 LY198", []),
+            ("LY19", []),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    resolver.resolve_canonical_identifier(value),
+                    expected,
+                )
+
+    def test_canonical_source_resolution_preserves_ambiguous_aliases(self):
+        resolver = ExactEntityResolver.from_product_sources([
+            product_source("radio-one", slug="shared-model"),
+            product_source("radio-two", slug="shared-model"),
+        ])
+
+        self.assertEqual(
+            resolver.resolve_canonical_identifier("SHARED MODEL"),
+            ["product:radio-one", "product:radio-two"],
+        )
 
 
 if __name__ == "__main__":
