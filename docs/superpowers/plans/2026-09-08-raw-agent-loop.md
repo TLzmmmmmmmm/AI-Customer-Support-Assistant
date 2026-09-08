@@ -319,7 +319,7 @@ git commit -m "feat: define native agent tool schemas"
 - Consumes: `AgentToolCall`, `TOOL_SPECS`, Day 1 `ToolError`, `ToolErrorCode`, result models, and `Mapping[str, Callable[..., object]]` from `build_tool_registry()`.
 - Produces: `ToolObservation` and `ToolExecutor.execute(call, successful_observations)`.
 
-- [ ] **Step 1: Write failing executor tests for success, safe failures, and caching**
+- [x] **Step 1: Write failing executor tests for success, safe failures, and caching**
 
 Create `tests/test_agent_executor.py`. Use real Day 1 result model instances and
 a `MappingProxyType` registry. Cover these exact assertions:
@@ -428,7 +428,7 @@ Also add table-driven tests for:
 - failure followed by corrected arguments executes again;
 - same tool with different validated arguments executes both calls.
 
-- [ ] **Step 2: Run the executor tests and verify the missing module failure**
+- [x] **Step 2: Run the executor tests and verify the missing module failure**
 
 Run:
 
@@ -438,7 +438,7 @@ Run:
 
 Expected: FAIL because `agent.executor` does not exist.
 
-- [ ] **Step 3: Implement the execution result and serializer**
+- [x] **Step 3: Implement the execution result and serializer**
 
 Create `agent/executor.py` around these exact interfaces:
 
@@ -561,7 +561,7 @@ exception or wrong result type to `TOOL_EXECUTION_ERROR`. Never include `str(err
 Do not use `getattr`, `globals`, `eval`, `exec`, dynamic imports, signature
 inspection, or a second callable registry.
 
-- [ ] **Step 4: Export executor contracts and run focused tests**
+- [x] **Step 4: Export executor contracts and run focused tests**
 
 Run:
 
@@ -571,7 +571,7 @@ Run:
 
 Expected: all tests PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```powershell
 git add agent\__init__.py agent\executor.py tests\test_agent_executor.py
