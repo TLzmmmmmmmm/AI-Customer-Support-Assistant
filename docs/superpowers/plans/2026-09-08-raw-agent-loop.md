@@ -71,7 +71,7 @@
 - Consumes: `MAX_PRODUCT_ID_CHARACTERS`, `MAX_PRODUCT_QUERY_CHARACTERS` from `support_tools.service`; `ProductDetailsResult`, `ContactInfoResult`, and `ProductSearchResult` from `support_tools`.
 - Produces: `AgentToolCall`, `AgentTurn`, `AgentResult`, `AgentDeadline`, `AgentDeadlineExceeded`, `ToolSpec`, `TOOL_SPECS`, and `llm_tool_schemas()`.
 
-- [ ] **Step 1: Write failing schema and deadline tests**
+- [x] **Step 1: Write failing schema and deadline tests**
 
 Create `tests/test_agent_models.py` with focused tests equivalent to:
 
@@ -136,7 +136,7 @@ class AgentModelTests(unittest.TestCase):
             deadline.ensure_active()
 ```
 
-- [ ] **Step 2: Run the new tests and verify they fail because `agent.models` does not exist**
+- [x] **Step 2: Run the new tests and verify they fail because `agent.models` does not exist**
 
 Run:
 
@@ -146,7 +146,7 @@ Run:
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'agent'`.
 
-- [ ] **Step 3: Implement strict Agent models and explicit tool specifications**
+- [x] **Step 3: Implement strict Agent models and explicit tool specifications**
 
 Create `agent/models.py` with these concrete shapes:
 
@@ -284,12 +284,12 @@ def llm_tool_schemas() -> list[dict[str, Any]]:
 Ensure `llm_tool_schemas()` returns fresh nested dictionaries so callers cannot
 mutate `TOOL_SPECS`. Do not put executable callables in this mapping.
 
-- [ ] **Step 4: Export only public Agent model contracts**
+- [x] **Step 4: Export only public Agent model contracts**
 
 Create `agent/__init__.py` exporting the concrete names that later tasks import.
 Do not export Day 1 result types under new aliases.
 
-- [ ] **Step 5: Run model tests**
+- [x] **Step 5: Run model tests**
 
 Run:
 
@@ -299,7 +299,7 @@ Run:
 
 Expected: all tests PASS.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```powershell
 git add agent\__init__.py agent\models.py tests\test_agent_models.py
