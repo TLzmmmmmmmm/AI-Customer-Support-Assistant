@@ -590,7 +590,7 @@ git commit -m "feat: add safe agent tool executor"
 - Consumes: provider-compatible `messages` and optional native function-tool schema dictionaries.
 - Produces: `complete_chat(messages, *, tools=None) -> object`, returning one complete SDK `ChatCompletion` response.
 
-- [ ] **Step 1: Add failing non-streaming request tests**
+- [x] **Step 1: Add failing non-streaming request tests**
 
 Extend `tests/test_llm.py` with tests equivalent to:
 
@@ -644,7 +644,7 @@ Add retry tests proving:
 - non-retryable 4xx propagates after one attempt;
 - inputs are shallow-copied and not mutated.
 
-- [ ] **Step 2: Run the focused tests and verify `complete_chat` is missing**
+- [x] **Step 2: Run the focused tests and verify `complete_chat` is missing**
 
 Run:
 
@@ -654,7 +654,7 @@ Run:
 
 Expected: FAIL with `AttributeError: module 'services.llm' has no attribute 'complete_chat'`.
 
-- [ ] **Step 3: Implement `complete_chat` using the existing retry contract**
+- [x] **Step 3: Implement `complete_chat` using the existing retry contract**
 
 Add to `services/llm.py`:
 
@@ -695,7 +695,7 @@ Keep `open_chat_stream`, `iter_chat_content`, and `stream_chat` intact. If a
 small private request-copy helper is shared, ensure legacy tests still prove
 the existing streaming request bytes and retry behavior.
 
-- [ ] **Step 4: Run LLM and existing route provider tests**
+- [x] **Step 4: Run LLM and existing route provider tests**
 
 Run:
 
@@ -705,7 +705,7 @@ Run:
 
 Expected: all currently applicable tests PASS before route migration.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```powershell
 git add services\llm.py tests\test_llm.py
