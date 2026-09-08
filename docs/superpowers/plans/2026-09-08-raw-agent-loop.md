@@ -1226,7 +1226,7 @@ git add tests\test_chat_http.py
 git commit -m "test: verify raw agent HTTP behavior"
 ```
 
-- [ ] **Step 9: Confirm final branch state**
+- [x] **Step 9: Confirm final branch state**
 
 Run:
 
