@@ -725,7 +725,7 @@ git commit -m "feat: add non-streaming tool completion"
 - Consumes: `ToolExecutor`, `AgentDeadline`, `llm_tool_schemas()`, and a callable matching `complete_chat(messages, *, tools=None)`.
 - Produces: `AgentLoop.run(messages, *, deadline) -> AgentResult`, `MAX_TOOL_CALLS = 3`, `SAFE_AGENT_ANSWER`, and `AGENT_TOOL_POLICY`.
 
-- [ ] **Step 1: Write failing loop tests for no-tool, one-tool, and action precedence**
+- [x] **Step 1: Write failing loop tests for no-tool, one-tool, and action precedence**
 
 Create SDK-shaped fakes without importing private SDK internals:
 
@@ -765,7 +765,7 @@ Write tests proving:
 - the policy system message is inserted without modifying the existing RAG
   system message.
 
-- [ ] **Step 2: Add failing loop tests for the must-use behavior sequences**
+- [x] **Step 2: Add failing loop tests for the must-use behavior sequences**
 
 Use controlled completion sequences to verify:
 
@@ -792,7 +792,7 @@ Inspect the model-visible `AGENT_TOOL_POLICY` in the first completion request an
 assert it states these must-use and generic-handoff rules. The fake model
 controls decisions; do not add Python intent matching or a deterministic router.
 
-- [ ] **Step 3: Add failing loop tests for errors, duplicates, and maximum calls**
+- [x] **Step 3: Add failing loop tests for errors, duplicates, and maximum calls**
 
 Cover:
 
@@ -815,7 +815,7 @@ Cover:
   after the call;
 - every tool execution checks the deadline before and after execution.
 
-- [ ] **Step 4: Run the loop tests and verify the missing implementation failure**
+- [x] **Step 4: Run the loop tests and verify the missing implementation failure**
 
 Run:
 
@@ -825,7 +825,7 @@ Run:
 
 Expected: FAIL because `agent.loop` does not exist.
 
-- [ ] **Step 5: Implement the explicit loop and safe normalizer**
+- [x] **Step 5: Implement the explicit loop and safe normalizer**
 
 Create `agent/loop.py` with:
 
@@ -890,7 +890,7 @@ Malformed provider structure returns `SAFE_AGENT_ANSWER`; provider API errors
 and `AgentDeadlineExceeded` propagate to the route. Never catch those as tool
 errors.
 
-- [ ] **Step 6: Run Agent unit tests**
+- [x] **Step 6: Run Agent unit tests**
 
 Run:
 
@@ -900,7 +900,7 @@ Run:
 
 Expected: all tests PASS.
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 ```powershell
 git add agent\__init__.py agent\loop.py tests\test_agent_loop.py
