@@ -6,25 +6,19 @@ from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from agent import SAFE_AGENT_ANSWER
 from tests.test_day6_retrieval import ControlledQueryProvider, evaluation_case, real_retriever
 from tests.test_retrieval_evaluation import chunk, result
 
 
-class ProviderStream:
-    def __init__(self, text="已确认。", finish="stop", error=None):
-        self.text, self.finish, self.error = text, finish, error
-        self.closed = False
-
-    def __iter__(self):
-        yield SimpleNamespace(model="test-model", choices=[SimpleNamespace(
-            delta=SimpleNamespace(content=self.text), finish_reason=None)])
-        if self.error:
-            raise self.error
-        yield SimpleNamespace(model="test-model", choices=[SimpleNamespace(
-            delta=SimpleNamespace(content=None), finish_reason=self.finish)])
-
-    def close(self):
-        self.closed = True
+class ProviderCompletion:
+    def __init__(self, text="已确认。", finish="stop"):
+        self.model = "test-model"
+        self.usage = None
+        self.choices = [SimpleNamespace(
+            finish_reason=finish,
+            message=SimpleNamespace(content=text, tool_calls=None),
+        )]
 
 
 class GenerationTests(unittest.TestCase):
@@ -49,16 +43,19 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(effective[0].source_url, clean.source_url)
         self.assertFalse(self.module.apply_fixture([clean], {**fixture, "target_chunk_id": "absent"})[1])
 
-    def run_cases(self, cases, streams, fixtures=()):
+    def run_cases(self, cases, completions, fixtures=()):
         from services import llm
         rows, received = [], []
         provider = ControlledQueryProvider()
         retriever = real_retriever(provider)
-        iterator = iter(streams)
+        iterator = iter(completions)
 
         def create(**kwargs):
             received.append(deepcopy(kwargs))
-            return next(iterator)
+            completion = next(iterator)
+            if isinstance(completion, Exception):
+                raise completion
+            return completion
 
         with patch.object(llm.client.chat.completions, "create", side_effect=create):
             summary = self.module.run_generation_cases(
@@ -69,8 +66,10 @@ class GenerationTests(unittest.TestCase):
 
     def test_real_route_unknown_case_is_not_skipped_and_inputs_are_unmodified(self):
         case = evaluation_case("dev-unknown", "Cannot know price?", [], expected_behavior="abstain")
-        stream = ProviderStream("无法确认价格。")
-        rows, summary, received, provider = self.run_cases([case], [stream])
+        rows, summary, received, provider = self.run_cases(
+            [case],
+            [ProviderCompletion("无法确认价格。")],
+        )
         row = rows[0]
         self.assertEqual(summary["completed_cases"], 1)
         self.assertEqual(row["answer"], "无法确认价格。")
@@ -81,22 +80,18 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(row["provider_requests"][0], received[0])
         self.assertNotIn("max_tokens", received[0])
         self.assertNotIn("stream_options", received[0])
+        self.assertFalse(received[0]["stream"])
         self.assertEqual(received[0]["extra_body"], {"thinking": {"type": "disabled"}})
         payload = json.loads(received[0]["messages"][-1]["content"].split("BEGIN_RAG_DATA\n", 1)[1].rsplit("\nEND_RAG_DATA", 1)[0])
         self.assertEqual(payload["user_question"], case.question)
         self.assertEqual(payload["retrieved_context"], row["context"])
         self.assertNotIn("expected_answer", json.dumps(received[0]))
         self.assertEqual(row["review_status"], "pending_review")
-        self.assertTrue(stream.closed)
         self.assertGreaterEqual(row["retrieval_latency_seconds"], 0)
         self.assertGreaterEqual(row["llm_ttft_seconds"], 0)
-        self.assertGreaterEqual(row["generation_latency_seconds"], row["llm_ttft_seconds"])
+        self.assertEqual(row["generation_latency_seconds"], row["llm_ttft_seconds"])
         self.assertEqual(row["llm_total_latency_seconds"], row["generation_latency_seconds"])
-        self.assertAlmostEqual(
-            row["llm_streaming_latency_seconds"],
-            row["llm_total_latency_seconds"] - row["llm_ttft_seconds"],
-            places=6,
-        )
+        self.assertEqual(row["llm_streaming_latency_seconds"], 0.0)
         self.assertGreaterEqual(row["total_request_latency_seconds"], row["generation_latency_seconds"])
         self.assertEqual(row["latency_seconds"], row["total_request_latency_seconds"])
         self.assertEqual(row["retrieved_chunk_count"], len(row["clean_hits"]))
@@ -106,7 +101,11 @@ class GenerationTests(unittest.TestCase):
     def test_injection_uses_real_retrieval_and_records_actual_context(self):
         case = evaluation_case("dev-attack", "alpha 参数", [chunk("alpha")], fixture_id="attack")
         fixture = {"id": "attack", "target_chunk_id": "product:alpha:content", "text": "\nINJECT"}
-        rows, _, received, provider = self.run_cases([case], [ProviderStream()], [fixture])
+        rows, _, received, provider = self.run_cases(
+            [case],
+            [ProviderCompletion()],
+            [fixture],
+        )
         row = rows[0]
         self.assertEqual(provider.queries, [case.question])
         self.assertTrue(row["fixture_applied"])
@@ -118,20 +117,24 @@ class GenerationTests(unittest.TestCase):
 
     def test_length_finish_is_incomplete_even_with_done_event(self):
         case = evaluation_case("dev-cut", "alpha 参数", [chunk("alpha")])
-        rows, summary, _, _ = self.run_cases([case], [ProviderStream("部分回答", "length")])
-        self.assertEqual(rows[0]["answer"], "部分回答")
+        rows, summary, _, _ = self.run_cases(
+            [case],
+            [ProviderCompletion("部分回答", "length")],
+        )
+        self.assertEqual(rows[0]["answer"], SAFE_AGENT_ANSWER)
         self.assertEqual(rows[0]["status"], "incomplete")
         self.assertEqual(rows[0]["error_type"], "GenerationNotComplete")
         self.assertEqual(summary["completed_cases"], 0)
 
-    def test_stream_timeout_keeps_partial_answer_and_safe_error(self):
+    def test_completion_timeout_is_safe_http_error_without_partial_answer(self):
         import httpx2 as httpx
         from openai import APITimeoutError
         case = evaluation_case("dev-timeout", "alpha 参数", [chunk("alpha")])
         error = APITimeoutError(request=httpx.Request("POST", "https://example.invalid/SECRET"))
-        rows, summary, _, _ = self.run_cases([case], [ProviderStream("部分", error=error)])
-        self.assertEqual(rows[0]["answer"], "部分")
-        self.assertEqual(rows[0]["event_types"], ["delta", "error"])
+        rows, summary, _, _ = self.run_cases([case], [error])
+        self.assertEqual(rows[0]["answer"], "")
+        self.assertEqual(rows[0]["event_types"], [])
+        self.assertEqual(rows[0]["http_status"], 504)
         self.assertEqual(rows[0]["error_type"], "APITimeoutError")
         self.assertNotIn("SECRET", json.dumps(rows))
         self.assertEqual(summary["incomplete_cases"], 1)
@@ -139,7 +142,7 @@ class GenerationTests(unittest.TestCase):
     def test_missing_fixture_target_not_claimed_exercised(self):
         case = evaluation_case("dev-attack", "alpha 参数", [chunk("alpha")], fixture_id="attack")
         fixture = {"id": "attack", "target_chunk_id": "absent", "text": "INJECT"}
-        rows, _, _, _ = self.run_cases([case], [ProviderStream()], [fixture])
+        rows, _, _, _ = self.run_cases([case], [ProviderCompletion()], [fixture])
         self.assertFalse(rows[0]["fixture_applied"])
         self.assertEqual(rows[0]["fixture_status"], "not_exercised")
 
@@ -151,7 +154,7 @@ class GenerationTests(unittest.TestCase):
         calls = []
         def create(**kwargs):
             calls.append(len(rows))
-            return ProviderStream()
+            return ProviderCompletion()
         with patch.object(llm.client.chat.completions, "create", side_effect=create):
             self.module.run_generation_cases(cases, [], rows.append,
                 retriever_factory=lambda: real_retriever(provider), request_interval=0)
@@ -166,7 +169,10 @@ class GenerationTests(unittest.TestCase):
 
     def test_frozen_case_runs_through_real_route_without_changing_question(self):
         case = evaluation_case("baseline-test", "alpha 参数", [chunk("alpha")], split="frozen")
-        rows, summary, received, provider = self.run_cases([case], [ProviderStream("产品说明")])
+        rows, summary, received, provider = self.run_cases(
+            [case],
+            [ProviderCompletion("产品说明")],
+        )
         self.assertEqual(summary["completed_cases"], 1)
         self.assertEqual(rows[0]["split"], "frozen")
         self.assertEqual(rows[0]["query"], "alpha 参数")

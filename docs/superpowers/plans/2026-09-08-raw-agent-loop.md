@@ -1106,12 +1106,17 @@ git commit -m "feat: connect agent loop to chat route"
 - Modify: `tests/test_chat_http.py`
 - If verification exposes a defect, modify only the production or test files
   already listed in Tasks 1–5 and add a focused regression test first.
+- Owner-approved compatibility expansion after full-regression evidence:
+  `evaluation/generation.py`, `scripts/day5_live_smoke.py`,
+  `tests/test_day5_live_smoke.py`, `tests/test_day6_generation.py`, and
+  `tests/test_day6_generation_cli.py`. These adapters consume complete
+  completions without increasing paid-call allowances or running live APIs.
 
 **Interfaces:**
 - Consumes: the complete application path from `POST /api/chat-stream` through initial RAG, Agent Loop, tool registry, and NDJSON response.
 - Produces: release evidence for Day 2; no new production interface.
 
-- [ ] **Step 1: Update HTTP fakes to return complete non-streaming completions**
+- [x] **Step 1: Update HTTP fakes to return complete non-streaming completions**
 
 Replace iterator/delta fakes used by the route with SDK-shaped complete
 responses. Preserve separate legacy streaming tests in `tests/test_llm.py`.
@@ -1132,7 +1137,7 @@ Assert the provider request uses `stream=False`, includes all three native tool
 schemas on enabled turns, preserves the original RAG message and prior public
 history, and never sends a rewritten query to initial retrieval.
 
-- [ ] **Step 2: Add end-to-end controlled tool-call cases**
+- [x] **Step 2: Add end-to-end controlled tool-call cases**
 
 Add HTTP acceptance cases with completion side effects for:
 
@@ -1152,7 +1157,7 @@ Use the real app-scoped `DeterministicTools` with controlled Retriever and
 provider fakes where practical. Do not copy product/contact facts into Agent
 fixtures when the authoritative local source builder can provide them.
 
-- [ ] **Step 3: Replace obsolete route-stream failure expectations**
+- [x] **Step 3: Replace obsolete route-stream failure expectations**
 
 Because Day 2 intentionally finishes all non-streaming Agent completions before
 creating the response body, provider failures are pre-response HTTP errors.
@@ -1161,7 +1166,7 @@ case to assert the existing 504/503/502 JSON error contract instead of partial
 NDJSON. Keep direct unit coverage for legacy `open_chat_stream` and
 `iter_chat_content`; do not claim the route still emits token-level deltas.
 
-- [ ] **Step 4: Run the focused Day 2 suite**
+- [x] **Step 4: Run the focused Day 2 suite**
 
 Run:
 
@@ -1171,7 +1176,7 @@ Run:
 
 Expected: all tests PASS with no real external request.
 
-- [ ] **Step 5: Run source and contract safety checks**
+- [x] **Step 5: Run source and contract safety checks**
 
 Run:
 
@@ -1190,7 +1195,7 @@ Expected:
 Review the changed-file list and confirm there are no changes to knowledge
 sources, schemas, Retriever behavior, frontend files, or dependency manifests.
 
-- [ ] **Step 6: Run the complete repository regression suite**
+- [x] **Step 6: Run the complete repository regression suite**
 
 Run:
 
@@ -1201,7 +1206,7 @@ Run:
 Expected: all tests PASS. The pre-Day-2 baseline is 306 tests; the final count
 must be greater than 306 because the new Agent tests are included.
 
-- [ ] **Step 7: Perform offline manual acceptance**
+- [x] **Step 7: Perform offline manual acceptance**
 
 Run the existing Day 1 checks to prove tool compatibility remains intact:
 
@@ -1214,7 +1219,7 @@ Expected: both commands exit 0, return valid complete JSON, and contact output
 contains no address field. Do not run paid semantic search or a live LLM smoke
 test without separate explicit authorization.
 
-- [ ] **Step 8: Commit acceptance-test updates**
+- [x] **Step 8: Commit acceptance-test updates**
 
 ```powershell
 git add tests\test_chat_http.py

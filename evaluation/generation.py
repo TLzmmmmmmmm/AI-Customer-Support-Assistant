@@ -62,46 +62,37 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
     def observe_create(**kwargs):
         # Capture exactly what is sent; no max_tokens, usage options or judge.
         active["provider_requests"].append(deepcopy(kwargs))
-        active["provider_input_characters"] = sum(
+        active["provider_input_characters"] += sum(
             len(message.get("content", ""))
             for message in kwargs.get("messages", [])
             if isinstance(message.get("content", ""), str)
         )
         generation_started = time.monotonic()
         try:
-            stream = real_create(**kwargs)
+            completion = real_create(**kwargs)
         except Exception as error:
             elapsed = round(time.monotonic() - generation_started, 6)
-            active["generation_latency_seconds"] = elapsed
-            active["llm_total_latency_seconds"] = elapsed
+            total = round((active["llm_total_latency_seconds"] or 0.0) + elapsed, 6)
+            active["generation_latency_seconds"] = total
+            active["llm_total_latency_seconds"] = total
             active["provider_errors"].append(type(error).__name__)
             raise
 
-        def observed_stream():
-            try:
-                for item in stream:
-                    active["provider_model"] = getattr(item, "model", None)
-                    for choice in item.choices:
-                        if choice.delta.content:
-                            if active["llm_ttft_seconds"] is None:
-                                active["llm_ttft_seconds"] = round(time.monotonic() - generation_started, 6)
-                            active["provider_partial_answer"] += choice.delta.content
-                        if choice.finish_reason:
-                            active["finish_reasons"].append(choice.finish_reason)
-                    yield item
-            except Exception as error:
-                active["provider_errors"].append(type(error).__name__)
-                raise
-            finally:
-                elapsed = round(time.monotonic() - generation_started, 6)
-                active["generation_latency_seconds"] = elapsed
-                active["llm_total_latency_seconds"] = elapsed
-                if active["llm_ttft_seconds"] is not None:
-                    active["llm_streaming_latency_seconds"] = round(
-                        max(0.0, elapsed - active["llm_ttft_seconds"]), 6
-                    )
-                stream.close()
-        return observed_stream()
+        elapsed = round(time.monotonic() - generation_started, 6)
+        total = round((active["llm_total_latency_seconds"] or 0.0) + elapsed, 6)
+        active["generation_latency_seconds"] = total
+        active["llm_total_latency_seconds"] = total
+        if active["llm_ttft_seconds"] is None:
+            active["llm_ttft_seconds"] = elapsed
+        active["llm_streaming_latency_seconds"] = 0.0
+        active["provider_model"] = getattr(completion, "model", None)
+        for choice in completion.choices:
+            content = choice.message.content
+            if isinstance(content, str):
+                active["provider_partial_answer"] += content
+            if choice.finish_reason:
+                active["finish_reasons"].append(choice.finish_reason)
+        return completion
 
     def observe_context(hits):
         context = real_context(hits)
@@ -189,7 +180,12 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
                         and active["event_types"].count("done") == 1
                         and all(kind in ("delta", "done") for kind in active["event_types"])
                         and active["content_type"].startswith("application/x-ndjson")
-                        and active["finish_reasons"] == ["stop"]
+                        and bool(active["finish_reasons"])
+                        and active["finish_reasons"][-1] == "stop"
+                        and all(
+                            reason in ("tool_calls", "stop")
+                            for reason in active["finish_reasons"]
+                        )
                     )
                     if valid:
                         active["status"] = "completed"
