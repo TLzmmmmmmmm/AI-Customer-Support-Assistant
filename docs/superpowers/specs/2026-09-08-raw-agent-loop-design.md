@@ -39,6 +39,9 @@ The following work is explicitly deferred:
 - frontend changes;
 - framework-level agent abstractions.
 
+Day 2 adds a lightweight 120-second request deadline. It is an admission and
+continuation bound, not a hard preemptive cancellation mechanism.
+
 ## Architecture
 
 The request flow is:
@@ -64,6 +67,11 @@ both initial RAG and `search_products`; no second embedding provider or vector
 index is created. The lifespan also constructs `DeterministicTools`, the Day 1
 immutable registry, a tool executor, and a stateless application-scoped Agent
 Loop. All per-request messages, counters, and caches remain local to `run()`.
+
+One HTTP request acquires one existing application concurrency slot before
+initial RAG and holds it across initial RAG, the complete Agent Loop, every tool
+execution, and NDJSON response emission. Internal LLM completions never acquire
+or release separate request-level slots.
 
 ## Modules and Responsibilities
 
@@ -145,6 +153,13 @@ Every schema uses `additionalProperties: false`. The model proposes a native
 tool call; it never executes a tool. The backend accepts at most one tool call
 per LLM response.
 
+If an otherwise valid assistant message contains both non-blank `content` and
+one valid tool call, the turn is an action turn. The tool call takes precedence.
+The accompanying content remains internal, is preserved only as part of the
+provider-compatible assistant tool-call message, and is never treated as the
+final answer or emitted to the frontend. Only non-blank content with no tool
+call terminates normally as a user-facing answer.
+
 The Agent's internal history follows the standard pairing:
 
 ```text
@@ -168,9 +183,18 @@ The LLM receives an explicit must-use policy:
 - explicit product discovery, candidate selection, or recommendation requests
   require `search_products`;
 - phone, email, or contact-channel requests require `get_contact_info`;
-- after successful candidate discovery for a usage scenario, the model should
-  call `get_contact_info`, describe products only as candidates, and direct the
-  user to professional sales staff for final selection;
+- product recommendations and scenario-fit answers must describe retrieved
+  products only as candidates unless authoritative data explicitly establishes
+  suitability, and must direct the user to professional technical staff for
+  final selection;
+- recommendation-oriented solution and support answers should also add the
+  professional-technical-staff handoff when semantic judgment indicates that
+  expert confirmation is appropriate;
+- an empty product search must state that no reliable candidate was found and
+  still provide the generic professional-staff handoff;
+- the generic handoff does not require `get_contact_info`; that tool is required
+  only when the user explicitly asks for a phone number, email address, or
+  contact channel;
 - once a successful observation satisfies a requirement, the model must not
   repeat the same invocation merely because the original request still belongs
   to a must-use category;
@@ -217,8 +241,50 @@ complete history, including the third observation, and can only produce the
 final natural-language answer. It does not consume another tool slot.
 
 If contact information was not successfully obtained within the limit, the
-final answer may retain the professional-sales recommendation but must not
+final answer may retain the professional-staff handoff but must not
 invent a phone number, email address, or other contact fact.
+
+## Request Deadline and Concurrency Ownership
+
+`AGENT_TIMEOUT_SECONDS = 120.0` is a configurable lightweight deadline derived
+from the current 30-second per-LLM-call timeout and the maximum of four Agent
+LLM completions. The monotonic deadline begins immediately after the request
+successfully acquires the existing concurrency slot and covers:
+
+```text
+initial RAG
+  → all Agent LLM completions
+  → all tool executions
+  → final Agent result
+```
+
+The route and Agent check the deadline before and after each blocking retrieval,
+LLM, or tool operation. Once expired, no new operation starts. If an operation
+finishes after the deadline, its result does not cause another Agent step; the
+request terminates through the safe timeout path.
+
+This deadline does not attempt to kill a currently running synchronous Python
+function. A call already in progress exits through its own configured timeout
+or normal completion, so wall-clock completion may exceed 120 seconds by the
+duration of that current operation. The known external operations remain
+bounded by their existing provider settings:
+
+- each LLM request has the existing 30-second timeout and finite application
+  retry policy;
+- initial RAG and `search_products` use the existing embedding timeout and
+  finite SDK retry setting;
+- `get_product_details` and `get_contact_info` are local deterministic reads
+  from the application-scoped validated inventory.
+
+The executor does not wrap tools in an uncancellable background thread and does
+not release the concurrency slot while hidden work continues. Future external
+tools must provide their own bounded dependency calls before entering the
+registry; Day 2 does not introduce a generic process-isolation subsystem.
+
+Client cancellation likewise cannot preempt a synchronous operation already in
+progress. The concurrency slot remains held until that operation exits and the
+request cleanup path runs. Day 2 does not claim strict cancellation or an exact
+120-second hard cutoff.
 
 ## Error Handling
 
@@ -263,8 +329,14 @@ Existing provider exceptions continue through the current route mapping:
 - connection failure → HTTP 503;
 - provider status error → HTTP 502.
 
+Expiry of the lightweight Agent deadline also uses the existing public HTTP 504
+timeout code and safe message; it does not expose elapsed time or internal
+operation details.
+
 Rate limiting and the application-level LLM slot retain their current behavior.
-The slot is released on every success and failure path. Successful and safely
+The slot is acquired once per accepted request, held for the full request-level
+Agent lifecycle, and released on every normal completion, safe termination,
+provider error, deadline path, and cleanup path. Successful and safely
 terminated Agent results use the normal NDJSON response:
 
 ```json
@@ -284,8 +356,9 @@ change the NDJSON contract. When a user explicitly asks for a source, the model
 may use a trusted observed `SourceRef`; it must not construct a URL.
 
 `get_contact_info` remains the only tool source for structured contact facts and
-continues to exclude the company address. The Agent layer does not add an
-address field or maintain a second copy of contact data.
+continues to exclude the company address. A generic recommendation handoff does
+not require contact facts. The Agent layer does not add an address field or
+maintain a second copy of contact data.
 
 ## LLM Service Integration
 
@@ -321,6 +394,7 @@ Modified files:
 
 ```text
 services/llm.py
+config.py
 main.py
 routes/chat.py
 tests/test_llm.py
@@ -363,7 +437,16 @@ Required behavioral coverage includes:
     valid.
 17. Application startup constructs one Retriever and shares it with initial RAG
     and `search_products`.
-18. Existing RAG, retrieval, deterministic-tool, and full repository regression
+18. Recommendation and scenario-fit answers add a generic professional-staff
+    handoff without calling `get_contact_info` unless contact facts were asked
+    for, including when product search returns no candidates.
+19. An assistant response containing both content and one valid tool call treats
+    the call as the action and never emits the accompanying content.
+20. One concurrency slot covers initial RAG and every internal Agent operation;
+    internal completions never acquire additional slots.
+21. A fake monotonic clock verifies that the 120-second deadline prevents any
+    subsequent operation after expiry and releases the slot without sleeping.
+22. Existing RAG, retrieval, deterministic-tool, and full repository regression
     suites remain green.
 
 ## Completion Criteria
@@ -373,3 +456,5 @@ Agent Loop, safely execute only registered Day 1 tools, return complete tool
 observations to the LLM, perform multiple reasoning steps, enforce the
 three-call safety boundary, and emit the complete final answer through the
 unchanged NDJSON event schema without changing existing RAG retrieval behavior.
+The accepted request owns one concurrency slot throughout this lifecycle and
+does not start another operation after its lightweight 120-second deadline.
