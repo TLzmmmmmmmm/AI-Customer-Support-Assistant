@@ -4,11 +4,14 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx2 as httpx
 from fastapi import HTTPException
+from openai import APIConnectionError, APIStatusError, APITimeoutError
+
+from agent import AgentDeadlineExceeded, AgentResult
 from knowledge_pipeline.retrieval.models import (
     EmbeddingAPIError,
     EntityCatalogError,
-    RetrievalError,
     RetrievalResult,
     VectorIndexNotReadyError,
 )
@@ -39,20 +42,23 @@ def retrieval_result() -> RetrievalResult:
     })
 
 
+def status_error(status_code: int) -> APIStatusError:
+    request = httpx.Request("POST", "https://example.com/chat")
+    return APIStatusError(
+        "private provider error",
+        response=httpx.Response(status_code, request=request),
+        body=None,
+    )
+
+
 class FakeRetriever:
-    def __init__(
-        self,
-        *,
-        events: list[str],
-        error: Exception | None = None,
-        results: list[RetrievalResult] | None = None,
-    ):
+    def __init__(self, *, events, error=None, results=None):
         self.events = events
         self.error = error
         self.results = results if results is not None else [retrieval_result()]
-        self.queries: list[str] = []
+        self.queries = []
 
-    def retrieve(self, query: str):
+    def retrieve(self, query):
         self.events.append("retrieve")
         self.queries.append(query)
         if self.error is not None:
@@ -60,8 +66,23 @@ class FakeRetriever:
         return self.results
 
 
+class FakeAgentLoop:
+    def __init__(self, *, events, answer="完整回答", error=None):
+        self.events = events
+        self.answer = answer
+        self.error = error
+        self.calls = []
+
+    def run(self, messages, *, deadline):
+        self.events.append("agent")
+        self.calls.append({"messages": messages, "deadline": deadline})
+        if self.error is not None:
+            raise self.error
+        return AgentResult(answer=self.answer)
+
+
 async def consume_response(response) -> str:
-    parts: list[str] = []
+    parts = []
     async for part in response.body_iterator:
         parts.append(part.decode("utf-8") if isinstance(part, bytes) else part)
     return "".join(parts)
@@ -75,7 +96,7 @@ def parse_rag_payload(content: str) -> dict:
     return json.loads(content[start:finish])
 
 
-class ChatRouteRagOrchestrationTests(unittest.TestCase):
+class ChatRouteAgentOrchestrationTests(unittest.TestCase):
     def setUp(self):
         self.request = SimpleNamespace(state=SimpleNamespace(
             started_at=1.0,
@@ -87,95 +108,62 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
             ChatMessage(role="user", content="它的防护等级是什么？"),
         ])
 
-    def test_retrieves_latest_question_and_preserves_ndjson_stream(self):
-        events: list[str] = []
-        result = retrieval_result()
-        retriever = FakeRetriever(events=events, results=[result])
-        captured_messages: list[dict[str, str]] = []
-        captured_results: list[RetrievalResult] = []
-        real_context_builder = chat.build_retrieved_context
+    def test_one_slot_covers_initial_rag_agent_and_complete_ndjson_response(self):
+        events = []
+        retriever = FakeRetriever(events=events)
+        agent_loop = FakeAgentLoop(events=events, answer="完整回答")
+        clock_value = 10.0
 
-        def capture_context(results):
-            captured_results.extend(results)
-            return real_context_builder(results)
-
-        def acquire() -> bool:
+        def acquire():
             events.append("acquire")
             return True
 
-        def open_stream(messages):
-            events.append("open")
-            captured_messages.extend(messages)
-            return []
+        def clock():
+            events.append("clock")
+            return clock_value
 
-        def release() -> None:
+        def release():
             events.append("release")
 
         with (
             patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
-            patch.object(chat, "open_chat_stream", side_effect=open_stream),
             patch.object(chat, "release_llm_slot", side_effect=release),
-            patch.object(
-                chat,
-                "build_retrieved_context",
-                side_effect=capture_context,
-            ),
+            patch.object(chat.time, "monotonic", side_effect=clock),
             patch.object(chat, "log_request") as logged,
         ):
-            try:
-                response = chat.chat_stream(
-                    self.payload,
-                    self.request,
-                    None,
-                    retriever,
-                )
-            except TypeError:
-                self.fail("chat_stream has no Retriever orchestration input")
+            response = chat.chat_stream(
+                self.payload,
+                self.request,
+                None,
+                retriever,
+                agent_loop,
+            )
+            self.assertEqual(
+                events,
+                ["acquire", "clock", "clock", "retrieve", "clock", "agent"],
+            )
             body = asyncio.run(consume_response(response))
 
-        self.assertEqual(
-            retriever.queries,
-            ["它的防护等级是什么？"],
-        )
-        self.assertEqual(events, ["acquire", "retrieve", "open", "release"])
-        self.assertEqual(len(captured_results), 1)
-        self.assertIs(captured_results[0], result)
-        self.assertEqual(captured_results[0].rank, 1)
-        self.assertEqual(captured_results[0].score, -0.25)
-        self.assertEqual(captured_results[0].match_origin, "exact_entity")
-        self.assertEqual(captured_results[0].matched_entity_ids, ["product:hp780"])
-        self.assertEqual(captured_results[0].chunk_id, "product:hp780:specifications")
-        self.assertEqual(captured_results[0].parent_document_id, "product:hp780")
-        self.assertEqual(captured_results[0].content_hash, "a" * 64)
-        self.assertEqual(captured_results[0].metadata.product_id, "hp780")
-        self.assertEqual(captured_results[0].source_url, "https://example.com/hp780/")
-        self.assertEqual(
-            captured_results[0].source_files,
-            ["src/content/products/hp780.json"],
-        )
-        logged.assert_called_once_with(
-            request_id="request-1",
-            http_status=200,
-            outcome="success",
-            started_at=1.0,
-        )
-        self.assertEqual(response.media_type, "application/x-ndjson")
+        self.assertEqual(events.count("release"), 1)
+        self.assertGreater(events.index("release"), events.index("agent"))
+        self.assertEqual(retriever.queries, ["它的防护等级是什么？"])
         self.assertEqual(
             [json.loads(line) for line in body.splitlines()],
-            [{"type": "done"}],
+            [
+                {"type": "delta", "content": "完整回答"},
+                {"type": "done"},
+            ],
         )
+        provider_messages = agent_loop.calls[0]["messages"]
         self.assertEqual(
-            captured_messages[1:3],
+            provider_messages[1:3],
             [
                 {"role": "user", "content": "介绍 HP780。"},
-                {
-                    "role": "assistant",
-                    "content": "HP780 是一款对讲机。",
-                },
+                {"role": "assistant", "content": "HP780 是一款对讲机。"},
             ],
         )
         self.assertEqual(
-            parse_rag_payload(captured_messages[-1]["content"]),
+            parse_rag_payload(provider_messages[-1]["content"]),
             {
                 "retrieved_context": [{
                     "type": "product",
@@ -185,92 +173,149 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
                 "user_question": "它的防护等级是什么？",
             },
         )
-
-    def test_pre_stream_orchestration_error_releases_slot_without_generation(self):
-        events: list[str] = []
-        retriever = FakeRetriever(
-            events=events,
-            error=RuntimeError("context unavailable"),
+        logged.assert_called_once_with(
+            request_id="request-1",
+            http_status=200,
+            outcome="success",
+            started_at=1.0,
         )
 
-        def acquire() -> bool:
-            events.append("acquire")
-            return True
-
-        def release() -> None:
-            events.append("release")
+    def test_deadline_expiry_after_retrieval_returns_504_before_agent(self):
+        events = []
+        retriever = FakeRetriever(events=events)
+        agent_loop = FakeAgentLoop(events=events)
+        times = iter([10.0, 10.1, 130.0])
 
         with (
-            patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
-            patch.object(chat, "release_llm_slot", side_effect=release) as released,
-            patch.object(chat, "open_chat_stream") as open_stream,
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot") as release,
+            patch.object(
+                chat.time,
+                "monotonic",
+                side_effect=lambda: next(times),
+            ),
         ):
-            try:
-                with self.assertRaises(RuntimeError):
-                    chat.chat_stream(
-                        self.payload,
-                        self.request,
-                        None,
-                        retriever,
-                    )
-            except TypeError:
-                self.fail("chat_stream has no Retriever orchestration input")
+            with self.assertRaises(HTTPException) as caught:
+                chat.chat_stream(
+                    self.payload,
+                    self.request,
+                    None,
+                    retriever,
+                    agent_loop,
+                )
 
-        self.assertEqual(events, ["acquire", "retrieve", "release"])
-        released.assert_called_once_with()
-        open_stream.assert_not_called()
+        self.assertEqual(caught.exception.status_code, 504)
+        self.assertEqual(caught.exception.detail["code"], "timeout")
+        self.assertEqual(agent_loop.calls, [])
+        release.assert_called_once_with()
 
-    def test_known_retrieval_failures_return_503_without_generation(self):
-        for retrieval_error in (
+    def test_known_retrieval_errors_return_503_and_release_slot(self):
+        for error in (
             EmbeddingAPIError("provider failed"),
             VectorIndexNotReadyError("index failed"),
-            EntityCatalogError("entity resolver failed"),
+            EntityCatalogError("resolver failed"),
         ):
-            with self.subTest(error_type=type(retrieval_error).__name__):
-                events: list[str] = []
-                retriever = FakeRetriever(events=events, error=retrieval_error)
-
-                def acquire() -> bool:
-                    events.append("acquire")
-                    return True
-
-                def release() -> None:
-                    events.append("release")
-
+            with self.subTest(error=type(error).__name__):
+                events = []
+                retriever = FakeRetriever(events=events, error=error)
+                agent_loop = FakeAgentLoop(events=events)
                 with (
-                    patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
-                    patch.object(
-                        chat,
-                        "release_llm_slot",
-                        side_effect=release,
-                    ) as released,
-                    patch.object(chat, "open_chat_stream") as open_stream,
+                    patch.object(chat, "try_acquire_llm_slot", return_value=True),
+                    patch.object(chat, "release_llm_slot") as release,
                 ):
-                    try:
-                        with self.assertRaises(HTTPException) as caught:
-                            chat.chat_stream(
-                                self.payload,
-                                self.request,
-                                None,
-                                retriever,
-                            )
-                    except RetrievalError:
-                        self.fail(
-                            "known retrieval failure was not mapped to HTTP 503"
+                    with self.assertRaises(HTTPException) as caught:
+                        chat.chat_stream(
+                            self.payload,
+                            self.request,
+                            None,
+                            retriever,
+                            agent_loop,
                         )
 
                 self.assertEqual(caught.exception.status_code, 503)
                 self.assertEqual(
-                    caught.exception.detail,
-                    {
-                        "code": "retrieval_unavailable",
-                        "message": "服务暂时不可用，请稍后再试。",
-                        "internal_error": type(retrieval_error).__name__,
-                    },
+                    caught.exception.detail["code"],
+                    "retrieval_unavailable",
                 )
-                self.assertEqual(events, ["acquire", "retrieve", "release"])
-                released.assert_called_once_with()
-                open_stream.assert_not_called()
+                self.assertEqual(agent_loop.calls, [])
+                release.assert_called_once_with()
+
+    def test_agent_errors_keep_existing_http_mapping_and_release_slot(self):
+        request = httpx.Request("POST", "https://example.com/chat")
+        cases = (
+            (AgentDeadlineExceeded("expired"), 504, "timeout"),
+            (APITimeoutError(request=request), 504, "timeout"),
+            (APIConnectionError(request=request), 503, "provider_unavailable"),
+            (status_error(400), 502, "provider_error"),
+        )
+        for error, status, code in cases:
+            with self.subTest(error=type(error).__name__):
+                events = []
+                retriever = FakeRetriever(events=events)
+                agent_loop = FakeAgentLoop(events=events, error=error)
+                with (
+                    patch.object(chat, "try_acquire_llm_slot", return_value=True),
+                    patch.object(chat, "release_llm_slot") as release,
+                ):
+                    with self.assertRaises(HTTPException) as caught:
+                        chat.chat_stream(
+                            self.payload,
+                            self.request,
+                            None,
+                            retriever,
+                            agent_loop,
+                        )
+
+                self.assertEqual(caught.exception.status_code, status)
+                self.assertEqual(caught.exception.detail["code"], code)
+                release.assert_called_once_with()
+
+    def test_unexpected_agent_error_propagates_and_releases_slot(self):
+        events = []
+        retriever = FakeRetriever(events=events)
+        agent_loop = FakeAgentLoop(
+            events=events,
+            error=RuntimeError("private defect"),
+        )
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot") as release,
+        ):
+            with self.assertRaises(RuntimeError):
+                chat.chat_stream(
+                    self.payload,
+                    self.request,
+                    None,
+                    retriever,
+                    agent_loop,
+                )
+
+        release.assert_called_once_with()
+
+    def test_busy_slot_rejects_before_deadline_retrieval_or_agent(self):
+        events = []
+        retriever = FakeRetriever(events=events)
+        agent_loop = FakeAgentLoop(events=events)
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=False),
+            patch.object(chat, "release_llm_slot") as release,
+            patch.object(chat.time, "monotonic") as clock,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                chat.chat_stream(
+                    self.payload,
+                    self.request,
+                    None,
+                    retriever,
+                    agent_loop,
+                )
+
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual(events, [])
+        clock.assert_not_called()
+        release.assert_not_called()
 
 
 if __name__ == "__main__":

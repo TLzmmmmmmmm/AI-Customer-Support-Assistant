@@ -922,7 +922,7 @@ git commit -m "feat: implement bounded raw agent loop"
 - Consumes: `build_retriever()`, `build_deterministic_tools(retriever=...)`, `build_tool_registry()`, `ToolExecutor`, `AgentLoop`, `complete_chat`, `AgentDeadline`, and `AGENT_TIMEOUT_SECONDS`.
 - Produces: `app.state.agent_loop`, `get_agent_loop(request)`, and the migrated `/api/chat-stream` orchestration.
 
-- [ ] **Step 1: Write failing lifespan tests for one shared Retriever**
+- [x] **Step 1: Write failing lifespan tests for one shared Retriever**
 
 Extend `tests/test_main.py` so a lifespan run asserts:
 
@@ -945,7 +945,7 @@ self.assertFalse(hasattr(main.app.state, "agent_loop"))
 
 Do not construct a second Retriever in either builder.
 
-- [ ] **Step 2: Write failing direct-route tests for Agent orchestration and deadline**
+- [x] **Step 2: Write failing direct-route tests for Agent orchestration and deadline**
 
 Replace the old direct route's streaming-provider assumptions in
 `tests/test_chat_route.py` with a fake Agent Loop whose `run()` records provider
@@ -985,7 +985,7 @@ self.assertEqual(caught.exception.status_code, 504)
 self.assertEqual(agent_loop.calls, [])
 ```
 
-- [ ] **Step 3: Run focused tests and verify the missing Agent dependencies**
+- [x] **Step 3: Run focused tests and verify the missing Agent dependencies**
 
 Run:
 
@@ -996,7 +996,7 @@ Run:
 Expected: FAIL because lifespan and route do not yet construct or accept the
 Agent Loop.
 
-- [ ] **Step 4: Add the accepted deadline configuration**
+- [x] **Step 4: Add the accepted deadline configuration**
 
 Add to `config.py`:
 
@@ -1006,7 +1006,7 @@ AGENT_TIMEOUT_SECONDS = 120.0
 
 Do not add a second environment-loading path or timeout framework.
 
-- [ ] **Step 5: Wire the shared application-scoped Agent**
+- [x] **Step 5: Wire the shared application-scoped Agent**
 
 Update `main.py` lifespan in this order:
 
@@ -1029,7 +1029,7 @@ finally:
 Import existing Day 1 builders; do not recreate product/contact facts or tool
 callables in `main.py`.
 
-- [ ] **Step 6: Migrate the route while preserving its public protocol**
+- [x] **Step 6: Migrate the route while preserving its public protocol**
 
 Add:
 
@@ -1081,7 +1081,7 @@ entire Agent Loop, and response body cleanup. Do not acquire inside
 Keep legacy streaming helpers if existing evaluation or unit tests still import
 them; remove only route-specific dead code after confirming no caller remains.
 
-- [ ] **Step 7: Run application integration tests**
+- [x] **Step 7: Run application integration tests**
 
 Run:
 
@@ -1091,7 +1091,7 @@ Run:
 
 Expected: all tests PASS.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```powershell
 git add config.py main.py routes\chat.py tests\test_main.py tests\test_chat_route.py

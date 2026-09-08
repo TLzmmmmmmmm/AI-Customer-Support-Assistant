@@ -23,12 +23,18 @@ from concurrency import (
     try_acquire_llm_slot,
 )
 from app_logging import log_request
+from agent import AgentDeadline, AgentDeadlineExceeded, AgentLoop
+from config import AGENT_TIMEOUT_SECONDS
 
 router = APIRouter()
 
 
 def get_retriever(request: Request) -> Retriever:
     return request.app.state.retriever
+
+
+def get_agent_loop(request: Request) -> AgentLoop:
+    return request.app.state.agent_loop
 
 
 def encode_event(event: dict[str, object]) -> str:
@@ -116,12 +122,36 @@ def stream_events_with_slot(
     finally:
         release_llm_slot()
 
+
+def answer_events_with_slot(
+    answer: str,
+    request_id: str,
+    started_at: float,
+) -> Iterator[str]:
+    try:
+        yield encode_event({
+            "type": "delta",
+            "content": answer,
+        })
+        log_request(
+            request_id=request_id,
+            http_status=200,
+            outcome="success",
+            started_at=started_at,
+        )
+        yield encode_event({
+            "type": "done",
+        })
+    finally:
+        release_llm_slot()
+
 @router.post("/api/chat-stream")
 def chat_stream(
     payload: ChatRequest,
     request: Request,
     _: None = Depends(enforce_rate_limit),
     retriever: Retriever = Depends(get_retriever),
+    agent_loop: AgentLoop = Depends(get_agent_loop),
 ):
     started_at = request.state.started_at
     request_id = request.state.request_id
@@ -136,13 +166,22 @@ def chat_stream(
         )
     
     try:
+        deadline = AgentDeadline.start(
+            AGENT_TIMEOUT_SECONDS,
+            clock=time.monotonic,
+        )
+        deadline.ensure_active()
         results = retriever.retrieve(payload.messages[-1].content)
+        deadline.ensure_active()
         retrieved_context = build_retrieved_context(results)
         provider_messages = build_rag_messages(
             payload.messages,
             retrieved_context,
         )
-        stream = open_chat_stream(provider_messages)
+        agent_result = agent_loop.run(
+            provider_messages,
+            deadline=deadline,
+        )
 
     except RetrievalError as error:
         release_llm_slot()
@@ -156,7 +195,7 @@ def chat_stream(
             },
         )
 
-    except APITimeoutError as error:
+    except (AgentDeadlineExceeded, APITimeoutError) as error:
         release_llm_slot()
 
         raise HTTPException(
@@ -197,8 +236,8 @@ def chat_stream(
         raise
 
     return StreamingResponse(
-        stream_events_with_slot(
-            stream,
+        answer_events_with_slot(
+            agent_result.answer,
             request_id,
             started_at,
         ),

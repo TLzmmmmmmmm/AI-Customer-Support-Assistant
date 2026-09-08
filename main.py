@@ -14,14 +14,26 @@ from error_handling import (
     validation_exception_handler,
 )
 from services.retrieval import build_retriever
+from services.llm import complete_chat
+from services.tools import build_deterministic_tools
+from support_tools import build_tool_registry
+from agent import AgentLoop, ToolExecutor
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.retriever = build_retriever()
+    retriever = build_retriever()
+    tools = build_deterministic_tools(retriever=retriever)
+    registry = build_tool_registry(tools)
+    app.state.retriever = retriever
+    app.state.agent_loop = AgentLoop(
+        executor=ToolExecutor(registry),
+        complete_chat=complete_chat,
+    )
     try:
         yield
     finally:
+        del app.state.agent_loop
         del app.state.retriever
 
 
