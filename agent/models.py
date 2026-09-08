@@ -69,8 +69,8 @@ TOOL_SPECS: Mapping[str, ToolSpec] = MappingProxyType({
     ),
     "get_contact_info": ToolSpec(
         description=(
-            "Retrieve official phone and email contact channels when the user "
-            "explicitly asks how to contact the company; no address is returned."
+            "Retrieve only official phone and email contact channels when the "
+            "user explicitly asks how to contact the company."
         ),
         arguments_model=ContactInfoArguments,
         result_model=ContactInfoResult,

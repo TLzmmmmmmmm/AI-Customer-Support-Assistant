@@ -14,6 +14,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError
 import concurrency
 import main
 import rate_limit
+from agent import SAFE_AGENT_ANSWER
 from knowledge_pipeline.retrieval import (
     ExactEntityResolver,
     NumpyExactVectorIndex,
@@ -66,9 +67,22 @@ class ControlledEmbedding:
         return EmbeddingBatch(vectors=([1.0, 0.0],), input_tokens=1)
 
 
-def delta(content):
+def text_completion(content, finish_reason="stop"):
     return SimpleNamespace(choices=[SimpleNamespace(
-        delta=SimpleNamespace(content=content),
+        finish_reason=finish_reason,
+        message=SimpleNamespace(content=content, tool_calls=None),
+    )])
+
+
+def tool_completion(call_id, name, arguments, content=None):
+    call = SimpleNamespace(
+        id=call_id,
+        type="function",
+        function=SimpleNamespace(name=name, arguments=arguments),
+    )
+    return SimpleNamespace(choices=[SimpleNamespace(
+        finish_reason="tool_calls",
+        message=SimpleNamespace(content=content, tool_calls=[call]),
     )])
 
 
@@ -105,7 +119,7 @@ class ChatHttpAcceptanceTests(unittest.TestCase):
         self.create = self.enterContext(patch.object(
             llm.client.chat.completions,
             "create",
-            side_effect=lambda **kwargs: iter([delta("IP"), delta("68")]),
+            side_effect=lambda **kwargs: text_completion("IP68"),
         ))
         self.enterContext(patch.object(llm.time, "sleep"))
         self.client = self.enterContext(TestClient(main.app, raise_server_exceptions=False))
@@ -133,7 +147,7 @@ class ChatHttpAcceptanceTests(unittest.TestCase):
         self.assertEqual(error["request_id"], response.headers["X-Request-ID"])
         self.assertNotIn("private", response.text)
 
-    def test_real_rag_route_preserves_history_stream_and_minimal_log(self):
+    def test_real_rag_route_preserves_history_complete_answer_and_minimal_log(self):
         history = [
             {"role": "user", "content": "介绍对讲机"},
             {"role": "assistant", "content": "请告诉我型号。"},
@@ -143,15 +157,27 @@ class ChatHttpAcceptanceTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.headers["content-type"].startswith("application/x-ndjson"))
         self.assertEqual([json.loads(line) for line in response.text.splitlines()], [
-            {"type": "delta", "content": "IP"},
-            {"type": "delta", "content": "68"},
+            {"type": "delta", "content": "IP68"},
             {"type": "done"},
         ])
         self.assertEqual(self.provider.queries, [self.messages[0]["content"]])
         self.assertEqual(self.create.call_count, 1)
         messages = self.create.call_args.kwargs["messages"]
         self.assertEqual(messages[0]["role"], "system")
-        self.assertEqual(messages[1:3], history)
+        self.assertEqual(messages[1]["role"], "system")
+        self.assertEqual(messages[2:4], history)
+        self.assertFalse(self.create.call_args.kwargs["stream"])
+        self.assertEqual(
+            {
+                tool["function"]["name"]
+                for tool in self.create.call_args.kwargs["tools"]
+            },
+            {
+                "search_products",
+                "get_product_details",
+                "get_contact_info",
+            },
+        )
         payload = json.loads(messages[-1]["content"].split("BEGIN_RAG_DATA\n", 1)[1].rsplit("\nEND_RAG_DATA", 1)[0])
         self.assertEqual(payload, {
             "user_question": "HP780 的防护等级是什么？",
@@ -235,7 +261,7 @@ class ChatHttpAcceptanceTests(unittest.TestCase):
     def test_connection_retry_does_not_repeat_retrieval(self):
         self.create.side_effect = [
             APIConnectionError(request=httpx.Request("POST", "https://example.com")),
-            iter([delta("恢复成功")]),
+            text_completion("恢复成功"),
         ]
         response = self.post()
         self.assertEqual(response.status_code, 200)
@@ -246,31 +272,210 @@ class ChatHttpAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(self.provider.queries), 1)
         self.assert_slot_available()
 
-    def test_stream_errors_have_request_id_and_no_done_or_retry(self):
+    def test_provider_errors_before_response_are_http_errors(self):
         request = httpx.Request("POST", "https://example.com/completions")
-        for error, code in [
-            (APITimeoutError(request=request), "timeout"),
-            (APIConnectionError(request=request), "connection_error"),
-            (provider_error(500), "upstream_error"),
+        for error, status, code in [
+            (APITimeoutError(request=request), 504, "timeout"),
+            (APIConnectionError(request=request), 503, "provider_unavailable"),
+            (provider_error(500), 502, "provider_error"),
         ]:
             with self.subTest(code=code):
-                def broken_stream():
-                    yield delta("部分内容")
-                    raise error
-
                 self.create.reset_mock()
-                self.create.side_effect = lambda **kwargs: broken_stream()
+                self.create.side_effect = error
                 response = self.post()
-                self.assertEqual(response.status_code, 200)
-                events = [json.loads(line) for line in response.text.splitlines()]
-                self.assertEqual([event["type"] for event in events], ["delta", "error"])
-                self.assertEqual(events[0], {"type": "delta", "content": "部分内容"})
-                self.assertEqual(set(events[1]), {"type", "code", "message", "request_id"})
-                self.assertEqual(events[1]["code"], code)
-                self.assertEqual(events[1]["request_id"], response.headers["X-Request-ID"])
-                self.assertNotIn("private", response.text)
-                self.assertEqual(self.create.call_count, 1)
+                self.assert_http_error(response, status, code)
                 self.assert_slot_available()
+
+    def test_product_details_tool_observation_uses_day_one_contract(self):
+        self.create.side_effect = [
+            tool_completion(
+                "call-details",
+                "get_product_details",
+                '{"product_id":"HP780"}',
+            ),
+            text_completion("HP780 的详细参数已根据产品资料整理。"),
+        ]
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [json.loads(line) for line in response.text.splitlines()],
+            [
+                {
+                    "type": "delta",
+                    "content": "HP780 的详细参数已根据产品资料整理。",
+                },
+                {"type": "done"},
+            ],
+        )
+        second_messages = self.create.call_args_list[1].kwargs["messages"]
+        observation = json.loads(second_messages[-1]["content"])
+        self.assertTrue(observation["ok"])
+        self.assertEqual(observation["result"]["product_id"], "hp780")
+        self.assertGreater(len(observation["result"]["sources"]), 0)
+        self.assertEqual(
+            set(observation["result"]["sources"][0]),
+            {"title", "url"},
+        )
+        self.assertEqual(second_messages[-1]["tool_call_id"], "call-details")
+        self.assertNotIn("tool_call_id", response.text)
+        self.assertNotIn('"ok"', response.text)
+        self.assert_slot_available()
+
+    def test_recommendation_uses_search_and_generic_handoff_without_contact_call(self):
+        query = "推荐适合酒店使用的产品"
+        self.messages = [{"role": "user", "content": query}]
+        self.create.side_effect = [
+            tool_completion(
+                "call-search",
+                "search_products",
+                json.dumps({"query": query}, ensure_ascii=False),
+            ),
+            text_completion(
+                "以下型号可作为候选，请联系专业技术人员确认最终选型。"
+            ),
+        ]
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [json.loads(line) for line in response.text.splitlines()],
+            [
+                {
+                    "type": "delta",
+                    "content": (
+                        "以下型号可作为候选，请联系专业技术人员确认最终选型。"
+                    ),
+                },
+                {"type": "done"},
+            ],
+        )
+        self.assertEqual(self.provider.queries, [query, query])
+        observation = json.loads(
+            self.create.call_args_list[1].kwargs["messages"][-1]["content"]
+        )
+        self.assertTrue(observation["ok"])
+        self.assertLessEqual(len(observation["result"]["products"]), 5)
+        action_names = [
+            message["tool_calls"][0]["function"]["name"]
+            for call in self.create.call_args_list
+            for message in call.kwargs["messages"]
+            if message.get("tool_calls")
+        ]
+        self.assertEqual(set(action_names), {"search_products"})
+        self.assertNotIn("get_contact_info", action_names)
+        self.assert_slot_available()
+
+    def test_contact_tool_returns_no_address_and_uses_authoritative_observation(self):
+        self.messages = [{"role": "user", "content": "怎么联系你们？"}]
+
+        def respond(**kwargs):
+            messages = kwargs["messages"]
+            if not any(message.get("role") == "tool" for message in messages):
+                return tool_completion(
+                    "call-contact",
+                    "get_contact_info",
+                    "{}",
+                )
+            observation = json.loads(messages[-1]["content"])["result"]
+            return text_completion(
+                f"{observation['company_name']}，电话：{observation['duty_phone']}，"
+                f"邮箱：{observation['email']}"
+            )
+
+        self.create.side_effect = respond
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        events = [json.loads(line) for line in response.text.splitlines()]
+        self.assertEqual([event["type"] for event in events], ["delta", "done"])
+        observation = json.loads(
+            self.create.call_args_list[1].kwargs["messages"][-1]["content"]
+        )
+        self.assertTrue(observation["ok"])
+        self.assertEqual(
+            set(observation["result"]),
+            {"company_name", "duty_phone", "email", "sources"},
+        )
+        self.assertNotIn("address", response.text.lower())
+        self.assertNotIn("地址", response.text)
+        self.assertNotIn("sources", response.text)
+        self.assert_slot_available()
+
+    def test_product_not_found_is_observed_before_safe_model_answer(self):
+        self.create.side_effect = [
+            tool_completion(
+                "call-missing",
+                "get_product_details",
+                '{"product_id":"NOT-A-PRODUCT"}',
+            ),
+            text_completion("没有找到该型号，请核对产品型号后重试。"),
+        ]
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        observation = json.loads(
+            self.create.call_args_list[1].kwargs["messages"][-1]["content"]
+        )
+        self.assertFalse(observation["ok"])
+        self.assertEqual(observation["error"]["code"], "PRODUCT_NOT_FOUND")
+        self.assertEqual(
+            [json.loads(line) for line in response.text.splitlines()],
+            [
+                {
+                    "type": "delta",
+                    "content": "没有找到该型号，请核对产品型号后重试。",
+                },
+                {"type": "done"},
+            ],
+        )
+        self.assertNotIn("PRODUCT_NOT_FOUND", response.text)
+        self.assert_slot_available()
+
+    def test_malicious_tool_loop_stops_after_three_observations(self):
+        self.create.side_effect = [
+            tool_completion(
+                f"call-{index}",
+                "unknown_private_tool",
+                "{}",
+            )
+            for index in range(1, 5)
+        ]
+
+        response = self.post()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [json.loads(line) for line in response.text.splitlines()],
+            [
+                {"type": "delta", "content": SAFE_AGENT_ANSWER},
+                {"type": "done"},
+            ],
+        )
+        self.assertEqual(self.create.call_count, 4)
+        for call in self.create.call_args_list[:3]:
+            self.assertIn("tools", call.kwargs)
+        self.assertNotIn("tools", self.create.call_args_list[3].kwargs)
+        final_history = self.create.call_args_list[3].kwargs["messages"]
+        self.assertEqual(
+            [message["role"] for message in final_history[-6:]],
+            ["assistant", "tool", "assistant", "tool", "assistant", "tool"],
+        )
+        self.assertEqual(
+            [
+                json.loads(message["content"])["error"]["tool_name"]
+                for message in final_history
+                if message["role"] == "tool"
+            ],
+            ["tool_executor", "tool_executor", "tool_executor"],
+        )
+        self.assertNotIn("unknown_private_tool", response.text)
+        self.assertNotIn("tool_executor", response.text)
+        self.assert_slot_available()
 
     def test_unexpected_context_defect_remains_safe_500(self):
         with patch.object(chat, "build_retrieved_context", side_effect=RuntimeError("private defect")):
