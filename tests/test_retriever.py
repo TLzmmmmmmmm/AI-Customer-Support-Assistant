@@ -125,6 +125,15 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(self.provider.query_calls, ["HP780 参数"])
         self.assertEqual(len(results), 5)
 
+    def test_entity_resolution_reuses_catalog_without_embedding(self):
+        matches = self.retriever.resolve_entities("HP780 功率")
+
+        self.assertEqual(
+            [match.parent_document_id for match in matches],
+            ["product:hp780"],
+        )
+        self.assertEqual(self.provider.query_calls, [])
+
     def test_unique_product_top_k_counts_final_parent_documents(self):
         results = self.retriever.retrieve(
             "推荐对讲机",

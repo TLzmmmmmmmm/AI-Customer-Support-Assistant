@@ -9,6 +9,7 @@ from .entities import ExactEntityResolver
 from .index import VectorIndex
 from .models import (
     EmbeddingAPIError,
+    EntityMatch,
     RetrievalResult,
     SearchHit,
     VectorRecordValidationError,
@@ -132,6 +133,9 @@ class Retriever:
                 start=1,
             )
         ]
+
+    def resolve_entities(self, query: str) -> list[EntityMatch]:
+        return self._entity_resolver.resolve(query)
 
 
 def _to_result(
