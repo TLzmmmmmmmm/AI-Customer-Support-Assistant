@@ -128,6 +128,52 @@ class AgentDeadline:
             raise AgentDeadlineExceeded("agent deadline exceeded")
 
 
+def normalize_agent_turn(completion) -> AgentTurn | None:
+    try:
+        choices = completion.choices
+        if len(choices) != 1:
+            return None
+
+        choice = choices[0]
+        finish_reason = choice.finish_reason
+        if finish_reason in {"length", "content_filter"}:
+            return None
+
+        message = choice.message
+        content = message.content
+        if content is not None and not isinstance(content, str):
+            return None
+
+        calls = []
+        for raw_call in message.tool_calls or ():
+            if raw_call.type != "function":
+                return None
+            call_id = raw_call.id
+            name = raw_call.function.name
+            arguments = raw_call.function.arguments
+            if (
+                not isinstance(call_id, str)
+                or not call_id.strip()
+                or not isinstance(name, str)
+                or not name.strip()
+                or not isinstance(arguments, str)
+            ):
+                return None
+            calls.append(AgentToolCall(
+                id=call_id,
+                name=name,
+                arguments=arguments,
+            ))
+    except (AttributeError, TypeError):
+        return None
+
+    return AgentTurn(
+        content=content,
+        tool_calls=tuple(calls),
+        finish_reason=finish_reason,
+    )
+
+
 def llm_tool_schemas() -> list[dict[str, Any]]:
     schemas: list[dict[str, Any]] = []
     for name, spec in TOOL_SPECS.items():
@@ -155,4 +201,5 @@ __all__ = [
     "ToolArguments",
     "ToolSpec",
     "llm_tool_schemas",
+    "normalize_agent_turn",
 ]

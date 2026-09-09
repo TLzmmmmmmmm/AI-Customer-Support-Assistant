@@ -11,6 +11,7 @@ from .models import (
     ToolArguments,
     ToolSpec,
     llm_tool_schemas,
+    normalize_agent_turn,
 )
 from .executor import ToolExecutor, ToolObservation
 from .loop import (
@@ -39,4 +40,5 @@ __all__ = [
     "ToolObservation",
     "ToolSpec",
     "llm_tool_schemas",
+    "normalize_agent_turn",
 ]

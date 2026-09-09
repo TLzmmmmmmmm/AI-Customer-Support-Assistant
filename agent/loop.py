@@ -6,10 +6,10 @@ from .executor import ToolExecutor
 from .models import (
     AgentDeadline,
     AgentResult,
-    AgentToolCall,
     AgentTurn,
     TOOL_SPECS,
     llm_tool_schemas,
+    normalize_agent_turn,
 )
 from trace_models import FailureLayer, ToolTrace
 
@@ -30,52 +30,6 @@ Use the provided deterministic tools under these rules:
 - A failed invocation may be retried with corrected arguments or replaced with another appropriate tool.
 - Propose at most one tool call per response.
 """.strip()
-
-
-def _normalize_turn(completion) -> AgentTurn | None:
-    try:
-        choices = completion.choices
-        if len(choices) != 1:
-            return None
-
-        choice = choices[0]
-        finish_reason = choice.finish_reason
-        if finish_reason in {"length", "content_filter"}:
-            return None
-
-        message = choice.message
-        content = message.content
-        if content is not None and not isinstance(content, str):
-            return None
-
-        calls = []
-        for raw_call in message.tool_calls or ():
-            if raw_call.type != "function":
-                return None
-            call_id = raw_call.id
-            name = raw_call.function.name
-            arguments = raw_call.function.arguments
-            if (
-                not isinstance(call_id, str)
-                or not call_id.strip()
-                or not isinstance(name, str)
-                or not name.strip()
-                or not isinstance(arguments, str)
-            ):
-                return None
-            calls.append(AgentToolCall(
-                id=call_id,
-                name=name,
-                arguments=arguments,
-            ))
-    except (AttributeError, TypeError):
-        return None
-
-    return AgentTurn(
-        content=content,
-        tool_calls=tuple(calls),
-        finish_reason=finish_reason,
-    )
 
 
 def _assistant_tool_message(turn: AgentTurn) -> dict[str, object]:
@@ -182,7 +136,7 @@ class AgentLoop:
                 raise
             deadline.ensure_active()
 
-            turn = _normalize_turn(completion)
+            turn = normalize_agent_turn(completion)
             if turn is None:
                 return result(
                     SAFE_AGENT_ANSWER,

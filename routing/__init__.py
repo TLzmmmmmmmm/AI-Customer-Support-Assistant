@@ -8,6 +8,7 @@ from .models import (
     ToolTrace,
 )
 from .router import HybridRouter, ROUTER_SYSTEM_PROMPT
+from .orchestrator import RouteOrchestrator, SAFE_FALLBACK_ANSWER
 
 __all__ = [
     "FailureLayer",
@@ -15,8 +16,10 @@ __all__ = [
     "Route",
     "RouteDecision",
     "RouteExecutionResult",
+    "RouteOrchestrator",
     "RouteTrace",
     "ROUTER_SYSTEM_PROMPT",
     "RoutingResult",
+    "SAFE_FALLBACK_ANSWER",
     "ToolTrace",
 ]
