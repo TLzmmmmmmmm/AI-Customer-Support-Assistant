@@ -18,6 +18,7 @@ from services.llm import complete_chat
 from services.tools import build_deterministic_tools
 from support_tools import build_tool_registry
 from agent import AgentLoop, ToolExecutor
+from routing import HybridRouter, RouteOrchestrator
 
 
 @asynccontextmanager
@@ -25,16 +26,25 @@ async def lifespan(app: FastAPI):
     retriever = build_retriever()
     tools = build_deterministic_tools(retriever=retriever)
     registry = build_tool_registry(tools)
-    app.state.retriever = retriever
-    app.state.agent_loop = AgentLoop(
-        executor=ToolExecutor(registry),
+    executor = ToolExecutor(registry)
+    agent_loop = AgentLoop(
+        executor=executor,
+        complete_chat=complete_chat,
+    )
+    app.state.route_orchestrator = RouteOrchestrator(
+        router=HybridRouter(
+            retriever=retriever,
+            complete_chat=complete_chat,
+        ),
+        retriever=retriever,
+        executor=executor,
+        agent_loop=agent_loop,
         complete_chat=complete_chat,
     )
     try:
         yield
     finally:
-        del app.state.agent_loop
-        del app.state.retriever
+        del app.state.route_orchestrator
 
 
 app = FastAPI(lifespan=lifespan)
@@ -75,6 +85,8 @@ async def add_request_id(
 
     request.state.request_id = request_id
     request.state.started_at = time.monotonic()
+    request.state.route_trace = None
+    request.state.failure_layer = None
 
     response = await call_next(request)
 

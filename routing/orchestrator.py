@@ -27,6 +27,24 @@ def _set_failure_layer(error: Exception, layer: FailureLayer) -> None:
         pass
 
 
+def _set_error_context(
+    error: Exception,
+    *,
+    route: Route,
+    tool_calls: tuple[ToolTrace, ...] = (),
+    retrieved_chunk_ids: tuple[str, ...] = (),
+) -> None:
+    for name, value in (
+        ("route", route),
+        ("tool_calls", tool_calls),
+        ("retrieved_chunk_ids", retrieved_chunk_ids),
+    ):
+        try:
+            setattr(error, name, value)
+        except (AttributeError, TypeError):
+            pass
+
+
 def _tool_trace(observation) -> ToolTrace:
     return ToolTrace(
         name=observation.tool_name,
@@ -86,23 +104,33 @@ class RouteOrchestrator:
 
         retrieved = []
         if decision.route == Route.KNOWLEDGE:
-            deadline.ensure_active()
             try:
+                deadline.ensure_active()
                 retrieved = self._retriever.retrieve(messages[-1].content)
+                deadline.ensure_active()
+                provider_messages = build_rag_messages(
+                    messages,
+                    build_retrieved_context(retrieved),
+                )
             except Exception as error:
                 _set_failure_layer(error, FailureLayer.RETRIEVAL)
+                _set_error_context(error, route=decision.route)
                 raise
-            deadline.ensure_active()
-            provider_messages = build_rag_messages(
-                messages,
-                build_retrieved_context(retrieved),
-            )
         else:
             provider_messages = build_direct_messages(messages)
 
         retrieved_ids = tuple(item.chunk_id for item in retrieved)
         if decision.agentic:
-            result = self._agent_loop.run(provider_messages, deadline=deadline)
+            try:
+                result = self._agent_loop.run(provider_messages, deadline=deadline)
+            except Exception as error:
+                _set_error_context(
+                    error,
+                    route=decision.route,
+                    tool_calls=tuple(getattr(error, "tool_calls", ())),
+                    retrieved_chunk_ids=retrieved_ids,
+                )
+                raise
             return RouteExecutionResult(
                 answer=result.answer,
                 trace=RouteTrace(
@@ -131,9 +159,14 @@ class RouteOrchestrator:
                 name = "get_contact_info"
                 arguments = {}
 
-            deadline.ensure_active()
-            observation = self._executor.execute_named(name, arguments, {})
-            deadline.ensure_active()
+            try:
+                deadline.ensure_active()
+                observation = self._executor.execute_named(name, arguments, {})
+                deadline.ensure_active()
+            except Exception as error:
+                _set_failure_layer(error, FailureLayer.TOOL_EXECUTION)
+                _set_error_context(error, route=decision.route)
+                raise
             tool_trace = _tool_trace(observation)
             tool_failure = _tool_failure(tool_trace)
             provider_messages = build_tool_messages(
@@ -142,7 +175,20 @@ class RouteOrchestrator:
                 observation=observation.content,
             )
 
-        answer, generation_failure = self._generate(provider_messages, deadline)
+        try:
+            answer, generation_failure = self._generate(
+                provider_messages,
+                deadline,
+            )
+        except Exception as error:
+            _set_failure_layer(error, FailureLayer.GENERATION)
+            _set_error_context(
+                error,
+                route=decision.route,
+                tool_calls=() if tool_trace is None else (tool_trace,),
+                retrieved_chunk_ids=retrieved_ids,
+            )
+            raise
         return RouteExecutionResult(
             answer=answer,
             trace=RouteTrace(

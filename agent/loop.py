@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from .executor import ToolExecutor
 from .models import (
     AgentDeadline,
+    AgentDeadlineExceeded,
     AgentResult,
     AgentTurn,
     TOOL_SPECS,
@@ -70,6 +71,20 @@ class AgentLoop:
         tool_traces: list[ToolTrace] = []
         pending_failures: list[tuple[FailureLayer, str]] = []
 
+        def attach_error_metadata(error: Exception, layer: FailureLayer) -> None:
+            try:
+                error.failure_layer = layer
+                error.tool_calls = tuple(tool_traces)
+            except (AttributeError, TypeError):
+                pass
+
+        def ensure_active(layer: FailureLayer) -> None:
+            try:
+                deadline.ensure_active()
+            except AgentDeadlineExceeded as error:
+                attach_error_metadata(error, layer)
+                raise
+
         def result(answer: str, failure: FailureLayer | None = None) -> AgentResult:
             unresolved = failure
             if unresolved is None and pending_failures:
@@ -118,7 +133,12 @@ class AgentLoop:
 
         while True:
             tools_enabled = processed_calls < MAX_TOOL_CALLS
-            deadline.ensure_active()
+            completion_layer = (
+                FailureLayer.TOOL_SELECTION
+                if tools_enabled
+                else FailureLayer.GENERATION
+            )
+            ensure_active(completion_layer)
             try:
                 if tools_enabled:
                     completion = self._complete_chat(
@@ -128,13 +148,9 @@ class AgentLoop:
                 else:
                     completion = self._complete_chat(state)
             except Exception as error:
-                error.failure_layer = (
-                    FailureLayer.TOOL_SELECTION
-                    if tools_enabled
-                    else FailureLayer.GENERATION
-                )
+                attach_error_metadata(error, completion_layer)
                 raise
-            deadline.ensure_active()
+            ensure_active(completion_layer)
 
             turn = normalize_agent_turn(completion)
             if turn is None:
@@ -167,13 +183,13 @@ class AgentLoop:
                 processed_calls += 1
                 state.append(_assistant_tool_message(turn))
 
-                deadline.ensure_active()
+                ensure_active(FailureLayer.TOOL_EXECUTION)
                 observation = self._executor.execute(
                     turn.tool_calls[0],
                     successful_observations,
                 )
                 record(observation)
-                deadline.ensure_active()
+                ensure_active(FailureLayer.TOOL_EXECUTION)
                 state.append({
                     "role": "tool",
                     "tool_call_id": turn.tool_calls[0].id,

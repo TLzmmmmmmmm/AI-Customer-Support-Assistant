@@ -3,7 +3,7 @@ import unittest
 from collections import deque
 from types import SimpleNamespace
 
-from agent import AgentResult, ToolObservation
+from agent import AgentDeadlineExceeded, AgentResult, ToolObservation
 from models import ChatMessage
 from routing import (
     FailureLayer,
@@ -85,6 +85,11 @@ class Deadline:
         self.checks += 1
 
 
+class FailingDeadline:
+    def ensure_active(self):
+        raise AgentDeadlineExceeded("expired")
+
+
 def chat(question="用户问题"):
     return [ChatMessage(role="user", content=question)]
 
@@ -112,6 +117,30 @@ def build_orchestrator(decision, *, router_failure=None, retriever=None,
 
 
 class RouteOrchestratorTests(unittest.TestCase):
+    def test_knowledge_deadline_is_attributed_to_retrieval_route(self):
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
+            build_orchestrator(
+                RouteDecision(Route.KNOWLEDGE),
+            ).run(chat("解决方案"), deadline=FailingDeadline())
+
+        self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.RETRIEVAL,
+        )
+
+    def test_direct_deadline_is_attributed_to_generation_route(self):
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
+            build_orchestrator(
+                RouteDecision(Route.DIRECT),
+            ).run(chat("你好"), deadline=FailingDeadline())
+
+        self.assertEqual(caught.exception.route, Route.DIRECT)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.GENERATION,
+        )
+
     def test_fallback_is_fixed_and_executes_no_other_capability(self):
         from routing import SAFE_FALLBACK_ANSWER
 

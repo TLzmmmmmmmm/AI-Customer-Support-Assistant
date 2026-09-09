@@ -4,19 +4,22 @@ from types import MappingProxyType, SimpleNamespace
 from unittest.mock import patch
 
 import main
-from agent import AgentLoop
+from routing import RouteOrchestrator
 
 
-class ApplicationRetrievalLifespanTests(unittest.TestCase):
-    def test_builds_agent_with_one_shared_application_scoped_retriever(self):
+class ApplicationRoutingLifespanTests(unittest.TestCase):
+    def test_builds_one_application_scoped_orchestrator_from_shared_components(self):
         retriever = object()
         tools = SimpleNamespace()
         registry = MappingProxyType({})
 
         async def run_lifespan() -> None:
             async with main.app.router.lifespan_context(main.app):
-                self.assertIs(main.app.state.retriever, retriever)
-                self.assertIsInstance(main.app.state.agent_loop, AgentLoop)
+                orchestrator = main.app.state.route_orchestrator
+                self.assertIsInstance(orchestrator, RouteOrchestrator)
+                self.assertIs(orchestrator._retriever, retriever)
+                self.assertIs(orchestrator._executor._registry, registry)
+                self.assertIs(orchestrator._agent_loop._executor, orchestrator._executor)
 
         with (
             patch.object(
@@ -40,8 +43,7 @@ class ApplicationRetrievalLifespanTests(unittest.TestCase):
         build_retriever.assert_called_once_with()
         build_tools.assert_called_once_with(retriever=retriever)
         build_registry.assert_called_once_with(tools)
-        self.assertFalse(hasattr(main.app.state, "retriever"))
-        self.assertFalse(hasattr(main.app.state, "agent_loop"))
+        self.assertFalse(hasattr(main.app.state, "route_orchestrator"))
 
 
 if __name__ == "__main__":

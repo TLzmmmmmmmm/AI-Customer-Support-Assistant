@@ -7,6 +7,7 @@ from types import MappingProxyType, SimpleNamespace
 from agent.executor import ToolExecutor, ToolObservation
 from agent.models import AgentDeadlineExceeded
 from support_tools import ProductSearchResult, ToolError, ToolErrorCode
+from trace_models import FailureLayer
 
 
 BASE_MESSAGES = [
@@ -527,7 +528,7 @@ class AgentLoopTests(unittest.TestCase):
         executor = RecordingExecutor()
         deadline = RecordingDeadline(fail_on=2)
 
-        with self.assertRaises(AgentDeadlineExceeded):
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
             AgentLoop(
                 executor=executor,
                 complete_chat=FakeCompleteChat([
@@ -536,6 +537,11 @@ class AgentLoopTests(unittest.TestCase):
             ).run(BASE_MESSAGES, deadline=deadline)
 
         self.assertEqual(executor.calls, [])
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_SELECTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, ())
 
 
 if __name__ == "__main__":

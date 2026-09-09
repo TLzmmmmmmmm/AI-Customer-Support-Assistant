@@ -6,6 +6,13 @@ from starlette.exceptions import HTTPException
 from app_logging import log_request
 
 
+def _trace_fields(request: Request) -> dict[str, object]:
+    return {
+        "trace": getattr(request.state, "route_trace", None),
+        "failure_layer": getattr(request.state, "failure_layer", None),
+    }
+
+
 DEFAULT_MESSAGES = {
     400: "请求格式不正确，请检查后重试。",
     429: "请求过于频繁，请稍后再试。",
@@ -53,6 +60,7 @@ async def validation_exception_handler(
         outcome="validation_error",
         started_at=started_at,
         error=type(exc).__name__,
+        **_trace_fields(request),
     )
 
     return error_response(
@@ -108,6 +116,7 @@ async def http_exception_handler(
             if internal_error
             else None
         ),
+        **_trace_fields(request),
     )
 
     return error_response(
@@ -131,6 +140,7 @@ async def unhandled_exception_handler(
         outcome="internal_error",
         started_at=started_at,
         error=type(exc).__name__,
+        **_trace_fields(request),
     )
 
     return error_response(

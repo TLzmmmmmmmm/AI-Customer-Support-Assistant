@@ -8,38 +8,16 @@ import httpx2 as httpx
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-from agent import AgentDeadlineExceeded, AgentResult
+from agent import AgentDeadlineExceeded
 from knowledge_pipeline.retrieval.models import (
     EmbeddingAPIError,
     EntityCatalogError,
-    RetrievalResult,
     VectorIndexNotReadyError,
 )
 from models import ChatMessage, ChatRequest
 from routes import chat
-
-
-def retrieval_result() -> RetrievalResult:
-    return RetrievalResult.model_validate({
-        "rank": 1,
-        "score": -0.25,
-        "match_origin": "exact_entity",
-        "matched_entity_ids": ["product:hp780"],
-        "chunk_id": "product:hp780:specifications",
-        "parent_document_id": "product:hp780",
-        "type": "product",
-        "section": "技术参数",
-        "text": "# HP780\n\n防护等级：IP68",
-        "content_hash": "a" * 64,
-        "metadata": {
-            "product_id": "hp780",
-            "slug": "hp780",
-            "category_id": "two-way-radio",
-            "category_name": "对讲机通信",
-        },
-        "source_url": "https://example.com/hp780/",
-        "source_files": ["src/content/products/hp780.json"],
-    })
+from routing import Route, RouteExecutionResult, RouteTrace
+from trace_models import FailureLayer, ToolTrace
 
 
 def status_error(status_code: int) -> APIStatusError:
@@ -51,22 +29,7 @@ def status_error(status_code: int) -> APIStatusError:
     )
 
 
-class FakeRetriever:
-    def __init__(self, *, events, error=None, results=None):
-        self.events = events
-        self.error = error
-        self.results = results if results is not None else [retrieval_result()]
-        self.queries = []
-
-    def retrieve(self, query):
-        self.events.append("retrieve")
-        self.queries.append(query)
-        if self.error is not None:
-            raise self.error
-        return self.results
-
-
-class FakeAgentLoop:
+class FakeOrchestrator:
     def __init__(self, *, events, answer="完整回答", error=None):
         self.events = events
         self.answer = answer
@@ -74,11 +37,18 @@ class FakeAgentLoop:
         self.calls = []
 
     def run(self, messages, *, deadline):
-        self.events.append("agent")
+        self.events.append("orchestrate")
         self.calls.append({"messages": messages, "deadline": deadline})
         if self.error is not None:
             raise self.error
-        return AgentResult(answer=self.answer)
+        return RouteExecutionResult(
+            answer=self.answer,
+            trace=RouteTrace(
+                route=Route.PRODUCT_SEARCH,
+                tool_calls=(ToolTrace(name="search_products", success=True),),
+                tool_call_count=1,
+            ),
+        )
 
 
 async def consume_response(response) -> str:
@@ -88,19 +58,13 @@ async def consume_response(response) -> str:
     return "".join(parts)
 
 
-def parse_rag_payload(content: str) -> dict:
-    begin = "BEGIN_RAG_DATA\n"
-    end = "\nEND_RAG_DATA"
-    start = content.index(begin) + len(begin)
-    finish = content.rindex(end)
-    return json.loads(content[start:finish])
-
-
-class ChatRouteAgentOrchestrationTests(unittest.TestCase):
+class ChatRouteOrchestrationTests(unittest.TestCase):
     def setUp(self):
         self.request = SimpleNamespace(state=SimpleNamespace(
             started_at=1.0,
             request_id="request-1",
+            route_trace=None,
+            failure_layer=None,
         ))
         self.payload = ChatRequest(messages=[
             ChatMessage(role="user", content="介绍 HP780。"),
@@ -108,11 +72,9 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
             ChatMessage(role="user", content="它的防护等级是什么？"),
         ])
 
-    def test_one_slot_covers_initial_rag_agent_and_complete_ndjson_response(self):
+    def test_one_slot_covers_orchestration_and_complete_ndjson_response(self):
         events = []
-        retriever = FakeRetriever(events=events)
-        agent_loop = FakeAgentLoop(events=events, answer="完整回答")
-        clock_value = 10.0
+        orchestrator = FakeOrchestrator(events=events)
 
         def acquire():
             events.append("acquire")
@@ -120,7 +82,7 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
 
         def clock():
             events.append("clock")
-            return clock_value
+            return 10.0
 
         def release():
             events.append("release")
@@ -135,18 +97,16 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
                 self.payload,
                 self.request,
                 None,
-                retriever,
-                agent_loop,
+                orchestrator,
             )
             self.assertEqual(
                 events,
-                ["acquire", "clock", "clock", "retrieve", "clock", "agent"],
+                ["acquire", "clock", "clock", "orchestrate"],
             )
             body = asyncio.run(consume_response(response))
 
         self.assertEqual(events.count("release"), 1)
-        self.assertGreater(events.index("release"), events.index("agent"))
-        self.assertEqual(retriever.queries, ["它的防护等级是什么？"])
+        self.assertEqual(orchestrator.calls[0]["messages"], self.payload.messages)
         self.assertEqual(
             [json.loads(line) for line in body.splitlines()],
             [
@@ -154,95 +114,22 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
                 {"type": "done"},
             ],
         )
-        provider_messages = agent_loop.calls[0]["messages"]
-        self.assertEqual(
-            provider_messages[1:3],
-            [
-                {"role": "user", "content": "介绍 HP780。"},
-                {"role": "assistant", "content": "HP780 是一款对讲机。"},
-            ],
-        )
-        self.assertEqual(
-            parse_rag_payload(provider_messages[-1]["content"]),
-            {
-                "retrieved_context": [{
-                    "type": "product",
-                    "section": "技术参数",
-                    "text": "# HP780\n\n防护等级：IP68",
-                }],
-                "user_question": "它的防护等级是什么？",
-            },
-        )
+        trace = self.request.state.route_trace
+        self.assertEqual(trace.route, Route.PRODUCT_SEARCH)
         logged.assert_called_once_with(
             request_id="request-1",
             http_status=200,
             outcome="success",
             started_at=1.0,
+            trace=trace,
         )
 
-    def test_deadline_expiry_after_retrieval_returns_504_before_agent(self):
-        events = []
-        retriever = FakeRetriever(events=events)
-        agent_loop = FakeAgentLoop(events=events)
-        times = iter([10.0, 10.1, 130.0])
-
-        with (
-            patch.object(chat, "try_acquire_llm_slot", return_value=True),
-            patch.object(chat, "release_llm_slot") as release,
-            patch.object(
-                chat.time,
-                "monotonic",
-                side_effect=lambda: next(times),
-            ),
-        ):
-            with self.assertRaises(HTTPException) as caught:
-                chat.chat_stream(
-                    self.payload,
-                    self.request,
-                    None,
-                    retriever,
-                    agent_loop,
-                )
-
-        self.assertEqual(caught.exception.status_code, 504)
-        self.assertEqual(caught.exception.detail["code"], "timeout")
-        self.assertEqual(agent_loop.calls, [])
-        release.assert_called_once_with()
-
-    def test_known_retrieval_errors_return_503_and_release_slot(self):
-        for error in (
-            EmbeddingAPIError("provider failed"),
-            VectorIndexNotReadyError("index failed"),
-            EntityCatalogError("resolver failed"),
-        ):
-            with self.subTest(error=type(error).__name__):
-                events = []
-                retriever = FakeRetriever(events=events, error=error)
-                agent_loop = FakeAgentLoop(events=events)
-                with (
-                    patch.object(chat, "try_acquire_llm_slot", return_value=True),
-                    patch.object(chat, "release_llm_slot") as release,
-                ):
-                    with self.assertRaises(HTTPException) as caught:
-                        chat.chat_stream(
-                            self.payload,
-                            self.request,
-                            None,
-                            retriever,
-                            agent_loop,
-                        )
-
-                self.assertEqual(caught.exception.status_code, 503)
-                self.assertEqual(
-                    caught.exception.detail["code"],
-                    "retrieval_unavailable",
-                )
-                self.assertEqual(agent_loop.calls, [])
-                release.assert_called_once_with()
-
-    def test_agent_errors_keep_existing_http_mapping_and_release_slot(self):
+    def test_known_errors_keep_existing_http_mapping_and_release_slot(self):
         request = httpx.Request("POST", "https://example.com/chat")
         cases = (
+            (EmbeddingAPIError("provider failed"), 503, "retrieval_unavailable"),
+            (VectorIndexNotReadyError("index failed"), 503, "retrieval_unavailable"),
+            (EntityCatalogError("resolver failed"), 503, "retrieval_unavailable"),
             (AgentDeadlineExceeded("expired"), 504, "timeout"),
             (APITimeoutError(request=request), 504, "timeout"),
             (APIConnectionError(request=request), 503, "provider_unavailable"),
@@ -250,9 +137,17 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
         )
         for error, status, code in cases:
             with self.subTest(error=type(error).__name__):
-                events = []
-                retriever = FakeRetriever(events=events)
-                agent_loop = FakeAgentLoop(events=events, error=error)
+                error.route = Route.KNOWLEDGE
+                error.failure_layer = (
+                    FailureLayer.RETRIEVAL
+                    if isinstance(error, (
+                        EmbeddingAPIError,
+                        VectorIndexNotReadyError,
+                        EntityCatalogError,
+                    ))
+                    else FailureLayer.GENERATION
+                )
+                orchestrator = FakeOrchestrator(events=[], error=error)
                 with (
                     patch.object(chat, "try_acquire_llm_slot", return_value=True),
                     patch.object(chat, "release_llm_slot") as release,
@@ -262,21 +157,22 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
                             self.payload,
                             self.request,
                             None,
-                            retriever,
-                            agent_loop,
+                            orchestrator,
                         )
 
                 self.assertEqual(caught.exception.status_code, status)
                 self.assertEqual(caught.exception.detail["code"], code)
+                self.assertEqual(
+                    self.request.state.route_trace.failure_layer,
+                    error.failure_layer,
+                )
                 release.assert_called_once_with()
 
-    def test_unexpected_agent_error_propagates_and_releases_slot(self):
-        events = []
-        retriever = FakeRetriever(events=events)
-        agent_loop = FakeAgentLoop(
-            events=events,
-            error=RuntimeError("private defect"),
-        )
+    def test_unexpected_error_propagates_records_safe_trace_and_releases_slot(self):
+        error = RuntimeError("private defect")
+        error.route = Route.DIRECT
+        error.failure_layer = FailureLayer.GENERATION
+        orchestrator = FakeOrchestrator(events=[], error=error)
 
         with (
             patch.object(chat, "try_acquire_llm_slot", return_value=True),
@@ -287,17 +183,14 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
                     self.payload,
                     self.request,
                     None,
-                    retriever,
-                    agent_loop,
+                    orchestrator,
                 )
 
+        self.assertEqual(self.request.state.route_trace.route, Route.DIRECT)
         release.assert_called_once_with()
 
-    def test_busy_slot_rejects_before_deadline_retrieval_or_agent(self):
-        events = []
-        retriever = FakeRetriever(events=events)
-        agent_loop = FakeAgentLoop(events=events)
-
+    def test_busy_slot_rejects_before_deadline_or_orchestration(self):
+        orchestrator = FakeOrchestrator(events=[])
         with (
             patch.object(chat, "try_acquire_llm_slot", return_value=False),
             patch.object(chat, "release_llm_slot") as release,
@@ -308,12 +201,12 @@ class ChatRouteAgentOrchestrationTests(unittest.TestCase):
                     self.payload,
                     self.request,
                     None,
-                    retriever,
-                    agent_loop,
+                    orchestrator,
                 )
 
         self.assertEqual(caught.exception.status_code, 503)
-        self.assertEqual(events, [])
+        self.assertEqual(orchestrator.calls, [])
+        self.assertIsNone(self.request.state.route_trace)
         clock.assert_not_called()
         release.assert_not_called()
 

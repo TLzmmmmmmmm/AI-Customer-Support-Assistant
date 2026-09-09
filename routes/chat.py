@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from knowledge_pipeline.retrieval import RetrievalError, Retriever
+from knowledge_pipeline.retrieval import RetrievalError
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -12,25 +12,20 @@ from openai import (
 )
 from rate_limit import enforce_rate_limit
 from models import ChatRequest
-from prompts import build_rag_messages
-from rag_context import build_retrieved_context
 from concurrency import (
     release_llm_slot,
     try_acquire_llm_slot,
 )
 from app_logging import log_request
-from agent import AgentDeadline, AgentDeadlineExceeded, AgentLoop
+from agent import AgentDeadline, AgentDeadlineExceeded
 from config import AGENT_TIMEOUT_SECONDS
+from routing import RouteOrchestrator, RouteTrace
 
 router = APIRouter()
 
 
-def get_retriever(request: Request) -> Retriever:
-    return request.app.state.retriever
-
-
-def get_agent_loop(request: Request) -> AgentLoop:
-    return request.app.state.agent_loop
+def get_route_orchestrator(request: Request) -> RouteOrchestrator:
+    return request.app.state.route_orchestrator
 
 
 def encode_event(event: dict[str, object]) -> str:
@@ -43,6 +38,7 @@ def answer_events_with_slot(
     answer: str,
     request_id: str,
     started_at: float,
+    trace: RouteTrace,
 ) -> Iterator[str]:
     try:
         yield encode_event({
@@ -54,6 +50,7 @@ def answer_events_with_slot(
             http_status=200,
             outcome="success",
             started_at=started_at,
+            trace=trace,
         )
         yield encode_event({
             "type": "done",
@@ -66,8 +63,7 @@ def chat_stream(
     payload: ChatRequest,
     request: Request,
     _: None = Depends(enforce_rate_limit),
-    retriever: Retriever = Depends(get_retriever),
-    agent_loop: AgentLoop = Depends(get_agent_loop),
+    orchestrator: RouteOrchestrator = Depends(get_route_orchestrator),
 ):
     started_at = request.state.started_at
     request_id = request.state.request_id
@@ -87,19 +83,14 @@ def chat_stream(
             clock=time.monotonic,
         )
         deadline.ensure_active()
-        results = retriever.retrieve(payload.messages[-1].content)
-        deadline.ensure_active()
-        retrieved_context = build_retrieved_context(results)
-        provider_messages = build_rag_messages(
+        route_result = orchestrator.run(
             payload.messages,
-            retrieved_context,
-        )
-        agent_result = agent_loop.run(
-            provider_messages,
             deadline=deadline,
         )
+        request.state.route_trace = route_result.trace
 
     except RetrievalError as error:
+        _remember_error_trace(request, error)
         release_llm_slot()
 
         raise HTTPException(
@@ -112,6 +103,7 @@ def chat_stream(
         )
 
     except (AgentDeadlineExceeded, APITimeoutError) as error:
+        _remember_error_trace(request, error)
         release_llm_slot()
 
         raise HTTPException(
@@ -124,6 +116,7 @@ def chat_stream(
         )
 
     except APIConnectionError as error:
+        _remember_error_trace(request, error)
         release_llm_slot()
 
         raise HTTPException(
@@ -136,6 +129,7 @@ def chat_stream(
         )
 
     except APIStatusError as error:
+        _remember_error_trace(request, error)
         release_llm_slot()
 
         raise HTTPException(
@@ -147,16 +141,35 @@ def chat_stream(
             },
         )
 
-    except Exception:
+    except Exception as error:
+        _remember_error_trace(request, error)
         release_llm_slot()
         raise
 
     return StreamingResponse(
         answer_events_with_slot(
-            agent_result.answer,
+            route_result.answer,
             request_id,
             started_at,
+            route_result.trace,
         ),
         media_type="application/x-ndjson",
+    )
+
+
+def _remember_error_trace(request: Request, error: Exception) -> None:
+    route = getattr(error, "route", None)
+    failure_layer = getattr(error, "failure_layer", None)
+    request.state.failure_layer = failure_layer
+    if route is None:
+        return
+    tool_calls = tuple(getattr(error, "tool_calls", ()))
+    retrieved_chunk_ids = tuple(getattr(error, "retrieved_chunk_ids", ()))
+    request.state.route_trace = RouteTrace(
+        route=route,
+        tool_calls=tool_calls,
+        tool_call_count=len(tool_calls),
+        retrieved_chunk_ids=retrieved_chunk_ids,
+        failure_layer=failure_layer,
     )
 
