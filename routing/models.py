@@ -52,11 +52,18 @@ class RouteExecutionResult:
     trace: RouteTrace
 
 
+@dataclass(frozen=True)
+class RoutingResult:
+    decision: RouteDecision
+    failure_layer: FailureLayer | None = None
+
+
 __all__ = [
     "FailureLayer",
     "Route",
     "RouteDecision",
     "RouteExecutionResult",
     "RouteTrace",
+    "RoutingResult",
     "ToolTrace",
 ]
