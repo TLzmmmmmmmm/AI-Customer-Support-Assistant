@@ -17,6 +17,8 @@ class ToolObservation:
     success: bool
     reused: bool
     cache_key: str | None
+    tool_name: str = "tool_executor"
+    error_code: str | None = None
 
 
 def _serialize_error(error: ToolError) -> str:
@@ -40,6 +42,8 @@ def _error_observation(error: ToolError) -> ToolObservation:
         success=False,
         reused=False,
         cache_key=None,
+        tool_name=error.tool_name,
+        error_code=error.code.value,
     )
 
 
@@ -60,21 +64,40 @@ class ToolExecutor:
         call: AgentToolCall,
         successful_observations: dict[str, str],
     ) -> ToolObservation:
-        spec = TOOL_SPECS.get(call.name)
-        if spec is None:
+        if call.name not in TOOL_SPECS:
             return _error_observation(_invalid_argument("tool_executor"))
 
         try:
             decoded = json.loads(call.arguments)
             if not isinstance(decoded, dict):
                 raise ValueError("tool arguments must be an object")
-            arguments = spec.arguments_model.model_validate(decoded)
-        except (json.JSONDecodeError, ValidationError, ValueError):
+        except (json.JSONDecodeError, ValueError):
             return _error_observation(_invalid_argument(call.name))
 
-        validated_arguments = arguments.model_dump(mode="json")
+        return self.execute_named(
+            call.name,
+            decoded,
+            successful_observations,
+        )
+
+    def execute_named(
+        self,
+        name: str,
+        arguments: Mapping[str, object],
+        successful_observations: dict[str, str],
+    ) -> ToolObservation:
+        spec = TOOL_SPECS.get(name)
+        if spec is None:
+            return _error_observation(_invalid_argument("tool_executor"))
+
+        try:
+            validated = spec.arguments_model.model_validate(arguments)
+        except ValidationError:
+            return _error_observation(_invalid_argument(name))
+
+        validated_arguments = validated.model_dump(mode="json")
         cache_key = json.dumps(
-            {"name": call.name, "arguments": validated_arguments},
+            {"name": name, "arguments": validated_arguments},
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -86,9 +109,10 @@ class ToolExecutor:
                 success=True,
                 reused=True,
                 cache_key=cache_key,
+                tool_name=name,
             )
 
-        tool = self._registry.get(call.name)
+        tool = self._registry.get(name)
         if tool is None:
             return _error_observation(_invalid_argument("tool_executor"))
 
@@ -102,7 +126,7 @@ class ToolExecutor:
             return _error_observation(ToolError(
                 code=ToolErrorCode.TOOL_EXECUTION_ERROR,
                 message="The tool could not complete the request.",
-                tool_name=call.name,
+                tool_name=name,
             ))
 
         content = json.dumps(
@@ -119,6 +143,7 @@ class ToolExecutor:
             success=True,
             reused=False,
             cache_key=cache_key,
+            tool_name=name,
         )
 
 

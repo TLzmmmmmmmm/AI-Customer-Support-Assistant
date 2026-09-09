@@ -12,6 +12,91 @@ from support_tools import (
 
 
 class AgentExecutorTests(unittest.TestCase):
+    def test_named_and_native_calls_share_validation_execution_and_cache(self):
+        from agent.executor import ToolExecutor
+
+        calls = []
+
+        def search_products(query):
+            calls.append(query)
+            return ProductSearchResult(products=[])
+
+        executor = ToolExecutor(MappingProxyType({
+            "search_products": search_products,
+        }))
+        cache = {}
+
+        named = executor.execute_named(
+            "search_products",
+            {"query": " 酒店 "},
+            cache,
+        )
+        native = executor.execute(
+            AgentToolCall(
+                "call-1",
+                "search_products",
+                '{"query":"酒店"}',
+            ),
+            cache,
+        )
+
+        self.assertEqual(calls, ["酒店"])
+        self.assertTrue(named.success)
+        self.assertFalse(named.reused)
+        self.assertTrue(native.success)
+        self.assertTrue(native.reused)
+        self.assertEqual(named.content, native.content)
+        self.assertEqual(named.tool_name, "search_products")
+        self.assertIsNone(named.error_code)
+
+    def test_named_invalid_arguments_do_not_execute_handler(self):
+        from agent.executor import ToolExecutor
+
+        calls = []
+        executor = ToolExecutor(MappingProxyType({
+            "search_products": lambda query: calls.append(query),
+        }))
+
+        observation = executor.execute_named(
+            "search_products",
+            {"query": "", "extra": True},
+            {},
+        )
+
+        self.assertFalse(observation.success)
+        self.assertEqual(observation.tool_name, "search_products")
+        self.assertEqual(observation.error_code, "INVALID_ARGUMENT")
+        self.assertEqual(calls, [])
+
+    def test_observation_metadata_distinguishes_safe_domain_and_system_errors(self):
+        from agent.executor import ToolExecutor
+
+        def missing(product_id):
+            raise ToolError(
+                code=ToolErrorCode.PRODUCT_NOT_FOUND,
+                message="No product matches.",
+                tool_name="get_product_details",
+            )
+
+        missing_result = ToolExecutor(MappingProxyType({
+            "get_product_details": missing,
+        })).execute_named(
+            "get_product_details",
+            {"product_id": "UNKNOWN"},
+            {},
+        )
+        unknown_result = ToolExecutor(MappingProxyType({})).execute_named(
+            "private_tool",
+            {},
+            {},
+        )
+
+        self.assertEqual(missing_result.tool_name, "get_product_details")
+        self.assertEqual(missing_result.error_code, "PRODUCT_NOT_FOUND")
+        self.assertEqual(unknown_result.tool_name, "tool_executor")
+        self.assertEqual(unknown_result.error_code, "INVALID_ARGUMENT")
+        self.assertNotIn("private_tool", unknown_result.content)
+
     def test_success_serializes_existing_result_and_reuses_request_cache(self):
         from agent.executor import ToolExecutor
 
