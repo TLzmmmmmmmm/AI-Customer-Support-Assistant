@@ -83,6 +83,136 @@ class RecordingExecutor:
 
 
 class AgentLoopTests(unittest.TestCase):
+    def test_successful_and_cached_proposals_return_individually_paired_traces(self):
+        from agent.loop import AgentLoop
+
+        calls = []
+
+        def search_products(query):
+            calls.append(query)
+            return ProductSearchResult(products=[])
+
+        complete = FakeCompleteChat([
+            tool_completion("call-1", "search_products", '{"query":"酒店"}'),
+            tool_completion("call-2", "search_products", '{"query":"酒店"}'),
+            text_completion("候选结果"),
+        ])
+        result = AgentLoop(
+            executor=ToolExecutor(MappingProxyType({
+                "search_products": search_products,
+            })),
+            complete_chat=complete,
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(calls, ["酒店"])
+        self.assertEqual(
+            [
+                (trace.name, trace.success, trace.error_code, trace.reused)
+                for trace in result.tool_calls
+            ],
+            [
+                ("search_products", True, None, False),
+                ("search_products", True, None, True),
+            ],
+        )
+        self.assertIsNone(result.failure_layer)
+
+    def test_domain_outcome_is_traced_without_system_failure(self):
+        from agent.loop import AgentLoop
+
+        def missing(product_id):
+            raise ToolError(
+                code=ToolErrorCode.PRODUCT_NOT_FOUND,
+                message="Product not found.",
+                tool_name="get_product_details",
+            )
+
+        result = AgentLoop(
+            executor=ToolExecutor(MappingProxyType({
+                "get_product_details": missing,
+            })),
+            complete_chat=FakeCompleteChat([
+                tool_completion(
+                    "call-1",
+                    "get_product_details",
+                    '{"product_id":"UNKNOWN"}',
+                ),
+                text_completion("没有找到该产品。"),
+            ]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(result.tool_calls[0].error_code, "PRODUCT_NOT_FOUND")
+        self.assertIsNone(result.failure_layer)
+
+    def test_recovered_agent_errors_remain_in_trace_without_request_failure(self):
+        from agent.loop import AgentLoop
+
+        def search_products(query):
+            return ProductSearchResult(products=[])
+
+        result = AgentLoop(
+            executor=ToolExecutor(MappingProxyType({
+                "search_products": search_products,
+            })),
+            complete_chat=FakeCompleteChat([
+                tool_completion("call-1", "search_products", '{"query":'),
+                tool_completion("call-2", "search_products", '{"query":"酒店"}'),
+                text_completion("候选结果"),
+            ]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(
+            [trace.error_code for trace in result.tool_calls],
+            ["INVALID_ARGUMENT", None],
+        )
+        self.assertIsNone(result.failure_layer)
+
+    def test_unrecovered_execution_error_sets_terminal_failure_layer(self):
+        from agent.loop import AgentLoop
+        from trace_models import FailureLayer
+
+        def broken(query):
+            raise RuntimeError("private")
+
+        result = AgentLoop(
+            executor=ToolExecutor(MappingProxyType({
+                "search_products": broken,
+            })),
+            complete_chat=FakeCompleteChat([
+                tool_completion("call-1", "search_products", '{"query":"酒店"}'),
+                text_completion("暂时无法查询。"),
+            ]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(result.tool_calls[0].error_code, "TOOL_EXECUTION_ERROR")
+        self.assertEqual(result.failure_layer, FailureLayer.TOOL_EXECUTION)
+
+    def test_multiple_tool_proposals_are_paired_as_selection_failures(self):
+        from agent.loop import AgentLoop
+        from trace_models import FailureLayer
+
+        response = SimpleNamespace(choices=[SimpleNamespace(
+            finish_reason="tool_calls",
+            message=SimpleNamespace(
+                content=None,
+                tool_calls=[
+                    tool_call("call-1", "get_contact_info", "{}"),
+                    tool_call("call-2", "private_tool", "{}"),
+                ],
+            ),
+        )])
+        result = AgentLoop(
+            executor=RecordingExecutor(),
+            complete_chat=FakeCompleteChat([response]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(
+            [trace.name for trace in result.tool_calls],
+            ["get_contact_info", "tool_executor"],
+        )
+        self.assertTrue(all(not trace.success for trace in result.tool_calls))
+        self.assertEqual(result.failure_layer, FailureLayer.TOOL_SELECTION)
+
     def test_direct_answer_preserves_input_and_adds_controlled_policy(self):
         from agent.loop import AGENT_TOOL_POLICY, AgentLoop
 

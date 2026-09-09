@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from trace_models import FailureLayer, ToolTrace
+
 
 class Route(str, Enum):
     PRODUCT_SEARCH = "product_search"
@@ -13,28 +15,11 @@ class Route(str, Enum):
     FALLBACK = "fallback"
 
 
-class FailureLayer(str, Enum):
-    ROUTING = "ROUTING"
-    TOOL_SELECTION = "TOOL_SELECTION"
-    ARGUMENT_GENERATION = "ARGUMENT_GENERATION"
-    TOOL_EXECUTION = "TOOL_EXECUTION"
-    RETRIEVAL = "RETRIEVAL"
-    GENERATION = "GENERATION"
-
-
 @dataclass(frozen=True)
 class RouteDecision:
     route: Route
     agentic: bool = False
     product_id: str | None = None
-
-
-@dataclass(frozen=True)
-class ToolTrace:
-    name: str
-    success: bool
-    error_code: str | None = None
-    reused: bool = False
 
 
 @dataclass(frozen=True)

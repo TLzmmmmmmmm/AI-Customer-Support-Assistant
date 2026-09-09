@@ -16,6 +16,7 @@ from support_tools.service import (
     MAX_PRODUCT_ID_CHARACTERS,
     MAX_PRODUCT_QUERY_CHARACTERS,
 )
+from trace_models import FailureLayer, ToolTrace
 
 
 class ToolArguments(BaseModel):
@@ -95,6 +96,8 @@ class AgentTurn:
 @dataclass(frozen=True)
 class AgentResult:
     answer: str
+    tool_calls: tuple[ToolTrace, ...] = ()
+    failure_layer: FailureLayer | None = None
 
 
 class AgentDeadlineExceeded(Exception):
