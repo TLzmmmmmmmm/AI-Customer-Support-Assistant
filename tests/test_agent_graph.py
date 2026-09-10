@@ -9,6 +9,7 @@ from knowledge_pipeline.models import (
     TechnicalParameterGroup,
     TechnicalParameterItem,
 )
+from knowledge_pipeline.retrieval.models import RetrievalResult
 from models import ChatMessage
 from routing import HybridRouter, Route, RouteDecision, RoutingResult
 from support_tools import (
@@ -32,12 +33,23 @@ class RecordingRouter:
 
 
 class RecordingRetriever:
-    def __init__(self):
+    def __init__(self, results=(), *, visited=None, error=None):
+        self.results = list(results)
+        self.visited = visited
+        self.error = error
         self.queries = []
 
     def resolve_entities(self, query):
         self.queries.append(query)
         return []
+
+    def retrieve(self, query):
+        if self.visited is not None:
+            self.visited.append("retrieve")
+        self.queries.append(query)
+        if self.error is not None:
+            raise self.error
+        return list(self.results)
 
 
 class RecordingCompletion:
@@ -95,6 +107,28 @@ def _initial_state(*, deadline=None, question="测试问题"):
     }
 
 
+def _retrieval_result(source):
+    return RetrievalResult.model_validate({
+        "rank": 1,
+        "score": 0.9,
+        "match_origin": "dense",
+        "matched_entity_ids": [],
+        "chunk_id": "solution:test:content",
+        "parent_document_id": "solution:test",
+        "type": "solution",
+        "section": "方案介绍",
+        "text": "# 测试方案\n\n方案内容。",
+        "content_hash": "a" * 64,
+        "metadata": {
+            "solution_id": "test",
+            "slug": "test",
+        },
+        "source_url": source.url,
+        "source_files": ["src/content/solutions/test.md"],
+        "sources": [source],
+    })
+
+
 def _recording_node(visited, name, update=None):
     def node(state):
         visited.append(name)
@@ -111,6 +145,7 @@ def _nodes(
     decision=None,
     router=None,
     executor=None,
+    retriever=None,
     **overrides,
 ):
     if router is None:
@@ -119,7 +154,6 @@ def _nodes(
             visited,
         )
     names = (
-        "retrieve",
         "rag_generate",
         "agent_step",
         "execute_tool",
@@ -130,6 +164,7 @@ def _nodes(
     return AgentGraphNodes(
         router=router,
         executor=executor or RecordingGraphExecutor(visited),
+        retriever=retriever or RecordingRetriever(visited=visited),
         **{
             name: overrides.get(name, _recording_node(visited, name))
             for name in names
@@ -151,6 +186,72 @@ class AgentGraphTests(unittest.TestCase):
             visited,
             ["route", "retrieve", "rag_generate", "finalize"],
         )
+
+    def test_rag_path_stores_real_hits_and_overwrites_sources(self):
+        visited = []
+        source = SourceRef(
+            title="测试方案",
+            url="https://example.com/solutions/test/",
+        )
+        stale = SourceRef(
+            title="旧资料",
+            url="https://example.com/stale/",
+        )
+        hit = _retrieval_result(source)
+        deadline = RecordingDeadline()
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.KNOWLEDGE),
+            retriever=RecordingRetriever([hit], visited=visited),
+        ))
+        state = _initial_state(deadline=deadline, question="最新问题")
+        state["sources"] = (stale,)
+
+        result = graph.invoke(state)
+
+        self.assertEqual(result["retrieval_hits"], (hit,))
+        self.assertIsInstance(result["retrieval_hits"], tuple)
+        self.assertEqual(result["sources"], (source,))
+        self.assertEqual(deadline.checks, 2)
+        self.assertEqual(
+            visited,
+            ["route", "retrieve", "rag_generate", "finalize"],
+        )
+
+    def test_rag_path_zero_hits_overwrites_state_with_empty_tuples(self):
+        visited = []
+        stale = SourceRef(
+            title="旧资料",
+            url="https://example.com/stale/",
+        )
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.KNOWLEDGE),
+            retriever=RecordingRetriever(visited=visited),
+        ))
+        state = _initial_state()
+        state["retrieval_hits"] = (_retrieval_result(stale),)
+        state["sources"] = (stale,)
+
+        result = graph.invoke(state)
+
+        self.assertEqual(result["retrieval_hits"], ())
+        self.assertEqual(result["sources"], ())
+
+    def test_rag_path_propagates_retrieval_failure_unchanged(self):
+        visited = []
+        expected = RuntimeError("retrieval unavailable")
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.KNOWLEDGE),
+            retriever=RecordingRetriever(visited=visited, error=expected),
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertFalse(hasattr(caught.exception, "failure_layer"))
 
     def test_direct_path_skips_retrieval_and_tools(self):
         visited = []

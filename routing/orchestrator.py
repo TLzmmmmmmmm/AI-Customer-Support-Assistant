@@ -18,6 +18,7 @@ from .deterministic import (
     DETERMINISTIC_TOOL_ROUTES,
     execute_deterministic_route,
 )
+from .knowledge import retrieval_sources, retrieve_knowledge
 from .models import Route, RouteExecutionResult, RouteTrace
 
 
@@ -109,9 +110,11 @@ class RouteOrchestrator:
         retrieved = []
         if decision.route == Route.KNOWLEDGE:
             try:
-                deadline.ensure_active()
-                retrieved = self._retriever.retrieve(messages[-1].content)
-                deadline.ensure_active()
+                retrieved = retrieve_knowledge(
+                    messages,
+                    deadline=deadline,
+                    retriever=self._retriever,
+                )
                 provider_messages = build_rag_messages(
                     messages,
                     build_retrieved_context(retrieved),
@@ -124,11 +127,7 @@ class RouteOrchestrator:
             provider_messages = build_direct_messages(messages)
 
         retrieved_ids = tuple(item.chunk_id for item in retrieved)
-        retrieved_sources = tuple(
-            source
-            for item in retrieved
-            for source in item.sources
-        )
+        retrieved_sources = retrieval_sources(retrieved)
         if decision.agentic:
             try:
                 result = self._agent_loop.run(provider_messages, deadline=deadline)

@@ -293,12 +293,13 @@ class RouteOrchestratorTests(unittest.TestCase):
     def test_knowledge_retrieves_latest_raw_query_then_generates_without_tools(self):
         retriever = FakeRetriever([retrieval_result()])
         complete = FakeComplete([completion("解决方案回答")])
+        deadline = Deadline()
 
         result = build_orchestrator(
             RouteDecision(Route.KNOWLEDGE),
             retriever=retriever,
             complete=complete,
-        ).run(chat("你们有哪些解决方案？"), deadline=Deadline())
+        ).run(chat("你们有哪些解决方案？"), deadline=deadline)
 
         self.assertEqual(result.answer, "解决方案回答")
         self.assertEqual(retriever.queries, ["你们有哪些解决方案？"])
@@ -306,6 +307,7 @@ class RouteOrchestratorTests(unittest.TestCase):
             result.trace.retrieved_chunk_ids,
             ("solution:emergency:content",),
         )
+        self.assertEqual(deadline.checks, 4)
         self.assertIsNone(complete.calls[0][1])
 
     def test_non_agentic_tool_routes_execute_known_tool_then_generate(self):

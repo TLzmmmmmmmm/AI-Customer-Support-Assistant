@@ -5,11 +5,13 @@ from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
 from agent import ToolExecutor
+from knowledge_pipeline.retrieval import Retriever
 from routing import HybridRouter, Route
 from routing.deterministic import (
     DETERMINISTIC_TOOL_ROUTES,
     execute_deterministic_route,
 )
+from routing.knowledge import retrieval_sources, retrieve_knowledge
 
 from .state import AgentState
 
@@ -21,7 +23,7 @@ AgentGraphNode: TypeAlias = Callable[[AgentState], dict[str, object]]
 class AgentGraphNodes:
     router: HybridRouter
     executor: ToolExecutor
-    retrieve: AgentGraphNode
+    retriever: Retriever
     rag_generate: AgentGraphNode
     agent_step: AgentGraphNode
     execute_tool: AgentGraphNode
@@ -59,6 +61,22 @@ def deterministic_tool_node(
     }
 
 
+def retrieve_node(
+    state: AgentState,
+    *,
+    retriever: Retriever,
+) -> dict[str, object]:
+    results = retrieve_knowledge(
+        state["messages"],
+        deadline=state["deadline"],
+        retriever=retriever,
+    )
+    return {
+        "retrieval_hits": tuple(results),
+        "sources": retrieval_sources(results),
+    }
+
+
 def select_route_edge(
     state: AgentState,
 ) -> Literal[
@@ -92,6 +110,7 @@ __all__ = [
     "AgentGraphNode",
     "AgentGraphNodes",
     "deterministic_tool_node",
+    "retrieve_node",
     "route_node",
     "select_agent_step_edge",
     "select_route_edge",
