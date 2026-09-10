@@ -1,11 +1,14 @@
 import json
 import unittest
 from collections import deque
+from copy import deepcopy
 from types import MappingProxyType, SimpleNamespace
 
 from agent import (
+    AGENT_TOOL_POLICY,
+    AgentDeadlineExceeded,
+    AgentLoop,
     SAFE_AGENT_ANSWER,
-    AgentToolCall,
     ToolExecutor,
     ToolObservation,
 )
@@ -17,6 +20,7 @@ from knowledge_pipeline.models import (
 )
 from knowledge_pipeline.retrieval.models import RetrievalResult
 from models import ChatMessage
+from prompts import build_direct_messages
 from routing import (
     SAFE_FALLBACK_ANSWER,
     FailureLayer,
@@ -78,21 +82,50 @@ class RecordingCompletion:
     def __call__(self, messages, *, tools=None):
         if self.visited is not None and self.label is not None:
             self.visited.append(self.label)
-        self.calls.append((messages, tools))
+        self.calls.append((deepcopy(messages), deepcopy(tools)))
+        response = self.responses.popleft()
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
+class KeywordRecordingCompletion:
+    def __init__(self, responses):
+        self.responses = deque(responses)
+        self.calls = []
+
+    def __call__(self, messages, **kwargs):
+        self.calls.append((deepcopy(messages), deepcopy(kwargs)))
         return self.responses.popleft()
 
 
 class RecordingDeadline:
-    def __init__(self):
+    def __init__(self, fail_on=None):
         self.checks = 0
+        self.fail_on = fail_on
 
     def ensure_active(self):
         self.checks += 1
+        if self.checks == self.fail_on:
+            raise AgentDeadlineExceeded("expired")
 
 
 class RecordingGraphExecutor:
-    def __init__(self, visited):
+    def __init__(self, visited, observations=()):
         self.visited = visited
+        self.observations = deque(observations)
+
+    def execute(self, call, cache):
+        self.visited.append("execute_tool")
+        if self.observations:
+            return self.observations.popleft()
+        return ToolObservation(
+            content='{"ok":true}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name=call.name,
+        )
 
     def execute_named(self, name, arguments, cache):
         self.visited.append("deterministic_tool")
@@ -109,6 +142,31 @@ def _completion(content):
     return SimpleNamespace(choices=[SimpleNamespace(
         finish_reason="stop",
         message=SimpleNamespace(content=content, tool_calls=None),
+    )])
+
+
+def _tool_call(call_id, name, arguments):
+    return SimpleNamespace(
+        id=call_id,
+        type="function",
+        function=SimpleNamespace(name=name, arguments=arguments),
+    )
+
+
+def _tool_completion(call_id, name, arguments, *, content=None):
+    return SimpleNamespace(choices=[SimpleNamespace(
+        finish_reason="tool_calls",
+        message=SimpleNamespace(
+            content=content,
+            tool_calls=[_tool_call(call_id, name, arguments)],
+        ),
+    )])
+
+
+def _multiple_tool_completion(*calls):
+    return SimpleNamespace(choices=[SimpleNamespace(
+        finish_reason="tool_calls",
+        message=SimpleNamespace(content=None, tool_calls=list(calls)),
     )])
 
 
@@ -149,16 +207,6 @@ def _retrieval_result(source, *, chunk_id="solution:test:content"):
     })
 
 
-def _recording_node(visited, name, update=None):
-    def node(state):
-        visited.append(name)
-        if update is None:
-            return {}
-        return update(state)
-
-    return node
-
-
 def _nodes(
     visited,
     *,
@@ -168,7 +216,6 @@ def _nodes(
     retriever=None,
     complete_chat=None,
     routing_failure=None,
-    **overrides,
 ):
     decision = decision or RouteDecision(Route.DIRECT)
     if router is None:
@@ -178,7 +225,9 @@ def _nodes(
             routing_failure,
         )
     if complete_chat is None:
-        if decision.route == Route.KNOWLEDGE:
+        if decision.agentic and decision.route != Route.FALLBACK:
+            generation_label = "agent_step"
+        elif decision.route == Route.KNOWLEDGE:
             generation_label = "rag_generate"
         elif decision.route in {
             Route.PRODUCT_SEARCH,
@@ -193,19 +242,11 @@ def _nodes(
             visited=visited,
             label=generation_label,
         )
-    names = (
-        "agent_step",
-        "execute_tool",
-    )
     return AgentGraphNodes(
         router=router,
         executor=executor or RecordingGraphExecutor(visited),
         retriever=retriever or RecordingRetriever(visited=visited),
         complete_chat=complete_chat,
-        **{
-            name: overrides.get(name, _recording_node(visited, name))
-            for name in names
-        },
     )
 
 
@@ -327,13 +368,8 @@ class AgentGraphTests(unittest.TestCase):
         self.assertNotIn("generation_failure", result)
         self.assertEqual(result["result"].answer, SAFE_FALLBACK_ANSWER)
 
-    def test_agent_path_executes_one_tool_then_ends_without_non_agentic_result(self):
+    def test_agent_path_executes_one_tool_then_finalizes_agentic_result(self):
         visited = []
-        call = AgentToolCall(
-            id="call-1",
-            name="get_contact_info",
-            arguments="{}",
-        )
         observation = ToolObservation(
             content='{"ok":true}',
             success=True,
@@ -341,30 +377,25 @@ class AgentGraphTests(unittest.TestCase):
             cache_key="get_contact_info:{}",
             tool_name="get_contact_info",
         )
-        agent_visits = 0
-
-        def agent_step(state):
-            nonlocal agent_visits
-            visited.append("agent_step")
-            agent_visits += 1
-            if agent_visits == 1:
-                return {"tool_call": call}
-            return {"tool_call": None, "answer": "agent answer"}
-
-        def execute_tool(state):
-            visited.append("execute_tool")
-            self.assertEqual(state["tool_call"], call)
-            return {"tool_result": observation}
+        complete = RecordingCompletion(
+            [
+                _tool_completion("call-1", "get_contact_info", "{}"),
+                _completion("agent answer"),
+            ],
+            visited=visited,
+            label="agent_step",
+        )
+        deadline = RecordingDeadline()
 
         graph = build_agent_graph(_nodes(
             visited,
             decision=RouteDecision(Route.KNOWLEDGE, agentic=True),
-            agent_step=agent_step,
-            execute_tool=execute_tool,
+            executor=RecordingGraphExecutor(visited, [observation]),
+            complete_chat=complete,
         ))
 
         result = graph.invoke(
-            _initial_state(),
+            _initial_state(deadline=deadline),
             config={"recursion_limit": 10},
         )
 
@@ -372,6 +403,7 @@ class AgentGraphTests(unittest.TestCase):
             visited,
             [
                 "route",
+                "retrieve",
                 "agent_step",
                 "execute_tool",
                 "agent_step",
@@ -379,7 +411,21 @@ class AgentGraphTests(unittest.TestCase):
         )
         self.assertEqual(result["answer"], "agent answer")
         self.assertEqual(result["tool_result"], observation)
-        self.assertNotIn("result", result)
+        self.assertEqual(result["agent_processed_calls"], 1)
+        self.assertEqual(result["agent_tool_traces"], (
+            ToolTrace("get_contact_info", True),
+        ))
+        self.assertEqual(result["result"].answer, "agent answer")
+        self.assertEqual(result["result"].trace.route, Route.KNOWLEDGE)
+        self.assertEqual(result["result"].trace.tool_call_count, 1)
+        self.assertEqual(deadline.checks, 8)
+        self.assertIsNotNone(complete.calls[0][1])
+        self.assertIsNotNone(complete.calls[1][1])
+        self.assertIn("BEGIN_RAG_DATA", complete.calls[0][0][-1]["content"])
+        self.assertEqual(
+            complete.calls[0][0][1],
+            {"role": "system", "content": AGENT_TOOL_POLICY},
+        )
 
     def test_non_agentic_routes_follow_production_mapping(self):
         cases = (
@@ -801,11 +847,20 @@ class AgentGraphTests(unittest.TestCase):
             FailureLayer.ROUTING,
         )
 
-    def test_agentic_precedes_every_production_route(self):
-        for route in Route:
+    def test_agentic_non_knowledge_non_fallback_routes_use_agent(self):
+        for route in (
+            Route.PRODUCT_SEARCH,
+            Route.EXACT_PRODUCT,
+            Route.CONTACT,
+            Route.DIRECT,
+        ):
             with self.subTest(route=route):
                 visited = []
-                complete = RecordingCompletion([_completion("must not be used")])
+                complete = RecordingCompletion(
+                    [_completion("agent answer")],
+                    visited=visited,
+                    label="agent_step",
+                )
                 graph = build_agent_graph(_nodes(
                     visited,
                     decision=RouteDecision(route, agentic=True),
@@ -818,9 +873,400 @@ class AgentGraphTests(unittest.TestCase):
                     visited,
                     ["route", "agent_step"],
                 )
-                self.assertEqual(complete.calls, [])
+                self.assertEqual(len(complete.calls), 1)
                 self.assertNotIn("generation_failure", result)
-                self.assertNotIn("result", result)
+                self.assertEqual(result["result"].trace.route, route)
+
+    def test_agentic_knowledge_retrieves_before_agent_step(self):
+        visited = []
+        complete = RecordingCompletion(
+            [_completion("知识回答")],
+            visited=visited,
+            label="agent_step",
+        )
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.KNOWLEDGE, agentic=True),
+            complete_chat=complete,
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(visited, ["route", "retrieve", "agent_step"])
+        self.assertIn("BEGIN_RAG_DATA", complete.calls[0][0][-1]["content"])
+        self.assertEqual(result["result"].trace.route, Route.KNOWLEDGE)
+
+    def test_fallback_wins_over_agentic_flag(self):
+        visited = []
+        complete = RecordingCompletion([_completion("must not be used")])
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.FALLBACK, agentic=True),
+            complete_chat=complete,
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(visited, ["route"])
+        self.assertEqual(complete.calls, [])
+        self.assertEqual(result["result"].answer, SAFE_FALLBACK_ANSWER)
+
+    def test_agent_provider_history_matches_raw_agent_loop(self):
+        messages = (
+            ChatMessage(role="user", content="第一个问题"),
+            ChatMessage(role="assistant", content="先前回答"),
+            ChatMessage(role="user", content="怎么联系？"),
+        )
+        observation = ToolObservation(
+            content='{"ok":true}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name="get_contact_info",
+        )
+        raw_complete = RecordingCompletion([
+            _tool_completion("call-1", "get_contact_info", "{}"),
+            _completion("联系我们。"),
+        ])
+        graph_complete = RecordingCompletion([
+            _tool_completion("call-1", "get_contact_info", "{}"),
+            _completion("联系我们。"),
+        ])
+        raw = AgentLoop(
+            executor=RecordingGraphExecutor([], [observation]),
+            complete_chat=raw_complete,
+        ).run(
+            build_direct_messages(messages),
+            deadline=RecordingDeadline(),
+        )
+        state = _initial_state()
+        state["messages"] = messages
+        state["last_user_message"] = messages[-1]
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor([], [observation]),
+            complete_chat=graph_complete,
+        ))
+
+        graph_state = graph.invoke(state)
+
+        self.assertEqual(graph_complete.calls, raw_complete.calls)
+        self.assertEqual(graph_state["result"].answer, raw.answer)
+        self.assertEqual(graph_state["result"].trace.tool_calls, raw.tool_calls)
+        self.assertEqual(
+            graph_state["result"].trace.failure_layer,
+            raw.failure_layer,
+        )
+        self.assertEqual(graph_state["result"].sources, raw.sources)
+
+    def test_agent_cache_hits_consume_three_slots_then_disable_tools(self):
+        source = SourceRef(title="联系资料", url="https://example.com/contact")
+        calls = []
+
+        def get_contact_info():
+            calls.append("called")
+            return ContactInfoResult(
+                company_name="测试公司",
+                duty_phone="4000000000",
+                email="support@example.com",
+                sources=[source],
+            )
+
+        complete = KeywordRecordingCompletion([
+            _tool_completion(f"call-{index}", "get_contact_info", "{}")
+            for index in range(1, 4)
+        ] + [_completion("最终回答")])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=ToolExecutor(MappingProxyType({
+                "get_contact_info": get_contact_info,
+            })),
+            complete_chat=complete,
+        ))
+
+        result = graph.invoke(
+            _initial_state(),
+            config={"recursion_limit": 12},
+        )
+
+        self.assertEqual(calls, ["called"])
+        self.assertEqual(result["agent_processed_calls"], 3)
+        self.assertEqual(
+            [trace.reused for trace in result["agent_tool_traces"]],
+            [False, True, True],
+        )
+        self.assertEqual(result["agent_successful_sources"], (
+            source,
+            source,
+            source,
+        ))
+        self.assertEqual(len(result["agent_successful_observations"]), 1)
+        self.assertTrue(all("tools" in call[1] for call in complete.calls[:3]))
+        self.assertNotIn("tools", complete.calls[3][1])
+        self.assertEqual(result["result"].sources, (source, source, source))
+
+    def test_disabled_tools_completion_cannot_execute_fourth_call(self):
+        visited = []
+        complete = KeywordRecordingCompletion([
+            _tool_completion(
+                f"call-{index}",
+                "get_contact_info",
+                "{}",
+            )
+            for index in range(1, 5)
+        ])
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor(visited),
+            complete_chat=complete,
+        ))
+
+        result = graph.invoke(
+            _initial_state(),
+            config={"recursion_limit": 12},
+        )
+
+        self.assertEqual(visited.count("execute_tool"), 3)
+        self.assertEqual(result["agent_processed_calls"], 3)
+        self.assertEqual(len(result["agent_tool_traces"]), 4)
+        self.assertFalse(result["agent_tool_traces"][-1].success)
+        self.assertNotIn("tools", complete.calls[3][1])
+        self.assertEqual(result["result"].answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(
+            result["result"].trace.failure_layer,
+            FailureLayer.GENERATION,
+        )
+
+    def test_successful_retry_clears_argument_failure(self):
+        def search_products(query):
+            return ProductSearchResult(products=[])
+
+        complete = RecordingCompletion([
+            _tool_completion("call-1", "search_products", '{"query":'),
+            _tool_completion(
+                "call-2",
+                "search_products",
+                '{"query":"酒店"}',
+            ),
+            _completion("候选回答"),
+        ])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.PRODUCT_SEARCH, agentic=True),
+            executor=ToolExecutor(MappingProxyType({
+                "search_products": search_products,
+            })),
+            complete_chat=complete,
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(
+            [trace.error_code for trace in result["agent_tool_traces"]],
+            ["INVALID_ARGUMENT", None],
+        )
+        self.assertEqual(result["agent_pending_failures"], ())
+        self.assertIsNone(result["result"].trace.failure_layer)
+
+    def test_unrecovered_tool_execution_failure_reaches_final_result(self):
+        observation = ToolObservation(
+            content='{"ok":false}',
+            success=False,
+            reused=False,
+            cache_key=None,
+            tool_name="get_contact_info",
+            error_code="TOOL_EXECUTION_ERROR",
+        )
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor([], [observation]),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+                _completion("暂时没有联系信息。"),
+            ]),
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(result["agent_pending_failures"], (
+            (FailureLayer.TOOL_EXECUTION, "get_contact_info"),
+        ))
+        self.assertEqual(
+            result["result"].trace.failure_layer,
+            FailureLayer.TOOL_EXECUTION,
+        )
+        self.assertEqual(result["result"].sources, ())
+
+    def test_multiple_agent_tool_proposals_terminate_without_execution(self):
+        visited = []
+        complete = RecordingCompletion([_multiple_tool_completion(
+            _tool_call("call-1", "get_contact_info", "{}"),
+            _tool_call("call-2", "private_tool", "{}"),
+        )])
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor(visited),
+            complete_chat=complete,
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertNotIn("execute_tool", visited)
+        self.assertEqual(result["agent_processed_calls"], 0)
+        self.assertEqual(
+            [trace.name for trace in result["result"].trace.tool_calls],
+            ["get_contact_info", "tool_executor"],
+        )
+        self.assertEqual(result["result"].answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(
+            result["result"].trace.failure_layer,
+            FailureLayer.TOOL_SELECTION,
+        )
+
+    def test_safe_agent_answer_suppresses_successful_tool_sources(self):
+        source = SourceRef(title="资料", url="https://example.com/source")
+        observation = ToolObservation(
+            content='{"ok":true}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name="get_contact_info",
+            sources=(source,),
+        )
+        invalid = SimpleNamespace(choices=[SimpleNamespace(
+            finish_reason="length",
+            message=SimpleNamespace(content="partial", tool_calls=None),
+        )])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor([], [observation]),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+                invalid,
+            ]),
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(result["agent_successful_sources"], (source,))
+        self.assertEqual(result["result"].answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(result["result"].sources, ())
+
+    def test_agent_provider_exception_keeps_current_trace_metadata(self):
+        expected = RuntimeError("provider unavailable")
+        observation = ToolObservation(
+            content='{"ok":true}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name="get_contact_info",
+        )
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor([], [observation]),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+                expected,
+            ]),
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_SELECTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, (
+            ToolTrace("get_contact_info", True),
+        ))
+
+    def test_agent_deadline_after_provider_prevents_tool_execution(self):
+        visited = []
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor(visited),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+            ]),
+        ))
+
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
+            graph.invoke(_initial_state(
+                deadline=RecordingDeadline(fail_on=2),
+            ))
+
+        self.assertNotIn("execute_tool", visited)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_SELECTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, ())
+
+    def test_agent_deadline_after_tool_includes_new_tool_trace(self):
+        observation = ToolObservation(
+            content='{"ok":true}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name="get_contact_info",
+        )
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=RecordingGraphExecutor([], [observation]),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+            ]),
+        ))
+
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
+            graph.invoke(_initial_state(
+                deadline=RecordingDeadline(fail_on=4),
+            ))
+
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_EXECUTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, (
+            ToolTrace("get_contact_info", True),
+        ))
+
+    def test_unexpected_agent_executor_exception_remains_unannotated(self):
+        expected = RuntimeError("executor infrastructure failure")
+
+        class FailingExecutor:
+            def execute(self, call, cache):
+                raise expected
+
+            def execute_named(self, name, arguments, cache):
+                raise AssertionError("not used")
+
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=FailingExecutor(),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+            ]),
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertFalse(hasattr(caught.exception, "failure_layer"))
+        self.assertFalse(hasattr(caught.exception, "tool_calls"))
 
     def test_route_node_uses_real_hybrid_router_contract(self):
         visited = []

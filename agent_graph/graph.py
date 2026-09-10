@@ -6,15 +6,19 @@ from langgraph.graph import END, START, StateGraph
 
 from .nodes import (
     AgentGraphNodes,
+    agent_finalize_node,
+    agent_step_node,
     deterministic_generate_node,
     deterministic_tool_node,
     direct_node,
     fallback_node,
     finalize_node,
+    execute_tool_node,
     rag_generate_node,
     retrieve_node,
     route_node,
     select_agent_step_edge,
+    select_retrieve_edge,
     select_route_edge,
 )
 from .state import AgentState
@@ -32,8 +36,15 @@ def build_agent_graph(nodes: AgentGraphNodes):
         "rag_generate",
         partial(rag_generate_node, complete_chat=nodes.complete_chat),
     )
-    graph.add_node("agent_step", nodes.agent_step)
-    graph.add_node("execute_tool", nodes.execute_tool)
+    graph.add_node(
+        "agent_step",
+        partial(agent_step_node, complete_chat=nodes.complete_chat),
+    )
+    graph.add_node(
+        "execute_tool",
+        partial(execute_tool_node, executor=nodes.executor),
+    )
+    graph.add_node("agent_finalize", agent_finalize_node)
     graph.add_node(
         "deterministic_tool",
         partial(deterministic_tool_node, executor=nodes.executor),
@@ -64,14 +75,21 @@ def build_agent_graph(nodes: AgentGraphNodes):
             "fallback": "fallback",
         },
     )
-    graph.add_edge("retrieve", "rag_generate")
+    graph.add_conditional_edges(
+        "retrieve",
+        select_retrieve_edge,
+        {
+            "agent_step": "agent_step",
+            "rag_generate": "rag_generate",
+        },
+    )
     graph.add_edge("rag_generate", "finalize")
     graph.add_conditional_edges(
         "agent_step",
         select_agent_step_edge,
         {
             "execute_tool": "execute_tool",
-            "end": END,
+            "agent_finalize": "agent_finalize",
         },
     )
     graph.add_edge("execute_tool", "agent_step")
@@ -80,6 +98,7 @@ def build_agent_graph(nodes: AgentGraphNodes):
     graph.add_edge("direct", "finalize")
     graph.add_edge("fallback", "finalize")
     graph.add_edge("finalize", END)
+    graph.add_edge("agent_finalize", END)
 
     return graph.compile()
 
