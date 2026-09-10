@@ -8,7 +8,7 @@ from agent.executor import ToolExecutor, ToolObservation
 from agent.models import AgentDeadlineExceeded
 from knowledge_pipeline.models import SourceRef
 from support_tools import ProductSearchResult, ToolError, ToolErrorCode
-from trace_models import FailureLayer
+from trace_models import FailureLayer, ToolTrace
 
 
 BASE_MESSAGES = [
@@ -129,6 +129,40 @@ class AgentLoopTests(unittest.TestCase):
             result.sources,
             (source_a, source_b, source_b, source_c),
         )
+
+    def test_inconsistent_success_uses_success_branch_without_adding_failure(self):
+        from agent.loop import AgentLoop
+
+        source = SourceRef(title="来源", url="https://example.com/source")
+        observation = ToolObservation(
+            content='{"ok":true,"result":{}}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name="get_contact_info",
+            error_code="TOOL_EXECUTION_ERROR",
+            sources=(source,),
+        )
+
+        result = AgentLoop(
+            executor=RecordingExecutor(observation),
+            complete_chat=FakeCompleteChat([
+                tool_completion("call-1", "get_contact_info", "{}"),
+                text_completion("答案"),
+            ]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(result.sources, (source,))
+        self.assertEqual(
+            result.tool_calls,
+            (ToolTrace(
+                name="get_contact_info",
+                success=True,
+                error_code="TOOL_EXECUTION_ERROR",
+                reused=False,
+            ),),
+        )
+        self.assertIsNone(result.failure_layer)
 
     def test_successful_and_cached_proposals_return_individually_paired_traces(self):
         from agent.loop import AgentLoop

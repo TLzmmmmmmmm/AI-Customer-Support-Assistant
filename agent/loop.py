@@ -12,6 +12,11 @@ from .models import (
     llm_tool_schemas,
     normalize_agent_turn,
 )
+from .tool_outcomes import (
+    successful_tool_sources,
+    tool_failure_from_trace,
+    tool_trace_from_observation,
+)
 from trace_models import FailureLayer, ToolTrace
 
 
@@ -98,15 +103,10 @@ class AgentLoop:
             )
 
         def record(observation) -> None:
-            trace = ToolTrace(
-                name=observation.tool_name,
-                success=observation.success,
-                error_code=observation.error_code,
-                reused=observation.reused,
-            )
+            trace = tool_trace_from_observation(observation)
             tool_traces.append(trace)
             if trace.success:
-                successful_sources.extend(observation.sources)
+                successful_sources.extend(successful_tool_sources(observation))
                 pending_failures[:] = [
                     item
                     for item in pending_failures
@@ -121,18 +121,10 @@ class AgentLoop:
                         )
                     )
                 ]
-            elif trace.error_code == "INVALID_ARGUMENT":
-                layer = (
-                    FailureLayer.TOOL_SELECTION
-                    if trace.name == "tool_executor"
-                    else FailureLayer.ARGUMENT_GENERATION
-                )
-                pending_failures.append((layer, trace.name))
-            elif trace.error_code in {
-                "TOOL_EXECUTION_ERROR",
-                "TOOL_UNAVAILABLE",
-            }:
-                pending_failures.append((FailureLayer.TOOL_EXECUTION, trace.name))
+            else:
+                failure = tool_failure_from_trace(trace)
+                if failure is not None:
+                    pending_failures.append((failure, trace.name))
 
         while True:
             tools_enabled = processed_calls < MAX_TOOL_CALLS

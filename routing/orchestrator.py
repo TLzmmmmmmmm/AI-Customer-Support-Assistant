@@ -7,7 +7,11 @@ from agent import (
     AgentLoop,
     SAFE_AGENT_ANSWER,
     ToolExecutor,
-    normalize_agent_turn,
+)
+from agent.tool_outcomes import (
+    successful_tool_sources,
+    tool_failure_from_trace,
+    tool_trace_from_observation,
 )
 from models import ChatMessage
 from prompts import build_direct_messages, build_rag_messages, build_tool_messages
@@ -18,18 +22,13 @@ from .deterministic import (
     DETERMINISTIC_TOOL_ROUTES,
     execute_deterministic_route,
 )
+from .errors import set_failure_layer as _set_failure_layer
+from .generation import generate_answer
 from .knowledge import retrieval_sources, retrieve_knowledge
 from .models import Route, RouteExecutionResult, RouteTrace
 
 
 SAFE_FALLBACK_ANSWER = "目前无法根据现有资料可靠确认这项信息。"
-
-
-def _set_failure_layer(error: Exception, layer: FailureLayer) -> None:
-    try:
-        error.failure_layer = layer
-    except (AttributeError, TypeError):
-        pass
 
 
 def _set_error_context(
@@ -48,25 +47,6 @@ def _set_error_context(
             setattr(error, name, value)
         except (AttributeError, TypeError):
             pass
-
-
-def _tool_trace(observation) -> ToolTrace:
-    return ToolTrace(
-        name=observation.tool_name,
-        success=observation.success,
-        error_code=observation.error_code,
-        reused=observation.reused,
-    )
-
-
-def _tool_failure(trace: ToolTrace) -> FailureLayer | None:
-    if trace.error_code in {"TOOL_EXECUTION_ERROR", "TOOL_UNAVAILABLE"}:
-        return FailureLayer.TOOL_EXECUTION
-    if trace.error_code == "INVALID_ARGUMENT":
-        if trace.name == "tool_executor":
-            return FailureLayer.TOOL_SELECTION
-        return FailureLayer.ARGUMENT_GENERATION
-    return None
 
 
 class RouteOrchestrator:
@@ -170,10 +150,9 @@ class RouteOrchestrator:
                 _set_failure_layer(error, FailureLayer.TOOL_EXECUTION)
                 _set_error_context(error, route=decision.route)
                 raise
-            tool_trace = _tool_trace(observation)
-            tool_failure = _tool_failure(tool_trace)
-            if observation.success:
-                tool_sources = observation.sources
+            tool_trace = tool_trace_from_observation(observation)
+            tool_failure = tool_failure_from_trace(tool_trace)
+            tool_sources = successful_tool_sources(observation)
             provider_messages = build_tool_messages(
                 messages,
                 route=decision.route.value,
@@ -181,9 +160,10 @@ class RouteOrchestrator:
             )
 
         try:
-            answer, generation_failure = self._generate(
+            answer, generation_failure = generate_answer(
                 provider_messages,
-                deadline,
+                deadline=deadline,
+                complete_chat=self._complete_chat,
             )
         except Exception as error:
             _set_failure_layer(error, FailureLayer.GENERATION)
@@ -209,24 +189,5 @@ class RouteOrchestrator:
                 else retrieved_sources + tool_sources
             ),
         )
-
-    def _generate(self, messages, deadline):
-        deadline.ensure_active()
-        try:
-            completion = self._complete_chat(messages)
-        except Exception as error:
-            _set_failure_layer(error, FailureLayer.GENERATION)
-            raise
-        deadline.ensure_active()
-        turn = normalize_agent_turn(completion)
-        if (
-            turn is None
-            or turn.tool_calls
-            or turn.content is None
-            or not turn.content.strip()
-        ):
-            return SAFE_AGENT_ANSWER, FailureLayer.GENERATION
-        return turn.content, None
-
 
 __all__ = ["RouteOrchestrator", "SAFE_FALLBACK_ANSWER"]

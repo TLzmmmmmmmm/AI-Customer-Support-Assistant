@@ -445,6 +445,29 @@ class RouteOrchestratorTests(unittest.TestCase):
                 self.assertEqual(result.trace.failure_layer, failure)
                 self.assertEqual(result.trace.tool_calls[0].error_code, error_code)
 
+    def test_tool_failure_takes_precedence_over_generation_failure(self):
+        from agent import SAFE_AGENT_ANSWER
+
+        executor = FakeExecutor(ToolObservation(
+            content=json.dumps({
+                "ok": False,
+                "error": {"code": "TOOL_EXECUTION_ERROR"},
+            }),
+            success=False,
+            reused=False,
+            cache_key=None,
+            tool_name="get_product_details",
+            error_code="TOOL_EXECUTION_ERROR",
+        ))
+        result = build_orchestrator(
+            RouteDecision(Route.EXACT_PRODUCT, product_id="ly198"),
+            executor=executor,
+            complete=FakeComplete([completion("partial", finish_reason="length")]),
+        ).run(chat("LY198 参数"), deadline=Deadline())
+
+        self.assertEqual(result.answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(result.trace.failure_layer, FailureLayer.TOOL_EXECUTION)
+
 
 if __name__ == "__main__":
     unittest.main()
