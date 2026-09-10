@@ -5,3 +5,4 @@ python-dotenv==1.2.3
 pydantic==2.13.4
 starlette==1.6.0
 numpy==2.5.2
+langgraph==1.2.11
