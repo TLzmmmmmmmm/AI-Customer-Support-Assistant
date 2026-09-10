@@ -10,6 +10,7 @@ from .nodes import (
     deterministic_tool_node,
     direct_node,
     fallback_node,
+    finalize_node,
     rag_generate_node,
     retrieve_node,
     route_node,
@@ -49,7 +50,7 @@ def build_agent_graph(nodes: AgentGraphNodes):
         partial(direct_node, complete_chat=nodes.complete_chat),
     )
     graph.add_node("fallback", fallback_node)
-    graph.add_node("finalize", nodes.finalize)
+    graph.add_node("finalize", finalize_node)
 
     graph.add_edge(START, "route")
     graph.add_conditional_edges(
@@ -70,7 +71,7 @@ def build_agent_graph(nodes: AgentGraphNodes):
         select_agent_step_edge,
         {
             "execute_tool": "execute_tool",
-            "finalize": "finalize",
+            "end": END,
         },
     )
     graph.add_edge("execute_tool", "agent_step")

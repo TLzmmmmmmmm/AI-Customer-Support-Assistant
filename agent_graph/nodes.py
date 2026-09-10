@@ -19,6 +19,7 @@ from routing.deterministic import (
     execute_deterministic_route,
 )
 from routing.generation import generate_answer
+from routing.finalization import finalize_non_agentic_route
 from routing.knowledge import retrieval_sources, retrieve_knowledge
 
 from .state import AgentState
@@ -36,7 +37,6 @@ class AgentGraphNodes:
     complete_chat: CompleteChat
     agent_step: AgentGraphNode
     execute_tool: AgentGraphNode
-    finalize: AgentGraphNode
 
 
 def route_node(
@@ -48,7 +48,10 @@ def route_node(
         state["messages"],
         deadline=state["deadline"],
     )
-    return {"route_decision": routing.decision}
+    return {
+        "route_decision": routing.decision,
+        "routing_failure": routing.failure_layer,
+    }
 
 
 def deterministic_tool_node(
@@ -149,6 +152,19 @@ def fallback_node(state: AgentState) -> dict[str, object]:
     return {"answer": SAFE_FALLBACK_ANSWER}
 
 
+def finalize_node(state: AgentState) -> dict[str, object]:
+    decision = state["route_decision"]
+    result = finalize_non_agentic_route(
+        decision.route,
+        answer=state["answer"],
+        routing_failure=state.get("routing_failure"),
+        retrieval_results=state["retrieval_hits"],
+        tool_observation=state["tool_result"],
+        generation_failure=state.get("generation_failure"),
+    )
+    return {"result": result}
+
+
 def select_route_edge(
     state: AgentState,
 ) -> Literal[
@@ -172,10 +188,10 @@ def select_route_edge(
 
 def select_agent_step_edge(
     state: AgentState,
-) -> Literal["execute_tool", "finalize"]:
+) -> Literal["execute_tool", "end"]:
     if state["tool_call"] is not None:
         return "execute_tool"
-    return "finalize"
+    return "end"
 
 
 __all__ = [
@@ -185,6 +201,7 @@ __all__ = [
     "deterministic_tool_node",
     "direct_node",
     "fallback_node",
+    "finalize_node",
     "rag_generate_node",
     "retrieve_node",
     "route_node",

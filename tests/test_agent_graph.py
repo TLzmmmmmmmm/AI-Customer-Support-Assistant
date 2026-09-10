@@ -23,7 +23,9 @@ from routing import (
     HybridRouter,
     Route,
     RouteDecision,
+    RouteExecutionResult,
     RoutingResult,
+    ToolTrace,
 )
 from support_tools import (
     ContactInfoResult,
@@ -36,13 +38,14 @@ from support_tools import (
 
 
 class RecordingRouter:
-    def __init__(self, decision, visited):
+    def __init__(self, decision, visited, failure=None):
         self.decision = decision
         self.visited = visited
+        self.failure = failure
 
     def route(self, messages, *, deadline):
         self.visited.append("route")
-        return RoutingResult(self.decision)
+        return RoutingResult(self.decision, self.failure)
 
 
 class RecordingRetriever:
@@ -124,14 +127,14 @@ def _initial_state(*, deadline=None, question="测试问题"):
     }
 
 
-def _retrieval_result(source):
+def _retrieval_result(source, *, chunk_id="solution:test:content"):
     return RetrievalResult.model_validate({
         "rank": 1,
         "score": 0.9,
         "match_origin": "dense",
         "matched_entity_ids": [],
-        "chunk_id": "solution:test:content",
-        "parent_document_id": "solution:test",
+        "chunk_id": chunk_id,
+        "parent_document_id": chunk_id.rsplit(":", 1)[0],
         "type": "solution",
         "section": "方案介绍",
         "text": "# 测试方案\n\n方案内容。",
@@ -164,6 +167,7 @@ def _nodes(
     executor=None,
     retriever=None,
     complete_chat=None,
+    routing_failure=None,
     **overrides,
 ):
     decision = decision or RouteDecision(Route.DIRECT)
@@ -171,6 +175,7 @@ def _nodes(
         router = RecordingRouter(
             decision,
             visited,
+            routing_failure,
         )
     if complete_chat is None:
         if decision.route == Route.KNOWLEDGE:
@@ -191,7 +196,6 @@ def _nodes(
     names = (
         "agent_step",
         "execute_tool",
-        "finalize",
     )
     return AgentGraphNodes(
         router=router,
@@ -213,12 +217,13 @@ class AgentGraphTests(unittest.TestCase):
             decision=RouteDecision(Route.KNOWLEDGE),
         ))
 
-        graph.invoke(_initial_state())
+        result = graph.invoke(_initial_state())
 
         self.assertEqual(
             visited,
-            ["route", "retrieve", "rag_generate", "finalize"],
+            ["route", "retrieve", "rag_generate"],
         )
+        self.assertIsInstance(result["result"], RouteExecutionResult)
 
     def test_rag_path_stores_real_hits_and_overwrites_sources(self):
         visited = []
@@ -248,8 +253,13 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(deadline.checks, 4)
         self.assertEqual(
             visited,
-            ["route", "retrieve", "rag_generate", "finalize"],
+            ["route", "retrieve", "rag_generate"],
         )
+        self.assertEqual(
+            result["result"].trace.retrieved_chunk_ids,
+            ("solution:test:content",),
+        )
+        self.assertEqual(result["result"].sources, (source,))
 
     def test_rag_path_zero_hits_overwrites_state_with_empty_tuples(self):
         visited = []
@@ -270,6 +280,8 @@ class AgentGraphTests(unittest.TestCase):
 
         self.assertEqual(result["retrieval_hits"], ())
         self.assertEqual(result["sources"], ())
+        self.assertEqual(result["result"].trace.retrieved_chunk_ids, ())
+        self.assertEqual(result["result"].sources, ())
 
     def test_rag_path_propagates_retrieval_failure_unchanged(self):
         visited = []
@@ -295,9 +307,11 @@ class AgentGraphTests(unittest.TestCase):
 
         result = graph.invoke(_initial_state())
 
-        self.assertEqual(visited, ["route", "direct", "finalize"])
+        self.assertEqual(visited, ["route", "direct"])
         self.assertEqual(result["answer"], "generated answer")
         self.assertIsNone(result["generation_failure"])
+        self.assertEqual(result["result"].trace.route, Route.DIRECT)
+        self.assertEqual(result["result"].sources, ())
 
     def test_fallback_path_goes_directly_to_finalization(self):
         visited = []
@@ -308,11 +322,12 @@ class AgentGraphTests(unittest.TestCase):
 
         result = graph.invoke(_initial_state())
 
-        self.assertEqual(visited, ["route", "finalize"])
+        self.assertEqual(visited, ["route"])
         self.assertEqual(result["answer"], SAFE_FALLBACK_ANSWER)
         self.assertNotIn("generation_failure", result)
+        self.assertEqual(result["result"].answer, SAFE_FALLBACK_ANSWER)
 
-    def test_agent_path_executes_one_tool_then_finalizes(self):
+    def test_agent_path_executes_one_tool_then_ends_without_non_agentic_result(self):
         visited = []
         call = AgentToolCall(
             id="call-1",
@@ -360,29 +375,29 @@ class AgentGraphTests(unittest.TestCase):
                 "agent_step",
                 "execute_tool",
                 "agent_step",
-                "finalize",
             ],
         )
         self.assertEqual(result["answer"], "agent answer")
         self.assertEqual(result["tool_result"], observation)
+        self.assertNotIn("result", result)
 
     def test_non_agentic_routes_follow_production_mapping(self):
         cases = (
             (
                 Route.PRODUCT_SEARCH,
-                ["route", "deterministic_tool", "deterministic_generate", "finalize"],
+                ["route", "deterministic_tool", "deterministic_generate"],
             ),
             (
                 Route.EXACT_PRODUCT,
-                ["route", "deterministic_tool", "deterministic_generate", "finalize"],
+                ["route", "deterministic_tool", "deterministic_generate"],
             ),
             (
                 Route.CONTACT,
-                ["route", "deterministic_tool", "deterministic_generate", "finalize"],
+                ["route", "deterministic_tool", "deterministic_generate"],
             ),
-            (Route.KNOWLEDGE, ["route", "retrieve", "rag_generate", "finalize"]),
-            (Route.DIRECT, ["route", "direct", "finalize"]),
-            (Route.FALLBACK, ["route", "finalize"]),
+            (Route.KNOWLEDGE, ["route", "retrieve", "rag_generate"]),
+            (Route.DIRECT, ["route", "direct"]),
+            (Route.FALLBACK, ["route"]),
         )
 
         for route, expected in cases:
@@ -393,9 +408,10 @@ class AgentGraphTests(unittest.TestCase):
                     decision=RouteDecision(route, agentic=False),
                 ))
 
-                graph.invoke(_initial_state())
+                result = graph.invoke(_initial_state())
 
                 self.assertEqual(visited, expected)
+                self.assertIsInstance(result["result"], RouteExecutionResult)
 
     def test_deterministic_routes_store_real_observations_and_sources(self):
         source = SourceRef(
@@ -506,7 +522,23 @@ class AgentGraphTests(unittest.TestCase):
                         "user_question": question,
                     },
                 )
-                self.assertEqual(visited, ["route", "finalize"])
+                execution = result["result"]
+                self.assertIsInstance(execution, RouteExecutionResult)
+                self.assertEqual(execution.answer, "工具回答")
+                self.assertEqual(execution.trace.route, decision.route)
+                self.assertEqual(
+                    execution.trace.tool_calls,
+                    (ToolTrace(
+                        name=result["tool_result"].tool_name,
+                        success=True,
+                        reused=False,
+                    ),),
+                )
+                self.assertEqual(execution.trace.tool_call_count, 1)
+                self.assertEqual(execution.trace.retrieved_chunk_ids, ())
+                self.assertIsNone(execution.trace.failure_layer)
+                self.assertEqual(execution.sources, (source,))
+                self.assertEqual(visited, ["route"])
 
     def test_failed_deterministic_observation_clears_sources(self):
         stale_source = SourceRef(
@@ -541,23 +573,41 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(result["tool_result"].error_code, "PRODUCT_NOT_FOUND")
         self.assertIsNone(result["tool_failure"])
         self.assertEqual(result["sources"], ())
+        self.assertEqual(result["result"].trace.tool_call_count, 1)
+        self.assertIsNone(result["result"].trace.failure_layer)
+        self.assertEqual(result["result"].sources, ())
 
     def test_failed_deterministic_execution_writes_classified_tool_failure(self):
         def broken():
             raise RuntimeError("private")
 
+        invalid = SimpleNamespace(choices=[SimpleNamespace(
+            finish_reason="length",
+            message=SimpleNamespace(content="partial", tool_calls=None),
+        )])
         graph = build_agent_graph(_nodes(
             [],
             decision=RouteDecision(Route.CONTACT),
             executor=ToolExecutor(MappingProxyType({
                 "get_contact_info": broken,
             })),
+            complete_chat=RecordingCompletion([invalid]),
         ))
 
         result = graph.invoke(_initial_state())
 
         self.assertEqual(result["tool_failure"], FailureLayer.TOOL_EXECUTION)
+        self.assertEqual(
+            result["generation_failure"],
+            FailureLayer.GENERATION,
+        )
         self.assertEqual(result["sources"], ())
+        self.assertEqual(result["result"].answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(
+            result["result"].trace.failure_layer,
+            FailureLayer.TOOL_EXECUTION,
+        )
+        self.assertEqual(result["result"].sources, ())
 
     def test_rag_generation_uses_retrieved_context(self):
         source = SourceRef(
@@ -584,6 +634,39 @@ class AgentGraphTests(unittest.TestCase):
         self.assertIn('"text":"# 测试方案\\n\\n方案内容。"', provider_messages[-1]["content"])
         self.assertIn('"type":"solution"', provider_messages[-1]["content"])
         self.assertIn('"user_question":"方案是什么？"', provider_messages[-1]["content"])
+        self.assertEqual(result["result"].answer, "检索回答")
+        self.assertEqual(result["result"].trace.route, Route.KNOWLEDGE)
+        self.assertEqual(
+            result["result"].trace.retrieved_chunk_ids,
+            ("solution:test:content",),
+        )
+        self.assertEqual(result["result"].sources, (source,))
+
+    def test_rag_finalization_preserves_hit_and_source_order_and_duplicates(self):
+        first = SourceRef(title="A", url="https://example.com/a")
+        second = SourceRef(title="B", url="https://example.com/b")
+        hits = (
+            _retrieval_result(first, chunk_id="solution:first:content"),
+            _retrieval_result(second, chunk_id="solution:second:content"),
+            _retrieval_result(first, chunk_id="solution:third:content"),
+        )
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.KNOWLEDGE),
+            retriever=RecordingRetriever(hits),
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(
+            result["result"].trace.retrieved_chunk_ids,
+            (
+                "solution:first:content",
+                "solution:second:content",
+                "solution:third:content",
+            ),
+        )
+        self.assertEqual(result["result"].sources, (first, second, first))
 
     def test_zero_hit_rag_still_generates(self):
         complete = RecordingCompletion([_completion("无检索结果回答")])
@@ -631,6 +714,13 @@ class AgentGraphTests(unittest.TestCase):
                 {"role": "user", "content": "继续说明"},
             ],
         )
+        self.assertEqual(result["result"].answer, "直接回答")
+        self.assertEqual(result["result"].trace.route, Route.DIRECT)
+        self.assertEqual(result["result"].trace.tool_calls, ())
+        self.assertEqual(result["result"].trace.tool_call_count, 0)
+        self.assertEqual(result["result"].trace.retrieved_chunk_ids, ())
+        self.assertIsNone(result["result"].trace.failure_layer)
+        self.assertEqual(result["result"].sources, ())
 
     def test_invalid_direct_completion_stores_safe_generation_failure(self):
         invalid = SimpleNamespace(choices=[SimpleNamespace(
@@ -650,6 +740,31 @@ class AgentGraphTests(unittest.TestCase):
             result["generation_failure"],
             FailureLayer.GENERATION,
         )
+        self.assertEqual(result["result"].answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(
+            result["result"].trace.failure_layer,
+            FailureLayer.GENERATION,
+        )
+        self.assertEqual(result["result"].sources, ())
+
+    def test_invalid_rag_completion_suppresses_retrieval_sources(self):
+        source = SourceRef(title="资料", url="https://example.com/source")
+        invalid = SimpleNamespace(choices=[SimpleNamespace(
+            finish_reason="length",
+            message=SimpleNamespace(content="partial", tool_calls=None),
+        )])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.KNOWLEDGE),
+            retriever=RecordingRetriever([_retrieval_result(source)]),
+            complete_chat=RecordingCompletion([invalid]),
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(result["sources"], (source,))
+        self.assertEqual(result["result"].answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(result["result"].sources, ())
 
     def test_fallback_does_not_call_generation(self):
         complete = RecordingCompletion([_completion("must not be used")])
@@ -664,6 +779,27 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(result["answer"], SAFE_FALLBACK_ANSWER)
         self.assertEqual(complete.calls, [])
         self.assertNotIn("generation_failure", result)
+        self.assertEqual(result["result"].trace.route, Route.FALLBACK)
+        self.assertEqual(result["result"].trace.tool_calls, ())
+        self.assertEqual(result["result"].trace.tool_call_count, 0)
+        self.assertEqual(result["result"].trace.retrieved_chunk_ids, ())
+        self.assertIsNone(result["result"].trace.failure_layer)
+        self.assertEqual(result["result"].sources, ())
+
+    def test_route_node_stores_routing_failure_for_fallback_finalization(self):
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.FALLBACK),
+            routing_failure=FailureLayer.ROUTING,
+        ))
+
+        result = graph.invoke(_initial_state())
+
+        self.assertEqual(result["routing_failure"], FailureLayer.ROUTING)
+        self.assertEqual(
+            result["result"].trace.failure_layer,
+            FailureLayer.ROUTING,
+        )
 
     def test_agentic_precedes_every_production_route(self):
         for route in Route:
@@ -680,10 +816,11 @@ class AgentGraphTests(unittest.TestCase):
 
                 self.assertEqual(
                     visited,
-                    ["route", "agent_step", "finalize"],
+                    ["route", "agent_step"],
                 )
                 self.assertEqual(complete.calls, [])
                 self.assertNotIn("generation_failure", result)
+                self.assertNotIn("result", result)
 
     def test_route_node_uses_real_hybrid_router_contract(self):
         visited = []
@@ -711,6 +848,8 @@ class AgentGraphTests(unittest.TestCase):
             result["route_decision"],
             RouteDecision(Route.DIRECT),
         )
+        self.assertIn("routing_failure", result)
+        self.assertIsNone(result["routing_failure"])
         self.assertEqual(retriever.queries, ["请说明相关情况"])
         self.assertEqual(deadline.checks, 4)
         self.assertEqual(len(complete.calls), 1)
@@ -724,7 +863,8 @@ class AgentGraphTests(unittest.TestCase):
                 {"role": "user", "content": "请说明相关情况"},
             ],
         )
-        self.assertEqual(visited, ["direct", "finalize"])
+        self.assertEqual(visited, ["direct"])
+        self.assertEqual(result["result"].trace.route, Route.DIRECT)
 
 
 if __name__ == "__main__":
