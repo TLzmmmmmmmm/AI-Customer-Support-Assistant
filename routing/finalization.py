@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from agent import SAFE_AGENT_ANSWER, ToolObservation
+from agent import AgentResult, SAFE_AGENT_ANSWER, ToolObservation
 from agent.tool_outcomes import (
     successful_tool_sources,
     tool_failure_from_trace,
@@ -17,6 +17,37 @@ from .models import Route, RouteExecutionResult, RouteTrace
 
 
 SAFE_FALLBACK_ANSWER = "目前无法根据现有资料可靠确认这项信息。"
+
+
+def finalize_agentic_route(
+    route: Route,
+    *,
+    agent_result: AgentResult,
+    retrieval_results: Sequence[RetrievalResult] = (),
+) -> RouteExecutionResult:
+    retrieved_chunk_ids = tuple(
+        result.chunk_id
+        for result in retrieval_results
+    )
+    sources = (
+        *retrieval_sources(retrieval_results),
+        *agent_result.sources,
+    )
+    return RouteExecutionResult(
+        answer=agent_result.answer,
+        trace=RouteTrace(
+            route=route,
+            tool_calls=agent_result.tool_calls,
+            tool_call_count=len(agent_result.tool_calls),
+            retrieved_chunk_ids=retrieved_chunk_ids,
+            failure_layer=agent_result.failure_layer,
+        ),
+        sources=(
+            ()
+            if agent_result.answer == SAFE_AGENT_ANSWER
+            else sources
+        ),
+    )
 
 
 def finalize_non_agentic_route(
@@ -77,4 +108,8 @@ def finalize_non_agentic_route(
     )
 
 
-__all__ = ["SAFE_FALLBACK_ANSWER", "finalize_non_agentic_route"]
+__all__ = [
+    "SAFE_FALLBACK_ANSWER",
+    "finalize_agentic_route",
+    "finalize_non_agentic_route",
+]

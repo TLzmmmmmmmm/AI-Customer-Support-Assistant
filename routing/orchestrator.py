@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from agent import (
     AgentDeadline,
     AgentLoop,
-    SAFE_AGENT_ANSWER,
     ToolExecutor,
 )
 from agent.tool_outcomes import (
@@ -21,10 +20,14 @@ from .deterministic import (
     execute_deterministic_route,
 )
 from .errors import set_failure_layer as _set_failure_layer
-from .finalization import SAFE_FALLBACK_ANSWER, finalize_non_agentic_route
+from .finalization import (
+    SAFE_FALLBACK_ANSWER,
+    finalize_agentic_route,
+    finalize_non_agentic_route,
+)
 from .generation import generate_answer
-from .knowledge import retrieval_sources, retrieve_knowledge
-from .models import Route, RouteExecutionResult, RouteTrace
+from .knowledge import retrieve_knowledge
+from .models import Route, RouteExecutionResult
 
 
 def _set_error_context(
@@ -100,7 +103,6 @@ class RouteOrchestrator:
             provider_messages = build_direct_messages(messages)
 
         retrieved_ids = tuple(item.chunk_id for item in retrieved)
-        retrieved_sources = retrieval_sources(retrieved)
         if decision.agentic:
             try:
                 result = self._agent_loop.run(provider_messages, deadline=deadline)
@@ -112,20 +114,10 @@ class RouteOrchestrator:
                     retrieved_chunk_ids=retrieved_ids,
                 )
                 raise
-            return RouteExecutionResult(
-                answer=result.answer,
-                trace=RouteTrace(
-                    route=decision.route,
-                    tool_calls=result.tool_calls,
-                    tool_call_count=len(result.tool_calls),
-                    retrieved_chunk_ids=retrieved_ids,
-                    failure_layer=result.failure_layer,
-                ),
-                sources=(
-                    ()
-                    if result.answer == SAFE_AGENT_ANSWER
-                    else retrieved_sources + result.sources
-                ),
+            return finalize_agentic_route(
+                decision.route,
+                agent_result=result,
+                retrieval_results=retrieved,
             )
 
         observation = None

@@ -1,6 +1,6 @@
 import unittest
 
-from agent import SAFE_AGENT_ANSWER, ToolObservation
+from agent import AgentResult, SAFE_AGENT_ANSWER, ToolObservation
 from knowledge_pipeline.models import SourceRef
 from knowledge_pipeline.retrieval.models import RetrievalResult
 from routing import (
@@ -11,7 +11,10 @@ from routing import (
     RouteTrace,
     ToolTrace,
 )
-from routing.finalization import finalize_non_agentic_route
+from routing.finalization import (
+    finalize_agentic_route,
+    finalize_non_agentic_route,
+)
 
 
 def retrieval_result(chunk_id, sources):
@@ -172,6 +175,96 @@ class NonAgenticFinalizationTests(unittest.TestCase):
                 Route.PRODUCT_SEARCH,
                 answer="回答",
             )
+
+
+class AgenticFinalizationTests(unittest.TestCase):
+    def test_knowledge_combines_ordered_retrieval_and_agent_result(self):
+        first = SourceRef(title="RAG A", url="https://example.com/rag-a")
+        second = SourceRef(title="RAG B", url="https://example.com/rag-b")
+        tool_source = SourceRef(
+            title="Tool",
+            url="https://example.com/tool",
+        )
+        tool_traces = (
+            ToolTrace("search_products", True),
+            ToolTrace("get_contact_info", False, "INVALID_ARGUMENT"),
+        )
+        agent_result = AgentResult(
+            answer="混合回答",
+            tool_calls=tool_traces,
+            failure_layer=FailureLayer.ARGUMENT_GENERATION,
+            sources=(tool_source, first),
+        )
+        retrieval_results = (
+            retrieval_result("solution:first:content", (first, second)),
+            retrieval_result("solution:second:content", (first,)),
+        )
+
+        result = finalize_agentic_route(
+            Route.KNOWLEDGE,
+            agent_result=agent_result,
+            retrieval_results=retrieval_results,
+        )
+
+        self.assertEqual(result, RouteExecutionResult(
+            answer="混合回答",
+            trace=RouteTrace(
+                route=Route.KNOWLEDGE,
+                tool_calls=tool_traces,
+                tool_call_count=2,
+                retrieved_chunk_ids=(
+                    "solution:first:content",
+                    "solution:second:content",
+                ),
+                failure_layer=FailureLayer.ARGUMENT_GENERATION,
+            ),
+            sources=(first, second, first, tool_source, first),
+        ))
+
+    def test_safe_answer_suppresses_retrieval_and_agent_sources(self):
+        retrieval_source = SourceRef(
+            title="RAG",
+            url="https://example.com/rag",
+        )
+        tool_source = SourceRef(
+            title="Tool",
+            url="https://example.com/tool",
+        )
+        agent_result = AgentResult(
+            answer=SAFE_AGENT_ANSWER,
+            tool_calls=(ToolTrace("get_contact_info", True),),
+            failure_layer=FailureLayer.GENERATION,
+            sources=(tool_source,),
+        )
+
+        result = finalize_agentic_route(
+            Route.KNOWLEDGE,
+            agent_result=agent_result,
+            retrieval_results=(retrieval_result(
+                "solution:test:content",
+                (retrieval_source,),
+            ),),
+        )
+
+        self.assertEqual(result.answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(result.sources, ())
+        self.assertEqual(
+            result.trace.failure_layer,
+            FailureLayer.GENERATION,
+        )
+
+    def test_non_knowledge_route_has_no_retrieval_evidence(self):
+        source = SourceRef(title="Tool", url="https://example.com/tool")
+        agent_result = AgentResult(answer="回答", sources=(source,))
+
+        result = finalize_agentic_route(
+            Route.EXACT_PRODUCT,
+            agent_result=agent_result,
+        )
+
+        self.assertEqual(result.trace.route, Route.EXACT_PRODUCT)
+        self.assertEqual(result.trace.retrieved_chunk_ids, ())
+        self.assertEqual(result.sources, (source,))
 
 
 if __name__ == "__main__":

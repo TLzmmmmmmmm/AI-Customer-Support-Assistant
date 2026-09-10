@@ -85,6 +85,112 @@ class RecordingExecutor:
 
 
 class AgentLoopTests(unittest.TestCase):
+    def test_provider_exception_keeps_original_error_and_current_traces(self):
+        from agent.loop import AgentLoop
+
+        expected = RuntimeError("provider unavailable")
+        complete = FakeCompleteChat([
+            tool_completion("call-1", "get_contact_info", "{}"),
+            expected,
+        ])
+
+        with self.assertRaises(RuntimeError) as caught:
+            AgentLoop(
+                executor=RecordingExecutor(),
+                complete_chat=complete,
+            ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_SELECTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, (
+            ToolTrace(name="tool_executor", success=True),
+        ))
+
+    def test_unexpected_executor_exception_remains_unannotated(self):
+        from agent.loop import AgentLoop
+
+        expected = RuntimeError("executor infrastructure failure")
+
+        class FailingExecutor:
+            def execute(self, call, successful_observations):
+                raise expected
+
+        with self.assertRaises(RuntimeError) as caught:
+            AgentLoop(
+                executor=FailingExecutor(),
+                complete_chat=FakeCompleteChat([
+                    tool_completion("call-1", "get_contact_info", "{}"),
+                ]),
+            ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertIs(caught.exception, expected)
+        self.assertFalse(hasattr(caught.exception, "failure_layer"))
+        self.assertFalse(hasattr(caught.exception, "tool_calls"))
+
+    def test_deadline_expiry_after_tool_records_new_trace_before_raising(self):
+        from agent.loop import AgentLoop
+
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
+            AgentLoop(
+                executor=RecordingExecutor(),
+                complete_chat=FakeCompleteChat([
+                    tool_completion("call-1", "get_contact_info", "{}"),
+                ]),
+            ).run(BASE_MESSAGES, deadline=RecordingDeadline(fail_on=4))
+
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_EXECUTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, (
+            ToolTrace(name="tool_executor", success=True),
+        ))
+
+    def test_earliest_unrecovered_failure_wins_terminal_result(self):
+        from agent.loop import AgentLoop
+
+        class SequentialExecutor:
+            def __init__(self):
+                self.observations = deque([
+                    ToolObservation(
+                        content='{"ok":false}',
+                        success=False,
+                        reused=False,
+                        cache_key=None,
+                        tool_name="get_contact_info",
+                        error_code="TOOL_EXECUTION_ERROR",
+                    ),
+                    ToolObservation(
+                        content='{"ok":false}',
+                        success=False,
+                        reused=False,
+                        cache_key=None,
+                        tool_name="search_products",
+                        error_code="INVALID_ARGUMENT",
+                    ),
+                ])
+
+            def execute(self, call, successful_observations):
+                return self.observations.popleft()
+
+        result = AgentLoop(
+            executor=SequentialExecutor(),
+            complete_chat=FakeCompleteChat([
+                tool_completion("call-1", "get_contact_info", "{}"),
+                tool_completion(
+                    "call-2",
+                    "search_products",
+                    '{"query":"酒店"}',
+                ),
+                text_completion("最终回答"),
+            ]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(result.failure_layer, FailureLayer.TOOL_EXECUTION)
+
     def test_successful_tool_sources_are_preserved_in_execution_order(self):
         from agent.loop import AgentLoop
 
