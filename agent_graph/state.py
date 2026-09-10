@@ -7,6 +7,7 @@ from knowledge_pipeline.models import SourceRef
 from knowledge_pipeline.retrieval.models import RetrievalResult
 from models import ChatMessage
 from routing import RouteDecision
+from trace_models import FailureLayer
 
 
 class AgentState(TypedDict):
@@ -17,6 +18,8 @@ class AgentState(TypedDict):
     retrieval_hits: tuple[RetrievalResult, ...]
     tool_call: AgentToolCall | None
     tool_result: ToolObservation | None
+    tool_failure: NotRequired[FailureLayer | None]
+    generation_failure: NotRequired[FailureLayer | None]
     answer: str | None
     sources: tuple[SourceRef, ...]
     error: Exception | None

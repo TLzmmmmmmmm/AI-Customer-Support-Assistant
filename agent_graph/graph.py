@@ -6,7 +6,11 @@ from langgraph.graph import END, START, StateGraph
 
 from .nodes import (
     AgentGraphNodes,
+    deterministic_generate_node,
     deterministic_tool_node,
+    direct_node,
+    fallback_node,
+    rag_generate_node,
     retrieve_node,
     route_node,
     select_agent_step_edge,
@@ -23,15 +27,28 @@ def build_agent_graph(nodes: AgentGraphNodes):
         "retrieve",
         partial(retrieve_node, retriever=nodes.retriever),
     )
-    graph.add_node("rag_generate", nodes.rag_generate)
+    graph.add_node(
+        "rag_generate",
+        partial(rag_generate_node, complete_chat=nodes.complete_chat),
+    )
     graph.add_node("agent_step", nodes.agent_step)
     graph.add_node("execute_tool", nodes.execute_tool)
     graph.add_node(
         "deterministic_tool",
         partial(deterministic_tool_node, executor=nodes.executor),
     )
-    graph.add_node("direct", nodes.direct)
-    graph.add_node("fallback", nodes.fallback)
+    graph.add_node(
+        "deterministic_generate",
+        partial(
+            deterministic_generate_node,
+            complete_chat=nodes.complete_chat,
+        ),
+    )
+    graph.add_node(
+        "direct",
+        partial(direct_node, complete_chat=nodes.complete_chat),
+    )
+    graph.add_node("fallback", fallback_node)
     graph.add_node("finalize", nodes.finalize)
 
     graph.add_edge(START, "route")
@@ -57,7 +74,8 @@ def build_agent_graph(nodes: AgentGraphNodes):
         },
     )
     graph.add_edge("execute_tool", "agent_step")
-    graph.add_edge("deterministic_tool", "finalize")
+    graph.add_edge("deterministic_tool", "deterministic_generate")
+    graph.add_edge("deterministic_generate", "finalize")
     graph.add_edge("direct", "finalize")
     graph.add_edge("fallback", "finalize")
     graph.add_edge("finalize", END)
