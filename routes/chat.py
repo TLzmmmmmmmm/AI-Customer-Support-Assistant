@@ -1,6 +1,7 @@
 import json
 import time
 from collections.abc import Iterator
+from dataclasses import replace
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -17,7 +18,8 @@ from concurrency import (
     try_acquire_llm_slot,
 )
 from app_logging import log_request
-from agent import AgentDeadline, AgentDeadlineExceeded
+from agent import AgentDeadline, AgentDeadlineExceeded, SAFE_AGENT_ANSWER
+from citation import render_answer
 from config import AGENT_TIMEOUT_SECONDS
 from routing import RouteOrchestrator, RouteTrace
 
@@ -87,7 +89,28 @@ def chat_stream(
             payload.messages,
             deadline=deadline,
         )
-        request.state.route_trace = route_result.trace
+        rendered = render_answer(
+            route_result.answer,
+            route_result.sources,
+            fallback=SAFE_AGENT_ANSWER,
+            language_hint=payload.messages[-1].content,
+        )
+        citation_status = (
+            "degraded"
+            if rendered.invalid_source_count
+            else "rendered"
+            if rendered.sources
+            else "none"
+        )
+        trace = replace(
+            route_result.trace,
+            citation_count=len(rendered.sources),
+            deduplicated_citation_count=rendered.deduplicated_count,
+            invalid_source_count=rendered.invalid_source_count,
+            citation_status=citation_status,
+            answer_sanitized=rendered.answer_sanitized,
+        )
+        request.state.route_trace = trace
 
     except RetrievalError as error:
         _remember_error_trace(request, error)
@@ -148,10 +171,10 @@ def chat_stream(
 
     return StreamingResponse(
         answer_events_with_slot(
-            route_result.answer,
+            rendered.text,
             request_id,
             started_at,
-            route_result.trace,
+            trace,
         ),
         media_type="application/x-ndjson",
     )

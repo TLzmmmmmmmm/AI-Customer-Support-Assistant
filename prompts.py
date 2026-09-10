@@ -479,10 +479,22 @@ RAG_SYSTEM_INSTRUCTIONS = """
 
 """
 
+CITATION_GENERATION_POLICY = """
+## Citation output boundary
+
+Do not output URLs in the answer.
+Do not write a references or citation section.
+Do not invent or rewrite source titles.
+The backend adds trusted references after generation.
+""".strip()
+
+
 SYSTEM_PROMPT = (
     BASE_SYSTEM_PROMPT.rstrip()
     + "\n\n"
     + RAG_SYSTEM_INSTRUCTIONS.strip()
+    + "\n\n"
+    + CITATION_GENERATION_POLICY
 )
 
 RAG_DATA_NOTICE = (

@@ -110,6 +110,11 @@ class ErrorHandlingPrivacyTests(unittest.TestCase):
             ),),
             tool_call_count=1,
             retrieved_chunk_ids=("solution:hotel:content",),
+            citation_count=2,
+            deduplicated_citation_count=1,
+            invalid_source_count=1,
+            citation_status="degraded",
+            answer_sanitized=True,
         )
         private_values = (
             "private user question",
@@ -137,6 +142,11 @@ class ErrorHandlingPrivacyTests(unittest.TestCase):
         self.assertIn("tool_call_count=1", message)
         self.assertIn('retrieved_chunk_ids=["solution:hotel:content"]', message)
         self.assertIn("failure_layer=-", message)
+        self.assertIn("citation_count=2", message)
+        self.assertIn("deduplicated_citation_count=1", message)
+        self.assertIn("invalid_source_count=1", message)
+        self.assertIn("citation_status=degraded", message)
+        self.assertIn("answer_sanitized=True", message)
         for value in private_values:
             self.assertNotIn(value, message)
 

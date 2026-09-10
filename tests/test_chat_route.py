@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from agent import AgentDeadlineExceeded
+from knowledge_pipeline.models import SourceRef
 from knowledge_pipeline.retrieval.models import (
     EmbeddingAPIError,
     EntityCatalogError,
@@ -30,10 +31,11 @@ def status_error(status_code: int) -> APIStatusError:
 
 
 class FakeOrchestrator:
-    def __init__(self, *, events, answer="完整回答", error=None):
+    def __init__(self, *, events, answer="完整回答", error=None, sources=()):
         self.events = events
         self.answer = answer
         self.error = error
+        self.sources = sources
         self.calls = []
 
     def run(self, messages, *, deadline):
@@ -48,6 +50,7 @@ class FakeOrchestrator:
                 tool_calls=(ToolTrace(name="search_products", success=True),),
                 tool_call_count=1,
             ),
+            sources=tuple(self.sources),
         )
 
 
@@ -123,6 +126,80 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             started_at=1.0,
             trace=trace,
         )
+
+    def test_final_delta_removes_model_urls_and_appends_only_trusted_citations(self):
+        trusted = SourceRef(
+            title="LY198 产品详情",
+            url="https://trusted.example/products/ly198/",
+        )
+        orchestrator = FakeOrchestrator(
+            events=[],
+            answer=(
+                "LY198 功率信息。详情见 "
+                "[产品页](https://fake.example/ly198)。\n\n"
+                "参考资料：\nFake：https://fake.example/source"
+            ),
+            sources=(trusted,),
+        )
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot"),
+            patch.object(chat, "log_request"),
+        ):
+            response = chat.chat_stream(
+                self.payload,
+                self.request,
+                None,
+                orchestrator,
+            )
+            body = asyncio.run(consume_response(response))
+
+        events = [json.loads(line) for line in body.splitlines()]
+        self.assertEqual(events, [
+            {
+                "type": "delta",
+                "content": (
+                    "LY198 功率信息。详情见 产品页。\n\n"
+                    "参考资料：\n"
+                    "LY198 产品详情：https://trusted.example/products/ly198/"
+                ),
+            },
+            {"type": "done"},
+        ])
+        self.assertNotIn("fake.example", body)
+        self.assertEqual(self.request.state.route_trace.citation_count, 1)
+        self.assertTrue(self.request.state.route_trace.answer_sanitized)
+
+    def test_empty_sanitized_answer_uses_safe_answer_without_references(self):
+        from agent import SAFE_AGENT_ANSWER
+
+        orchestrator = FakeOrchestrator(
+            events=[],
+            answer="References:\nhttps://fake.example",
+            sources=(SourceRef(
+                title="Trusted",
+                url="https://trusted.example/source",
+            ),),
+        )
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot"),
+            patch.object(chat, "log_request"),
+        ):
+            response = chat.chat_stream(
+                self.payload, self.request, None, orchestrator
+            )
+            body = asyncio.run(consume_response(response))
+
+        events = [json.loads(line) for line in body.splitlines()]
+        self.assertEqual(events[0], {
+            "type": "delta",
+            "content": SAFE_AGENT_ANSWER,
+        })
+        self.assertNotIn("References:", body)
+        self.assertEqual(self.request.state.route_trace.citation_count, 0)
 
     def test_known_errors_keep_existing_http_mapping_and_release_slot(self):
         request = httpx.Request("POST", "https://example.com/chat")

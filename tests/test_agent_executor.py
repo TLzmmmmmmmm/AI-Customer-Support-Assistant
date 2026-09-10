@@ -5,6 +5,7 @@ from types import MappingProxyType
 from agent.models import AgentToolCall
 from support_tools import (
     ContactInfoResult,
+    ProductSearchItem,
     ProductSearchResult,
     ToolError,
     ToolErrorCode,
@@ -12,6 +13,50 @@ from support_tools import (
 
 
 class AgentExecutorTests(unittest.TestCase):
+    def test_success_preserves_structured_sources_across_cache_reuse(self):
+        from agent.executor import ToolExecutor
+        from knowledge_pipeline.models import SourceRef
+
+        source = SourceRef(
+            title="LY198 产品详情",
+            url="https://example.com/products/ly198/",
+        )
+
+        def search_products(query):
+            return ProductSearchResult(products=[ProductSearchItem(
+                product_id="ly198",
+                name="LY198",
+                category_id="two-way-radio",
+                category_name="对讲机",
+                relevant_content="候选产品",
+                sources=[source],
+            )])
+
+        executor = ToolExecutor(MappingProxyType({
+            "search_products": search_products,
+        }))
+        cache = {}
+
+        first = executor.execute_named(
+            "search_products", {"query": "对讲机"}, cache
+        )
+        reused = executor.execute_named(
+            "search_products", {"query": "对讲机"}, cache
+        )
+
+        self.assertEqual(first.sources, (source,))
+        self.assertEqual(reused.sources, (source,))
+        self.assertTrue(reused.reused)
+
+    def test_failed_observation_has_no_sources(self):
+        from agent.executor import ToolExecutor
+
+        result = ToolExecutor(MappingProxyType({})).execute_named(
+            "get_contact_info", {}, {}
+        )
+
+        self.assertEqual(result.sources, ())
+
     def test_named_and_native_calls_share_validation_execution_and_cache(self):
         from agent.executor import ToolExecutor
 

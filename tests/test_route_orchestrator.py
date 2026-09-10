@@ -4,6 +4,7 @@ from collections import deque
 from types import SimpleNamespace
 
 from agent import AgentDeadlineExceeded, AgentResult, ToolObservation
+from knowledge_pipeline.models import SourceRef
 from models import ChatMessage
 from routing import (
     FailureLayer,
@@ -94,12 +95,20 @@ def chat(question="用户问题"):
     return [ChatMessage(role="user", content=question)]
 
 
-def retrieval_result(chunk_id="solution:emergency:content"):
+def retrieval_result(
+    chunk_id="solution:emergency:content",
+    source=None,
+):
+    source = source or SourceRef(
+        title="应急通信解决方案",
+        url="https://example.com/solutions/emergency/",
+    )
     return SimpleNamespace(
         chunk_id=chunk_id,
         type="solution",
         section="应急通信",
         text="# 应急通信\n\n解决方案内容",
+        sources=[source],
     )
 
 
@@ -117,6 +126,96 @@ def build_orchestrator(decision, *, router_failure=None, retriever=None,
 
 
 class RouteOrchestratorTests(unittest.TestCase):
+    def test_knowledge_preserves_retrieved_sources(self):
+        source = SourceRef(
+            title="酒店通信解决方案",
+            url="https://example.com/solutions/hotel/",
+        )
+        result = build_orchestrator(
+            RouteDecision(Route.KNOWLEDGE),
+            retriever=FakeRetriever([retrieval_result(source=source)]),
+            complete=FakeComplete([completion("方案回答")]),
+        ).run(chat("你们有哪些解决方案？"), deadline=Deadline())
+
+        self.assertEqual(result.sources, (source,))
+
+    def test_tool_route_preserves_only_successful_observation_sources(self):
+        source = SourceRef(
+            title="LY198 产品详情",
+            url="https://example.com/products/ly198/",
+        )
+        success = ToolObservation(
+            content='{"ok":true,"result":{}}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name="get_product_details",
+            sources=(source,),
+        )
+        successful_result = build_orchestrator(
+            RouteDecision(Route.EXACT_PRODUCT, product_id="ly198"),
+            executor=FakeExecutor(success),
+            complete=FakeComplete([completion("功率回答")]),
+        ).run(chat("LY198 功率是多少？"), deadline=Deadline())
+
+        failed = ToolObservation(
+            content='{"ok":false,"error":{"code":"PRODUCT_NOT_FOUND"}}',
+            success=False,
+            reused=False,
+            cache_key=None,
+            tool_name="get_product_details",
+            error_code="PRODUCT_NOT_FOUND",
+        )
+        failed_result = build_orchestrator(
+            RouteDecision(Route.EXACT_PRODUCT, product_id="missing"),
+            executor=FakeExecutor(failed),
+            complete=FakeComplete([completion("没有找到")]),
+        ).run(chat("missing 参数"), deadline=Deadline())
+
+        self.assertEqual(successful_result.sources, (source,))
+        self.assertEqual(failed_result.sources, ())
+
+    def test_agentic_knowledge_combines_rag_and_tool_sources(self):
+        rag_source = SourceRef(title="A", url="https://example.com/a")
+        tool_source = SourceRef(title="B", url="https://example.com/b")
+        result = build_orchestrator(
+            RouteDecision(Route.KNOWLEDGE, agentic=True),
+            retriever=FakeRetriever([retrieval_result(source=rag_source)]),
+            agent=FakeAgent(AgentResult(
+                answer="混合回答",
+                sources=(tool_source,),
+            )),
+        ).run(chat("方案和联系方式"), deadline=Deadline())
+
+        self.assertEqual(result.sources, (rag_source, tool_source))
+
+    def test_known_safe_answers_suppress_available_sources(self):
+        from agent import SAFE_AGENT_ANSWER
+
+        source = SourceRef(title="A", url="https://example.com/a")
+        result = build_orchestrator(
+            RouteDecision(Route.KNOWLEDGE),
+            retriever=FakeRetriever([retrieval_result(source=source)]),
+            complete=FakeComplete([
+                completion("partial", finish_reason="length"),
+            ]),
+        ).run(chat("问题"), deadline=Deadline())
+
+        self.assertEqual(result.answer, SAFE_AGENT_ANSWER)
+        self.assertEqual(result.sources, ())
+
+    def test_direct_and_route_fallback_have_no_sources(self):
+        direct = build_orchestrator(
+            RouteDecision(Route.DIRECT),
+            complete=FakeComplete([completion("你好")]),
+        ).run(chat("你好"), deadline=Deadline())
+        fallback = build_orchestrator(
+            RouteDecision(Route.FALLBACK),
+        ).run(chat("库存多少"), deadline=Deadline())
+
+        self.assertEqual(direct.sources, ())
+        self.assertEqual(fallback.sources, ())
+
     def test_knowledge_deadline_is_attributed_to_retrieval_route(self):
         with self.assertRaises(AgentDeadlineExceeded) as caught:
             build_orchestrator(

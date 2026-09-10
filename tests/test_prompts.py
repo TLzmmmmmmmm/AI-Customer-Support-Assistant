@@ -24,6 +24,26 @@ def parse_tool_data(content: str) -> dict:
 
 
 class RagPromptBuilderTests(unittest.TestCase):
+    def test_all_generation_paths_forbid_model_generated_citations_and_urls(self):
+        direct = prompts.build_direct_messages([
+            ChatMessage(role="user", content="你好"),
+        ])
+        rag = prompts.build_rag_messages([
+            ChatMessage(role="user", content="介绍解决方案"),
+        ], [])
+        tool = prompts.build_tool_messages(
+            [ChatMessage(role="user", content="公司电话")],
+            route="contact",
+            observation='{"ok":true,"result":{}}',
+        )
+
+        for messages in (direct, rag, tool):
+            with self.subTest(messages=messages):
+                system_text = messages[0]["content"]
+                self.assertIn("Do not output URLs", system_text)
+                self.assertIn("Do not write a references or citation section", system_text)
+                self.assertIn("Do not invent or rewrite source titles", system_text)
+
     def test_direct_messages_preserve_the_original_conversation(self):
         history = [
             ChatMessage(role="user", content="你好"),

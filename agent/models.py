@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from knowledge_pipeline.models import SourceRef
 from support_tools import (
     ContactInfoResult,
     ProductDetailsResult,
@@ -98,6 +99,7 @@ class AgentResult:
     answer: str
     tool_calls: tuple[ToolTrace, ...] = ()
     failure_layer: FailureLayer | None = None
+    sources: tuple[SourceRef, ...] = ()
 
 
 class AgentDeadlineExceeded(Exception):

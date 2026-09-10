@@ -72,7 +72,13 @@ class GenerationTests(unittest.TestCase):
         )
         row = rows[0]
         self.assertEqual(summary["completed_cases"], 1)
-        self.assertEqual(row["answer"], "无法确认价格。")
+        self.assertEqual(
+            row["answer"],
+            "无法确认价格。\n\n参考资料：\n"
+            "noise：https://example.com/noise/\n"
+            "alpha：https://example.com/alpha/\n"
+            "beta：https://example.com/beta/",
+        )
         self.assertEqual(row["event_types"], ["delta", "done"])
         self.assertEqual(row["http_status"], 200)
         self.assertEqual(provider.queries, [case.question])
@@ -176,7 +182,13 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(summary["completed_cases"], 1)
         self.assertEqual(rows[0]["split"], "frozen")
         self.assertEqual(rows[0]["query"], "alpha 参数")
-        self.assertEqual(rows[0]["answer"], "产品说明")
+        self.assertEqual(
+            rows[0]["answer"],
+            "产品说明\n\n参考资料：\n"
+            "alpha：https://example.com/alpha/\n"
+            "noise：https://example.com/noise/\n"
+            "beta：https://example.com/beta/",
+        )
         self.assertEqual(provider.queries, ["alpha 参数"])
 
     def test_mixed_splits_are_rejected_before_provider(self):

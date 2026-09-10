@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from .executor import ToolExecutor
+from .executor import ToolExecutor, ToolObservation
 from .models import (
     AgentDeadline,
     AgentDeadlineExceeded,
@@ -67,8 +67,9 @@ class AgentLoop:
             "content": AGENT_TOOL_POLICY,
         })
         processed_calls = 0
-        successful_observations: dict[str, str] = {}
+        successful_observations: dict[str, ToolObservation] = {}
         tool_traces: list[ToolTrace] = []
+        successful_sources = []
         pending_failures: list[tuple[FailureLayer, str]] = []
 
         def attach_error_metadata(error: Exception, layer: FailureLayer) -> None:
@@ -93,6 +94,7 @@ class AgentLoop:
                 answer=answer,
                 tool_calls=tuple(tool_traces),
                 failure_layer=unresolved,
+                sources=tuple(successful_sources),
             )
 
         def record(observation) -> None:
@@ -104,6 +106,7 @@ class AgentLoop:
             )
             tool_traces.append(trace)
             if trace.success:
+                successful_sources.extend(observation.sources)
                 pending_failures[:] = [
                     item
                     for item in pending_failures

@@ -56,7 +56,10 @@ def log_request(
         "request_id=%s http_status=%s "
         "outcome=%s latency_ms=%.1f error=%s "
         "route=%s tool_calls=%s tool_call_count=%s "
-        "retrieved_chunk_ids=%s failure_layer=%s",
+        "retrieved_chunk_ids=%s failure_layer=%s "
+        "citation_count=%s deduplicated_citation_count=%s "
+        "invalid_source_count=%s citation_status=%s "
+        "answer_sanitized=%s",
         request_id,
         http_status,
         outcome,
@@ -71,4 +74,9 @@ def log_request(
             separators=(",", ":"),
         ),
         "-" if layer is None else layer.value,
+        0 if trace is None else trace.citation_count,
+        0 if trace is None else trace.deduplicated_citation_count,
+        0 if trace is None else trace.invalid_source_count,
+        "none" if trace is None else trace.citation_status,
+        False if trace is None else trace.answer_sanitized,
     )

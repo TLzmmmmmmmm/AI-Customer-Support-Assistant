@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from support_tools import ToolError, ToolErrorCode
+from knowledge_pipeline.models import SourceRef
+from support_tools import ProductSearchResult, ToolError, ToolErrorCode
 
 from .models import AgentToolCall, TOOL_SPECS
 
@@ -19,6 +20,17 @@ class ToolObservation:
     cache_key: str | None
     tool_name: str = "tool_executor"
     error_code: str | None = None
+    sources: tuple[SourceRef, ...] = ()
+
+
+def _result_sources(result: object) -> tuple[SourceRef, ...]:
+    if isinstance(result, ProductSearchResult):
+        return tuple(
+            source
+            for product in result.products
+            for source in product.sources
+        )
+    return tuple(getattr(result, "sources", ()))
 
 
 def _serialize_error(error: ToolError) -> str:
@@ -62,7 +74,7 @@ class ToolExecutor:
     def execute(
         self,
         call: AgentToolCall,
-        successful_observations: dict[str, str],
+        successful_observations: dict[str, ToolObservation],
     ) -> ToolObservation:
         if call.name not in TOOL_SPECS:
             return _error_observation(_invalid_argument("tool_executor"))
@@ -84,7 +96,7 @@ class ToolExecutor:
         self,
         name: str,
         arguments: Mapping[str, object],
-        successful_observations: dict[str, str],
+        successful_observations: dict[str, ToolObservation],
     ) -> ToolObservation:
         spec = TOOL_SPECS.get(name)
         if spec is None:
@@ -105,11 +117,12 @@ class ToolExecutor:
         cached = successful_observations.get(cache_key)
         if cached is not None:
             return ToolObservation(
-                content=cached,
+                content=cached.content,
                 success=True,
                 reused=True,
                 cache_key=cache_key,
                 tool_name=name,
+                sources=cached.sources,
             )
 
         tool = self._registry.get(name)
@@ -137,14 +150,16 @@ class ToolExecutor:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        successful_observations[cache_key] = content
-        return ToolObservation(
+        observation = ToolObservation(
             content=content,
             success=True,
             reused=False,
             cache_key=cache_key,
             tool_name=name,
+            sources=_result_sources(result),
         )
+        successful_observations[cache_key] = observation
+        return observation
 
 
 __all__ = ["ToolExecutor", "ToolObservation"]

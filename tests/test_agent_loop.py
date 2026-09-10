@@ -6,6 +6,7 @@ from types import MappingProxyType, SimpleNamespace
 
 from agent.executor import ToolExecutor, ToolObservation
 from agent.models import AgentDeadlineExceeded
+from knowledge_pipeline.models import SourceRef
 from support_tools import ProductSearchResult, ToolError, ToolErrorCode
 from trace_models import FailureLayer
 
@@ -84,6 +85,51 @@ class RecordingExecutor:
 
 
 class AgentLoopTests(unittest.TestCase):
+    def test_successful_tool_sources_are_preserved_in_execution_order(self):
+        from agent.loop import AgentLoop
+
+        source_a = SourceRef(title="A", url="https://example.com/a")
+        source_b = SourceRef(title="B", url="https://example.com/b")
+        source_c = SourceRef(title="C", url="https://example.com/c")
+
+        class SequentialExecutor:
+            def __init__(self):
+                self.observations = deque([
+                    ToolObservation(
+                        content='{"ok":true,"result":{}}',
+                        success=True,
+                        reused=False,
+                        cache_key="one",
+                        tool_name="search_products",
+                        sources=(source_a, source_b),
+                    ),
+                    ToolObservation(
+                        content='{"ok":true,"result":{}}',
+                        success=True,
+                        reused=False,
+                        cache_key="two",
+                        tool_name="get_contact_info",
+                        sources=(source_b, source_c),
+                    ),
+                ])
+
+            def execute(self, call, successful_observations):
+                return self.observations.popleft()
+
+        result = AgentLoop(
+            executor=SequentialExecutor(),
+            complete_chat=FakeCompleteChat([
+                tool_completion("call-1", "search_products", '{"query":"酒店"}'),
+                tool_completion("call-2", "get_contact_info", "{}"),
+                text_completion("答案"),
+            ]),
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(
+            result.sources,
+            (source_a, source_b, source_b, source_c),
+        )
+
     def test_successful_and_cached_proposals_return_individually_paired_traces(self):
         from agent.loop import AgentLoop
 

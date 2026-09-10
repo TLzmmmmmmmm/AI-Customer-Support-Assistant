@@ -120,6 +120,11 @@ class RouteOrchestrator:
             provider_messages = build_direct_messages(messages)
 
         retrieved_ids = tuple(item.chunk_id for item in retrieved)
+        retrieved_sources = tuple(
+            source
+            for item in retrieved
+            for source in item.sources
+        )
         if decision.agentic:
             try:
                 result = self._agent_loop.run(provider_messages, deadline=deadline)
@@ -140,10 +145,16 @@ class RouteOrchestrator:
                     retrieved_chunk_ids=retrieved_ids,
                     failure_layer=result.failure_layer,
                 ),
+                sources=(
+                    ()
+                    if result.answer == SAFE_AGENT_ANSWER
+                    else retrieved_sources + result.sources
+                ),
             )
 
         tool_trace = None
         tool_failure = None
+        tool_sources = ()
         if decision.route in {
             Route.EXACT_PRODUCT,
             Route.PRODUCT_SEARCH,
@@ -169,6 +180,8 @@ class RouteOrchestrator:
                 raise
             tool_trace = _tool_trace(observation)
             tool_failure = _tool_failure(tool_trace)
+            if observation.success:
+                tool_sources = observation.sources
             provider_messages = build_tool_messages(
                 messages,
                 route=decision.route.value,
@@ -197,6 +210,11 @@ class RouteOrchestrator:
                 tool_call_count=0 if tool_trace is None else 1,
                 retrieved_chunk_ids=retrieved_ids,
                 failure_layer=tool_failure or generation_failure,
+            ),
+            sources=(
+                ()
+                if answer == SAFE_AGENT_ANSWER
+                else retrieved_sources + tool_sources
             ),
         )
 
