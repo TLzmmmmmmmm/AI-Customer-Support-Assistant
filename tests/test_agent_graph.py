@@ -1,11 +1,24 @@
 import unittest
 from collections import deque
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 
-from agent import AgentToolCall, ToolObservation
+from agent import AgentToolCall, ToolExecutor, ToolObservation
 from agent_graph import AgentGraphNodes, build_agent_graph
+from knowledge_pipeline.models import (
+    SourceRef,
+    TechnicalParameterGroup,
+    TechnicalParameterItem,
+)
 from models import ChatMessage
 from routing import HybridRouter, Route, RouteDecision, RoutingResult
+from support_tools import (
+    ContactInfoResult,
+    ProductDetailsResult,
+    ProductSearchItem,
+    ProductSearchResult,
+    ToolError,
+    ToolErrorCode,
+)
 
 
 class RecordingRouter:
@@ -45,6 +58,21 @@ class RecordingDeadline:
         self.checks += 1
 
 
+class RecordingGraphExecutor:
+    def __init__(self, visited):
+        self.visited = visited
+
+    def execute_named(self, name, arguments, cache):
+        self.visited.append("deterministic_tool")
+        return ToolObservation(
+            content='{"ok":true}',
+            success=True,
+            reused=False,
+            cache_key="key",
+            tool_name=name,
+        )
+
+
 def _completion(content):
     return SimpleNamespace(choices=[SimpleNamespace(
         finish_reason="stop",
@@ -52,8 +80,8 @@ def _completion(content):
     )])
 
 
-def _initial_state(*, deadline=None):
-    message = ChatMessage(role="user", content="测试问题")
+def _initial_state(*, deadline=None, question="测试问题"):
+    message = ChatMessage(role="user", content=question)
     return {
         "messages": (message,),
         "last_user_message": message,
@@ -77,7 +105,14 @@ def _recording_node(visited, name, update=None):
     return node
 
 
-def _nodes(visited, *, decision=None, router=None, **overrides):
+def _nodes(
+    visited,
+    *,
+    decision=None,
+    router=None,
+    executor=None,
+    **overrides,
+):
     if router is None:
         router = RecordingRouter(
             decision or RouteDecision(Route.DIRECT),
@@ -88,13 +123,13 @@ def _nodes(visited, *, decision=None, router=None, **overrides):
         "rag_generate",
         "agent_step",
         "execute_tool",
-        "deterministic_tool",
         "direct",
         "fallback",
         "finalize",
     )
     return AgentGraphNodes(
         router=router,
+        executor=executor or RecordingGraphExecutor(visited),
         **{
             name: overrides.get(name, _recording_node(visited, name))
             for name in names
@@ -214,6 +249,127 @@ class AgentGraphTests(unittest.TestCase):
                 graph.invoke(_initial_state())
 
                 self.assertEqual(visited, expected)
+
+    def test_deterministic_routes_store_real_observations_and_sources(self):
+        source = SourceRef(
+            title="权威资料",
+            url="https://example.com/source/",
+        )
+        calls = []
+
+        def search_products(query):
+            calls.append(("search_products", query))
+            return ProductSearchResult(products=[ProductSearchItem(
+                product_id="ly198",
+                name="LY198",
+                category_id="two-way-radio",
+                category_name="对讲机",
+                relevant_content="候选产品",
+                sources=[source],
+            )])
+
+        def get_product_details(product_id):
+            calls.append(("get_product_details", product_id))
+            return ProductDetailsResult(
+                product_id=product_id,
+                name="LY198",
+                category_id="two-way-radio",
+                category_name="对讲机",
+                key_features=["清晰通话"],
+                product_features="适用于日常通信。",
+                technical_parameters=[TechnicalParameterGroup(
+                    group="基本参数",
+                    items=[TechnicalParameterItem(name="功率", value="2W")],
+                )],
+                sources=[source],
+            )
+
+        def get_contact_info():
+            calls.append(("get_contact_info", None))
+            return ContactInfoResult(
+                company_name="测试公司",
+                duty_phone="4000000000",
+                email="support@example.com",
+                sources=[source],
+            )
+
+        executor = ToolExecutor(MappingProxyType({
+            "search_products": search_products,
+            "get_product_details": get_product_details,
+            "get_contact_info": get_contact_info,
+        }))
+        cases = (
+            (
+                RouteDecision(Route.PRODUCT_SEARCH),
+                "推荐几款对讲机",
+                ("search_products", "推荐几款对讲机"),
+            ),
+            (
+                RouteDecision(Route.EXACT_PRODUCT, product_id="ly198"),
+                "这个型号的功率是多少？",
+                ("get_product_details", "ly198"),
+            ),
+            (
+                RouteDecision(Route.CONTACT),
+                "联系方式是什么？",
+                ("get_contact_info", None),
+            ),
+        )
+
+        for decision, question, expected_call in cases:
+            with self.subTest(route=decision.route):
+                visited = []
+                deadline = RecordingDeadline()
+                graph = build_agent_graph(_nodes(
+                    visited,
+                    decision=decision,
+                    executor=executor,
+                ))
+
+                result = graph.invoke(_initial_state(
+                    deadline=deadline,
+                    question=question,
+                ))
+
+                self.assertEqual(calls[-1], expected_call)
+                self.assertIsInstance(result["tool_result"], ToolObservation)
+                self.assertTrue(result["tool_result"].success)
+                self.assertEqual(result["sources"], (source,))
+                self.assertEqual(deadline.checks, 2)
+                self.assertEqual(visited, ["route", "finalize"])
+
+    def test_failed_deterministic_observation_clears_sources(self):
+        stale_source = SourceRef(
+            title="旧资料",
+            url="https://example.com/stale/",
+        )
+
+        def missing(product_id):
+            raise ToolError(
+                code=ToolErrorCode.PRODUCT_NOT_FOUND,
+                message="No product matches.",
+                tool_name="get_product_details",
+            )
+
+        visited = []
+        graph = build_agent_graph(_nodes(
+            visited,
+            decision=RouteDecision(
+                Route.EXACT_PRODUCT,
+                product_id="missing",
+            ),
+            executor=ToolExecutor(MappingProxyType({
+                "get_product_details": missing,
+            })),
+        ))
+        state = _initial_state()
+        state["sources"] = (stale_source,)
+
+        result = graph.invoke(state)
+
+        self.assertFalse(result["tool_result"].success)
+        self.assertEqual(result["tool_result"].error_code, "PRODUCT_NOT_FOUND")
+        self.assertEqual(result["sources"], ())
 
     def test_agentic_precedes_every_production_route(self):
         for route in Route:

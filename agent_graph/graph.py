@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .nodes import (
     AgentGraphNodes,
+    deterministic_tool_node,
     route_node,
     select_agent_step_edge,
     select_route_edge,
@@ -21,7 +22,10 @@ def build_agent_graph(nodes: AgentGraphNodes):
     graph.add_node("rag_generate", nodes.rag_generate)
     graph.add_node("agent_step", nodes.agent_step)
     graph.add_node("execute_tool", nodes.execute_tool)
-    graph.add_node("deterministic_tool", nodes.deterministic_tool)
+    graph.add_node(
+        "deterministic_tool",
+        partial(deterministic_tool_node, executor=nodes.executor),
+    )
     graph.add_node("direct", nodes.direct)
     graph.add_node("fallback", nodes.fallback)
     graph.add_node("finalize", nodes.finalize)

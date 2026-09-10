@@ -14,6 +14,10 @@ from prompts import build_direct_messages, build_rag_messages, build_tool_messag
 from rag_context import build_retrieved_context
 from trace_models import FailureLayer, ToolTrace
 
+from .deterministic import (
+    DETERMINISTIC_TOOL_ROUTES,
+    execute_deterministic_route,
+)
 from .models import Route, RouteExecutionResult, RouteTrace
 
 
@@ -155,25 +159,14 @@ class RouteOrchestrator:
         tool_trace = None
         tool_failure = None
         tool_sources = ()
-        if decision.route in {
-            Route.EXACT_PRODUCT,
-            Route.PRODUCT_SEARCH,
-            Route.CONTACT,
-        }:
-            if decision.route == Route.EXACT_PRODUCT:
-                name = "get_product_details"
-                arguments = {"product_id": decision.product_id}
-            elif decision.route == Route.PRODUCT_SEARCH:
-                name = "search_products"
-                arguments = {"query": messages[-1].content}
-            else:
-                name = "get_contact_info"
-                arguments = {}
-
+        if decision.route in DETERMINISTIC_TOOL_ROUTES:
             try:
-                deadline.ensure_active()
-                observation = self._executor.execute_named(name, arguments, {})
-                deadline.ensure_active()
+                observation = execute_deterministic_route(
+                    decision,
+                    messages,
+                    deadline=deadline,
+                    executor=self._executor,
+                )
             except Exception as error:
                 _set_failure_layer(error, FailureLayer.TOOL_EXECUTION)
                 _set_error_context(error, route=decision.route)
