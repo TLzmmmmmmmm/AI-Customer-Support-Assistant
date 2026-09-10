@@ -9,8 +9,6 @@ from agent import (
     ToolExecutor,
 )
 from agent.tool_outcomes import (
-    successful_tool_sources,
-    tool_failure_from_trace,
     tool_trace_from_observation,
 )
 from models import ChatMessage
@@ -23,12 +21,10 @@ from .deterministic import (
     execute_deterministic_route,
 )
 from .errors import set_failure_layer as _set_failure_layer
+from .finalization import SAFE_FALLBACK_ANSWER, finalize_non_agentic_route
 from .generation import generate_answer
 from .knowledge import retrieval_sources, retrieve_knowledge
 from .models import Route, RouteExecutionResult, RouteTrace
-
-
-SAFE_FALLBACK_ANSWER = "目前无法根据现有资料可靠确认这项信息。"
 
 
 def _set_error_context(
@@ -79,12 +75,9 @@ class RouteOrchestrator:
 
         decision = routing.decision
         if decision.route == Route.FALLBACK:
-            return RouteExecutionResult(
-                answer=SAFE_FALLBACK_ANSWER,
-                trace=RouteTrace(
-                    route=decision.route,
-                    failure_layer=routing.failure_layer,
-                ),
+            return finalize_non_agentic_route(
+                decision.route,
+                routing_failure=routing.failure_layer,
             )
 
         retrieved = []
@@ -135,9 +128,7 @@ class RouteOrchestrator:
                 ),
             )
 
-        tool_trace = None
-        tool_failure = None
-        tool_sources = ()
+        observation = None
         if decision.route in DETERMINISTIC_TOOL_ROUTES:
             try:
                 observation = execute_deterministic_route(
@@ -150,9 +141,6 @@ class RouteOrchestrator:
                 _set_failure_layer(error, FailureLayer.TOOL_EXECUTION)
                 _set_error_context(error, route=decision.route)
                 raise
-            tool_trace = tool_trace_from_observation(observation)
-            tool_failure = tool_failure_from_trace(tool_trace)
-            tool_sources = successful_tool_sources(observation)
             provider_messages = build_tool_messages(
                 messages,
                 route=decision.route.value,
@@ -170,24 +158,20 @@ class RouteOrchestrator:
             _set_error_context(
                 error,
                 route=decision.route,
-                tool_calls=() if tool_trace is None else (tool_trace,),
+                tool_calls=(
+                    ()
+                    if observation is None
+                    else (tool_trace_from_observation(observation),)
+                ),
                 retrieved_chunk_ids=retrieved_ids,
             )
             raise
-        return RouteExecutionResult(
+        return finalize_non_agentic_route(
+            decision.route,
             answer=answer,
-            trace=RouteTrace(
-                route=decision.route,
-                tool_calls=() if tool_trace is None else (tool_trace,),
-                tool_call_count=0 if tool_trace is None else 1,
-                retrieved_chunk_ids=retrieved_ids,
-                failure_layer=tool_failure or generation_failure,
-            ),
-            sources=(
-                ()
-                if answer == SAFE_AGENT_ANSWER
-                else retrieved_sources + tool_sources
-            ),
+            retrieval_results=retrieved,
+            tool_observation=observation,
+            generation_failure=generation_failure,
         )
 
 __all__ = ["RouteOrchestrator", "SAFE_FALLBACK_ANSWER"]
