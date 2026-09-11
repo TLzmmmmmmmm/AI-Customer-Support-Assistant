@@ -1,8 +1,10 @@
 import json
 import unittest
 from collections import deque
+from contextlib import nullcontext
 from copy import deepcopy
 from types import MappingProxyType, SimpleNamespace
+from unittest.mock import patch
 
 from agent import (
     AGENT_TOOL_POLICY,
@@ -11,6 +13,7 @@ from agent import (
     SAFE_AGENT_ANSWER,
     ToolExecutor,
     ToolObservation,
+    normalize_agent_turn,
 )
 from agent_graph import AgentGraphNodes, build_agent_graph
 from knowledge_pipeline.models import (
@@ -28,6 +31,7 @@ from routing import (
     Route,
     RouteDecision,
     RouteExecutionResult,
+    RouteOrchestrator,
     RoutingResult,
     ToolTrace,
 )
@@ -96,18 +100,22 @@ class KeywordRecordingCompletion:
 
     def __call__(self, messages, **kwargs):
         self.calls.append((deepcopy(messages), deepcopy(kwargs)))
-        return self.responses.popleft()
+        response = self.responses.popleft()
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class RecordingDeadline:
-    def __init__(self, fail_on=None):
+    def __init__(self, fail_on=None, *, error=None):
         self.checks = 0
         self.fail_on = fail_on
+        self.error = error or AgentDeadlineExceeded("expired")
 
     def ensure_active(self):
         self.checks += 1
         if self.checks == self.fail_on:
-            raise AgentDeadlineExceeded("expired")
+            raise self.error
 
 
 class RecordingGraphExecutor:
@@ -324,7 +332,7 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(result["result"].trace.retrieved_chunk_ids, ())
         self.assertEqual(result["result"].sources, ())
 
-    def test_rag_path_propagates_retrieval_failure_unchanged(self):
+    def test_rag_path_adds_raw_retrieval_exception_metadata(self):
         visited = []
         expected = RuntimeError("retrieval unavailable")
         graph = build_agent_graph(_nodes(
@@ -337,7 +345,92 @@ class AgentGraphTests(unittest.TestCase):
             graph.invoke(_initial_state())
 
         self.assertIs(caught.exception, expected)
-        self.assertFalse(hasattr(caught.exception, "failure_layer"))
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.RETRIEVAL,
+        )
+        self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_route_exception_adds_only_raw_routing_failure(self):
+        expected = RuntimeError("routing unavailable")
+
+        class FailingRouter:
+            def route(self, messages, *, deadline):
+                raise expected
+
+        graph = build_agent_graph(_nodes([], router=FailingRouter()))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.ROUTING,
+        )
+        self.assertFalse(hasattr(caught.exception, "route"))
+        self.assertFalse(hasattr(caught.exception, "tool_calls"))
+        self.assertFalse(hasattr(caught.exception, "retrieved_chunk_ids"))
+
+    def test_retrieval_deadlines_use_empty_raw_context(self):
+        source = SourceRef(title="资料", url="https://example.com/source")
+        hit = _retrieval_result(source)
+        for fail_on in (1, 2):
+            with self.subTest(fail_on=fail_on):
+                expected = AgentDeadlineExceeded(f"deadline {fail_on}")
+                graph = build_agent_graph(_nodes(
+                    [],
+                    decision=RouteDecision(Route.KNOWLEDGE),
+                    retriever=RecordingRetriever([hit]),
+                ))
+
+                with self.assertRaises(AgentDeadlineExceeded) as caught:
+                    graph.invoke(_initial_state(deadline=RecordingDeadline(
+                        fail_on,
+                        error=expected,
+                    )))
+
+                self.assertIs(caught.exception, expected)
+                self.assertEqual(
+                    caught.exception.failure_layer,
+                    FailureLayer.RETRIEVAL,
+                )
+                self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+                self.assertEqual(caught.exception.tool_calls, ())
+                self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_knowledge_prompt_failures_use_empty_retrieval_context(self):
+        source = SourceRef(title="资料", url="https://example.com/source")
+        hit = _retrieval_result(source)
+        for agentic in (False, True):
+            with self.subTest(agentic=agentic):
+                expected = RuntimeError("context build failed")
+                graph = build_agent_graph(_nodes(
+                    [],
+                    decision=RouteDecision(
+                        Route.KNOWLEDGE,
+                        agentic=agentic,
+                    ),
+                    retriever=RecordingRetriever([hit]),
+                ))
+
+                with patch(
+                    "agent_graph.nodes.build_retrieved_context",
+                    side_effect=expected,
+                ):
+                    with self.assertRaises(RuntimeError) as caught:
+                        graph.invoke(_initial_state())
+
+                self.assertIs(caught.exception, expected)
+                self.assertEqual(
+                    caught.exception.failure_layer,
+                    FailureLayer.RETRIEVAL,
+                )
+                self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+                self.assertEqual(caught.exception.tool_calls, ())
+                self.assertEqual(caught.exception.retrieved_chunk_ids, ())
 
     def test_direct_path_skips_retrieval_and_tools(self):
         visited = []
@@ -654,6 +747,156 @@ class AgentGraphTests(unittest.TestCase):
             FailureLayer.TOOL_EXECUTION,
         )
         self.assertEqual(result["result"].sources, ())
+
+    def test_thrown_deterministic_execution_adds_raw_metadata(self):
+        expected = RuntimeError("executor boundary failed")
+
+        class FailingExecutor:
+            def execute_named(self, name, arguments, cache):
+                raise expected
+
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT),
+            executor=FailingExecutor(),
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_EXECUTION,
+        )
+        self.assertEqual(caught.exception.route, Route.CONTACT)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_deterministic_generation_exception_boundaries_add_raw_context(self):
+        cases = (
+            ("pre_deadline", 3),
+            ("provider", None),
+            ("post_deadline", 4),
+            ("normalization", None),
+        )
+        for boundary, fail_on in cases:
+            with self.subTest(boundary=boundary):
+                expected = (
+                    AgentDeadlineExceeded(boundary)
+                    if fail_on is not None
+                    else RuntimeError(boundary)
+                )
+                complete = RecordingCompletion([
+                    expected if boundary == "provider" else _completion("answer"),
+                ])
+                graph = build_agent_graph(_nodes(
+                    [],
+                    decision=RouteDecision(Route.CONTACT),
+                    complete_chat=complete,
+                ))
+                state = _initial_state(deadline=RecordingDeadline(
+                    fail_on,
+                    error=expected,
+                ))
+
+                normalization = (
+                    patch(
+                        "routing.generation.normalize_agent_turn",
+                        side_effect=expected,
+                    )
+                    if boundary == "normalization"
+                    else nullcontext()
+                )
+                with normalization:
+                    with self.assertRaises(type(expected)) as caught:
+                        graph.invoke(state)
+
+                self.assertIs(caught.exception, expected)
+                self.assertEqual(
+                    caught.exception.failure_layer,
+                    FailureLayer.GENERATION,
+                )
+                self.assertEqual(caught.exception.route, Route.CONTACT)
+                self.assertEqual(caught.exception.tool_calls, (
+                    ToolTrace("get_contact_info", True),
+                ))
+                self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_knowledge_generation_exception_uses_ordered_retrieval_ids(self):
+        expected = RuntimeError("provider failed")
+        first = SourceRef(title="A", url="https://example.com/a")
+        second = SourceRef(title="B", url="https://example.com/b")
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.KNOWLEDGE),
+            retriever=RecordingRetriever([
+                _retrieval_result(first, chunk_id="solution:first:content"),
+                _retrieval_result(second, chunk_id="solution:second:content"),
+            ]),
+            complete_chat=RecordingCompletion([expected]),
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.GENERATION,
+        )
+        self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.retrieved_chunk_ids, (
+            "solution:first:content",
+            "solution:second:content",
+        ))
+
+    def test_direct_generation_exception_adds_empty_raw_context(self):
+        expected = RuntimeError("provider failed")
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.DIRECT),
+            complete_chat=RecordingCompletion([expected]),
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.GENERATION,
+        )
+        self.assertEqual(caught.exception.route, Route.DIRECT)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_direct_and_tool_prompt_exceptions_remain_unannotated(self):
+        cases = (
+            (RouteDecision(Route.DIRECT), "build_direct_messages"),
+            (RouteDecision(Route.CONTACT), "build_tool_messages"),
+        )
+        for decision, builder in cases:
+            with self.subTest(builder=builder):
+                expected = RuntimeError(f"{builder} failed")
+                graph = build_agent_graph(_nodes([], decision=decision))
+
+                with patch(
+                    f"agent_graph.nodes.{builder}",
+                    side_effect=expected,
+                ):
+                    with self.assertRaises(RuntimeError) as caught:
+                        graph.invoke(_initial_state())
+
+                self.assertIs(caught.exception, expected)
+                self.assertFalse(hasattr(caught.exception, "failure_layer"))
+                self.assertFalse(hasattr(caught.exception, "route"))
+                self.assertFalse(hasattr(caught.exception, "tool_calls"))
+                self.assertFalse(hasattr(
+                    caught.exception,
+                    "retrieved_chunk_ids",
+                ))
 
     def test_rag_generation_uses_retrieved_context(self):
         source = SourceRef(
@@ -1160,6 +1403,8 @@ class AgentGraphTests(unittest.TestCase):
 
     def test_agent_provider_exception_keeps_current_trace_metadata(self):
         expected = RuntimeError("provider unavailable")
+        source = SourceRef(title="资料", url="https://example.com/source")
+        hit = _retrieval_result(source)
         observation = ToolObservation(
             content='{"ok":true}',
             success=True,
@@ -1169,7 +1414,8 @@ class AgentGraphTests(unittest.TestCase):
         )
         graph = build_agent_graph(_nodes(
             [],
-            decision=RouteDecision(Route.CONTACT, agentic=True),
+            decision=RouteDecision(Route.KNOWLEDGE, agentic=True),
+            retriever=RecordingRetriever([hit]),
             executor=RecordingGraphExecutor([], [observation]),
             complete_chat=RecordingCompletion([
                 _tool_completion("call-1", "get_contact_info", "{}"),
@@ -1188,6 +1434,11 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(caught.exception.tool_calls, (
             ToolTrace("get_contact_info", True),
         ))
+        self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+        self.assertEqual(
+            caught.exception.retrieved_chunk_ids,
+            ("solution:test:content",),
+        )
 
     def test_agent_deadline_after_provider_prevents_tool_execution(self):
         visited = []
@@ -1211,6 +1462,33 @@ class AgentGraphTests(unittest.TestCase):
             FailureLayer.TOOL_SELECTION,
         )
         self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.route, Route.CONTACT)
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_agent_deadline_before_tool_adds_raw_outer_context(self):
+        expected = AgentDeadlineExceeded("before tool")
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            complete_chat=RecordingCompletion([
+                _tool_completion("call-1", "get_contact_info", "{}"),
+            ]),
+        ))
+
+        with self.assertRaises(AgentDeadlineExceeded) as caught:
+            graph.invoke(_initial_state(deadline=RecordingDeadline(
+                fail_on=3,
+                error=expected,
+            )))
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.TOOL_EXECUTION,
+        )
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.route, Route.CONTACT)
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
 
     def test_agent_deadline_after_tool_includes_new_tool_trace(self):
         observation = ToolObservation(
@@ -1241,8 +1519,10 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(caught.exception.tool_calls, (
             ToolTrace("get_contact_info", True),
         ))
+        self.assertEqual(caught.exception.route, Route.CONTACT)
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
 
-    def test_unexpected_agent_executor_exception_remains_unannotated(self):
+    def test_unexpected_agent_executor_exception_adds_only_raw_context(self):
         expected = RuntimeError("executor infrastructure failure")
 
         class FailingExecutor:
@@ -1266,7 +1546,152 @@ class AgentGraphTests(unittest.TestCase):
 
         self.assertIs(caught.exception, expected)
         self.assertFalse(hasattr(caught.exception, "failure_layer"))
-        self.assertFalse(hasattr(caught.exception, "tool_calls"))
+        self.assertEqual(caught.exception.route, Route.CONTACT)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+
+    def test_agent_normalization_exception_does_not_recover_state_traces(self):
+        expected = RuntimeError("normalization failed")
+        source = SourceRef(title="资料", url="https://example.com/source")
+        hit = _retrieval_result(source)
+        proposal = _tool_completion("call-1", "get_contact_info", "{}")
+        first_turn = normalize_agent_turn(proposal)
+        self.assertIsNotNone(first_turn)
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.KNOWLEDGE, agentic=True),
+            retriever=RecordingRetriever([hit]),
+            executor=RecordingGraphExecutor([], [ToolObservation(
+                content='{"ok":true}',
+                success=True,
+                reused=False,
+                cache_key="key",
+                tool_name="get_contact_info",
+            )]),
+            complete_chat=RecordingCompletion([
+                proposal,
+                _completion("unused"),
+            ]),
+        ))
+
+        with patch(
+            "agent_graph.nodes.normalize_agent_turn",
+            side_effect=[first_turn, expected],
+        ):
+            with self.assertRaises(RuntimeError) as caught:
+                graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertFalse(hasattr(caught.exception, "failure_layer"))
+        self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(
+            caught.exception.retrieved_chunk_ids,
+            ("solution:test:content",),
+        )
+
+    def test_agent_message_build_exception_gets_only_raw_outer_context(self):
+        expected = RuntimeError("agent message build failed")
+        source = SourceRef(title="资料", url="https://example.com/source")
+        hit = _retrieval_result(source)
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.KNOWLEDGE, agentic=True),
+            retriever=RecordingRetriever([hit]),
+        ))
+
+        with patch(
+            "agent_graph.nodes.build_agent_messages",
+            side_effect=expected,
+        ):
+            with self.assertRaises(RuntimeError) as caught:
+                graph.invoke(_initial_state())
+
+        self.assertIs(caught.exception, expected)
+        self.assertFalse(hasattr(caught.exception, "failure_layer"))
+        self.assertEqual(caught.exception.route, Route.KNOWLEDGE)
+        self.assertEqual(caught.exception.tool_calls, ())
+        self.assertEqual(
+            caught.exception.retrieved_chunk_ids,
+            ("solution:test:content",),
+        )
+
+    def test_disabled_tools_provider_exception_preserves_generation_metadata(self):
+        expected = RuntimeError("disabled-tools provider failed")
+        complete = KeywordRecordingCompletion([
+            *(
+                _tool_completion(
+                    f"call-{index}",
+                    "get_contact_info",
+                    "{}",
+                )
+                for index in range(1, 4)
+            ),
+            expected,
+        ])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            complete_chat=complete,
+        ))
+
+        with self.assertRaises(RuntimeError) as caught:
+            graph.invoke(
+                _initial_state(),
+                config={"recursion_limit": 12},
+            )
+
+        self.assertIs(caught.exception, expected)
+        self.assertEqual(
+            caught.exception.failure_layer,
+            FailureLayer.GENERATION,
+        )
+        self.assertEqual(len(caught.exception.tool_calls), 3)
+        self.assertEqual(caught.exception.route, Route.CONTACT)
+        self.assertEqual(caught.exception.retrieved_chunk_ids, ())
+        self.assertNotIn("tools", complete.calls[-1][1])
+
+    def test_direct_provider_exception_metadata_matches_raw_orchestrator(self):
+        raw_error = RuntimeError("provider failed")
+        graph_error = RuntimeError("provider failed")
+        raw = RouteOrchestrator(
+            router=RecordingRouter(RouteDecision(Route.DIRECT), []),
+            retriever=RecordingRetriever(),
+            executor=RecordingGraphExecutor([]),
+            agent_loop=object(),
+            complete_chat=RecordingCompletion([raw_error]),
+        )
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.DIRECT),
+            complete_chat=RecordingCompletion([graph_error]),
+        ))
+
+        with self.assertRaises(RuntimeError) as raw_caught:
+            raw.run(
+                _initial_state()["messages"],
+                deadline=RecordingDeadline(),
+            )
+        with self.assertRaises(RuntimeError) as graph_caught:
+            graph.invoke(_initial_state())
+
+        self.assertIs(raw_caught.exception, raw_error)
+        self.assertIs(graph_caught.exception, graph_error)
+        raw_metadata = (
+            type(raw_caught.exception),
+            raw_caught.exception.failure_layer,
+            raw_caught.exception.route,
+            raw_caught.exception.tool_calls,
+            raw_caught.exception.retrieved_chunk_ids,
+        )
+        graph_metadata = (
+            type(graph_caught.exception),
+            graph_caught.exception.failure_layer,
+            graph_caught.exception.route,
+            graph_caught.exception.tool_calls,
+            graph_caught.exception.retrieved_chunk_ids,
+        )
+        self.assertEqual(graph_metadata, raw_metadata)
 
     def test_route_node_uses_real_hybrid_router_contract(self):
         visited = []
