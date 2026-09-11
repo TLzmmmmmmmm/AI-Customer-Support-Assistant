@@ -46,10 +46,10 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
         raise ValueError("invalid fixture references")
 
     from fastapi.testclient import TestClient
+    from agent_graph import nodes as agent_graph_nodes
     import config
     import main
     from routing import Route, RouteDecision, RoutingResult
-    from routing import orchestrator as route_orchestrator
     from services import llm
 
     interval = (config.RATE_LIMIT_WINDOW_SECONDS / config.RATE_LIMIT_REQUESTS + 0.1
@@ -57,8 +57,21 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
     if interval < 0:
         raise ValueError("request interval cannot be negative")
     real_create = llm.client.chat.completions.create
-    real_context = route_orchestrator.build_retrieved_context
+    real_context = agent_graph_nodes.build_retrieved_context
+    real_build_retriever = main.build_retriever
     active = {}
+
+    class EvaluationKnowledgeRouter:
+        def route(self, messages, *, deadline):
+            return RoutingResult(RouteDecision(Route.KNOWLEDGE))
+
+    built_retrievers = []
+
+    def build_evaluation_retriever():
+        factory = retriever_factory or real_build_retriever
+        retriever = factory()
+        built_retrievers.append(retriever)
+        return retriever
 
     def observe_create(**kwargs):
         # Capture exactly what is sent; no max_tokens, usage options or judge.
@@ -106,23 +119,24 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
     completed = attempted = 0
     last_start = None
     with ExitStack() as stack:
-        if retriever_factory is not None:
-            stack.enter_context(patch.object(main, "build_retriever", retriever_factory))
+        stack.enter_context(patch.object(
+            main,
+            "build_retriever",
+            build_evaluation_retriever,
+        ))
+        stack.enter_context(patch.object(
+            main,
+            "HybridRouter",
+            return_value=EvaluationKnowledgeRouter(),
+        ))
         stack.enter_context(patch.object(llm.client.chat.completions, "create", observe_create))
         stack.enter_context(patch.object(
-            route_orchestrator,
+            agent_graph_nodes,
             "build_retrieved_context",
             observe_context,
         ))
         client = stack.enter_context(TestClient(main.app, raise_server_exceptions=False))
-        orchestrator = main.app.state.route_orchestrator
-        retriever = orchestrator._retriever
-
-        class EvaluationKnowledgeRouter:
-            def route(self, messages, *, deadline):
-                return RoutingResult(RouteDecision(Route.KNOWLEDGE))
-
-        orchestrator._router = EvaluationKnowledgeRouter()
+        retriever = built_retrievers[0]
         real_retrieve = retriever.retrieve
 
         def observe_retrieve(query):

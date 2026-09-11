@@ -1,7 +1,8 @@
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import replace
+from typing import Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -12,7 +13,7 @@ from openai import (
     APITimeoutError,
 )
 from rate_limit import enforce_rate_limit
-from models import ChatRequest
+from models import ChatMessage, ChatRequest
 from concurrency import (
     release_llm_slot,
     try_acquire_llm_slot,
@@ -21,12 +22,22 @@ from app_logging import log_request
 from agent import AgentDeadline, AgentDeadlineExceeded, SAFE_AGENT_ANSWER
 from citation import render_answer
 from config import AGENT_TIMEOUT_SECONDS
-from routing import RouteOrchestrator, RouteTrace
+from routing import RouteExecutionResult, RouteTrace
 
 router = APIRouter()
 
 
-def get_route_orchestrator(request: Request) -> RouteOrchestrator:
+class _RouteRunner(Protocol):
+    def run(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        deadline: AgentDeadline,
+    ) -> RouteExecutionResult:
+        ...
+
+
+def get_route_orchestrator(request: Request) -> _RouteRunner:
     return request.app.state.route_orchestrator
 
 
@@ -65,7 +76,7 @@ def chat_stream(
     payload: ChatRequest,
     request: Request,
     _: None = Depends(enforce_rate_limit),
-    orchestrator: RouteOrchestrator = Depends(get_route_orchestrator),
+    orchestrator: _RouteRunner = Depends(get_route_orchestrator),
 ):
     started_at = request.state.started_at
     request_id = request.state.request_id

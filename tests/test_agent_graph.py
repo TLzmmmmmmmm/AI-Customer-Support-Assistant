@@ -15,7 +15,11 @@ from agent import (
     ToolObservation,
     normalize_agent_turn,
 )
-from agent_graph import AgentGraphNodes, build_agent_graph
+from agent_graph import (
+    AgentGraphNodes,
+    GraphRouteOrchestrator,
+    build_agent_graph,
+)
 from knowledge_pipeline.models import (
     SourceRef,
     TechnicalParameterGroup,
@@ -1249,6 +1253,53 @@ class AgentGraphTests(unittest.TestCase):
         self.assertTrue(all("tools" in call[1] for call in complete.calls[:3]))
         self.assertNotIn("tools", complete.calls[3][1])
         self.assertEqual(result["result"].sources, (source, source, source))
+
+    def test_compiled_graph_does_not_share_tool_cache_between_requests(self):
+        calls = []
+
+        def get_contact_info():
+            calls.append("called")
+            return ContactInfoResult(
+                company_name="测试公司",
+                duty_phone="4000000000",
+                email="support@example.com",
+            )
+
+        complete = KeywordRecordingCompletion([
+            _tool_completion("call-1", "get_contact_info", "{}"),
+            _completion("第一次回答"),
+            _tool_completion("call-2", "get_contact_info", "{}"),
+            _completion("第二次回答"),
+        ])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            executor=ToolExecutor(MappingProxyType({
+                "get_contact_info": get_contact_info,
+            })),
+            complete_chat=complete,
+        ))
+        orchestrator = GraphRouteOrchestrator(graph)
+        messages = [ChatMessage(role="user", content="怎么联系公司？")]
+
+        first = orchestrator.run(
+            messages,
+            deadline=RecordingDeadline(),
+        )
+        second = orchestrator.run(
+            messages,
+            deadline=RecordingDeadline(),
+        )
+
+        self.assertEqual(calls, ["called", "called"])
+        self.assertEqual(
+            [trace.reused for trace in first.trace.tool_calls],
+            [False],
+        )
+        self.assertEqual(
+            [trace.reused for trace in second.trace.tool_calls],
+            [False],
+        )
 
     def test_disabled_tools_completion_cannot_execute_fourth_call(self):
         visited = []
