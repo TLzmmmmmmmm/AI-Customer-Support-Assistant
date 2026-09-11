@@ -78,14 +78,19 @@ class RecordingRetriever:
 
     def resolve_entities(self, query):
         self.queries.append(query)
-        product_id = self.products.get(query)
-        if product_id is None:
+        product_ids = self.products.get(query)
+        if product_ids is None:
             return []
-        return [EntityMatch(
-            parent_document_id=f"product:{product_id}",
-            alias=product_id,
-            start=0,
-        )]
+        if isinstance(product_ids, str):
+            product_ids = (product_ids,)
+        return [
+            EntityMatch(
+                parent_document_id=f"product:{product_id}",
+                alias=product_id,
+                start=0,
+            )
+            for product_id in product_ids
+        ]
 
 
 class RecordingCompletion:
@@ -117,6 +122,117 @@ def messages(question, history=()):
 
 
 class HybridRouterTests(unittest.TestCase):
+    def test_single_explicit_product_routes_to_details_without_fact_keyword(self):
+        from routing import HybridRouter, Route
+
+        questions = (
+            "LY198的优点是什么？",
+            "LY598 有哪些卖点？",
+            "请说说 LY198",
+            "LY198 它有什么优点？",
+        )
+        retriever = RecordingRetriever({
+            question: "ly598" if "LY598" in question else "ly198"
+            for question in questions
+        })
+        complete = RecordingCompletion([])
+        router = HybridRouter(retriever=retriever, complete_chat=complete)
+
+        for question in questions:
+            with self.subTest(question=question):
+                result = router.route(
+                    messages(question),
+                    deadline=RecordingDeadline(),
+                )
+                self.assertEqual(result.decision.route, Route.EXACT_PRODUCT)
+                self.assertFalse(result.decision.agentic)
+                self.assertEqual(
+                    result.decision.product_id,
+                    "ly598" if "LY598" in question else "ly198",
+                )
+
+        self.assertEqual(complete.calls, [])
+
+    def test_multiple_explicit_products_route_to_agentic_details(self):
+        from routing import HybridRouter, Route
+
+        question = "LY198 和 LY598 哪个更好？"
+        complete = RecordingCompletion([])
+        result = HybridRouter(
+            retriever=RecordingRetriever({question: ("ly198", "ly598")}),
+            complete_chat=complete,
+        ).route(messages(question), deadline=RecordingDeadline())
+
+        self.assertEqual(result.decision.route, Route.EXACT_PRODUCT)
+        self.assertTrue(result.decision.agentic)
+        self.assertIsNone(result.decision.product_id)
+        self.assertEqual(complete.calls, [])
+
+    def test_comparative_pronoun_routes_to_agent_but_same_product_pronoun_does_not(self):
+        from routing import HybridRouter, Route
+
+        comparison = "LY198 和刚才那个相比怎么样？"
+        same_product = "LY198 它有什么优点？"
+        retriever = RecordingRetriever({
+            comparison: "ly198",
+            same_product: "ly198",
+        })
+        complete = RecordingCompletion([])
+        router = HybridRouter(retriever=retriever, complete_chat=complete)
+
+        comparison_result = router.route(
+            messages(comparison),
+            deadline=RecordingDeadline(),
+        )
+        same_product_result = router.route(
+            messages(same_product),
+            deadline=RecordingDeadline(),
+        )
+
+        self.assertEqual(comparison_result.decision.route, Route.EXACT_PRODUCT)
+        self.assertTrue(comparison_result.decision.agentic)
+        self.assertEqual(same_product_result.decision.route, Route.EXACT_PRODUCT)
+        self.assertFalse(same_product_result.decision.agentic)
+        self.assertEqual(complete.calls, [])
+
+    def test_repeated_explicit_product_question_ignores_conversation_history(self):
+        from routing import HybridRouter, Route
+
+        question = "LY198的优点是什么？"
+        retriever = RecordingRetriever({question: "ly198"})
+        complete = RecordingCompletion([])
+        router = HybridRouter(retriever=retriever, complete_chat=complete)
+        history = []
+
+        for _ in range(5):
+            result = router.route(
+                messages(question, history),
+                deadline=RecordingDeadline(),
+            )
+            self.assertEqual(result.decision.route, Route.EXACT_PRODUCT)
+            self.assertFalse(result.decision.agentic)
+            history.extend((
+                ("user", question),
+                ("assistant", "LY198 的特点包括小巧轻薄和一键对频。"),
+            ))
+
+        self.assertEqual(complete.calls, [])
+
+    def test_unsupported_fallback_precedes_product_and_other_capabilities(self):
+        from routing import HybridRouter, Route
+
+        question = "LY198 现在有库存吗？另外公司的电话是多少？"
+        complete = RecordingCompletion([])
+        result = HybridRouter(
+            retriever=RecordingRetriever({question: "ly198"}),
+            complete_chat=complete,
+        ).route(messages(question), deadline=RecordingDeadline())
+
+        self.assertEqual(result.decision.route, Route.FALLBACK)
+        self.assertFalse(result.decision.agentic)
+        self.assertEqual(result.decision.product_id, "ly198")
+        self.assertEqual(complete.calls, [])
+
     def test_high_confidence_routes_do_not_call_llm(self):
         from routing import HybridRouter, Route
 

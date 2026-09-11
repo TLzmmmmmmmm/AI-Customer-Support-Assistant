@@ -1,8 +1,8 @@
 from .core import (
     CitationCollection,
     CitationRenderResult,
+    citation_heading,
     collect_sources,
-    format_citations,
     render_answer,
     sanitize_generated_answer,
 )
@@ -10,8 +10,8 @@ from .core import (
 __all__ = [
     "CitationCollection",
     "CitationRenderResult",
+    "citation_heading",
     "collect_sources",
-    "format_citations",
     "render_answer",
     "sanitize_generated_answer",
 ]

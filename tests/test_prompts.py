@@ -24,6 +24,27 @@ def parse_tool_data(content: str) -> dict:
 
 
 class RagPromptBuilderTests(unittest.TestCase):
+    def test_all_generation_paths_require_plain_text_comparison_groups(self):
+        direct = prompts.build_direct_messages([
+            ChatMessage(role="user", content="比较 LY598 和 LY198"),
+        ])
+        rag = prompts.build_rag_messages([
+            ChatMessage(role="user", content="比较两个方案"),
+        ], [])
+        tool = prompts.build_tool_messages(
+            [ChatMessage(role="user", content="比较 LY598 和 LY198")],
+            route="exact_product",
+            observation='{"ok":true,"result":{}}',
+        )
+
+        for messages in (direct, rag, tool):
+            with self.subTest(messages=messages):
+                system_text = messages[0]["content"]
+                self.assertIn("不要使用 Markdown 表格或 HTML 表格", system_text)
+                self.assertIn("每个属性独立成组", system_text)
+                self.assertIn("型号或对象名称：资料值", system_text)
+                self.assertIn("属性组之间保留一个空行", system_text)
+
     def test_all_generation_paths_forbid_model_generated_citations_and_urls(self):
         direct = prompts.build_direct_messages([
             ChatMessage(role="user", content="你好"),

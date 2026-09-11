@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
@@ -43,6 +43,7 @@ class CitationCollection:
 class CitationRenderResult:
     text: str
     sources: tuple[SourceRef, ...]
+    citation_heading: str | None
     invalid_source_count: int
     deduplicated_count: int
     answer_sanitized: bool
@@ -115,24 +116,15 @@ def _answer_language(text: str) -> str | None:
     return None
 
 
-def format_citations(
-    sources: Sequence[SourceRef],
+def citation_heading(
     *,
     language_text: str,
     language_hint: str = "",
 ) -> str:
-    if not sources:
-        return ""
     language = _answer_language(language_text) or _answer_language(language_hint)
     if language == "zh":
-        heading = "参考资料："
-        separator = "："
-    else:
-        heading = "References:"
-        separator = ": "
-    lines = [heading]
-    lines.extend(f"{source.title}{separator}{source.url}" for source in sources)
-    return "\n".join(lines)
+        return "参考资料："
+    return "References:"
 
 
 def render_answer(
@@ -149,6 +141,7 @@ def render_answer(
         return CitationRenderResult(
             text=fallback,
             sources=(),
+            citation_heading=None,
             invalid_source_count=0,
             deduplicated_count=0,
             answer_sanitized=sanitized,
@@ -156,15 +149,16 @@ def render_answer(
         )
 
     collection = collect_sources(sources)
-    citations = format_citations(
-        collection.sources,
-        language_text=cleaned,
-        language_hint=language_hint,
-    )
-    rendered = cleaned if not citations else f"{cleaned.rstrip()}\n\n{citations}"
+    heading = None
+    if collection.sources:
+        heading = citation_heading(
+            language_text=cleaned,
+            language_hint=language_hint,
+        )
     return CitationRenderResult(
-        text=rendered,
+        text=cleaned,
         sources=collection.sources,
+        citation_heading=heading,
         invalid_source_count=collection.invalid_source_count,
         deduplicated_count=collection.deduplicated_count,
         answer_sanitized=sanitized,

@@ -131,11 +131,20 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
 
     def assert_ndjson(self, response, answer="受控回答", citations=()):
         self.assertEqual(response.status_code, 200)
+        events = [{"type": "delta", "content": answer}]
         if citations:
-            answer = answer + "\n\n参考资料：\n" + "\n".join(citations)
+            events.append({
+                "type": "citations",
+                "heading": "参考资料：",
+                "items": [
+                    {"title": title, "url": url}
+                    for title, url in citations
+                ],
+            })
+        events.append({"type": "done"})
         self.assertEqual(
             [json.loads(line) for line in response.text.splitlines()],
-            [{"type": "delta", "content": answer}, {"type": "done"}],
+            events,
         )
 
     def assert_slot_available(self):
@@ -151,24 +160,24 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             (
                 "推荐几款对讲机", "product_search", "search_products", 1, 1,
                 (
-                    "HP780：https://example.com/hp780/",
-                    "润信达 LY198：https://example.com/ly198/",
+                    ("HP780", "https://example.com/hp780/"),
+                    ("润信达 LY198", "https://example.com/ly198/"),
                 ),
             ),
             (
                 "LY198 功率是多少？", "exact_product", "get_product_details", 0, 1,
-                ("润信达 LY198：https://www.shengborun.com/two-way-radio/ly198/",),
+                (("润信达 LY198", "https://www.shengborun.com/two-way-radio/ly198/"),),
             ),
             (
                 "公司的电话是多少？", "contact", "get_contact_info", 0, 1,
-                ("联系我们：https://www.shengborun.com/about/#contact",),
+                (("联系我们", "https://www.shengborun.com/about/#contact"),),
             ),
             (
                 "你们有哪些解决方案？", "knowledge", None, 1, 1,
                 (
-                    "酒店通信：https://example.com/hotel/",
-                    "HP780：https://example.com/hp780/",
-                    "润信达 LY198：https://example.com/ly198/",
+                    ("酒店通信", "https://example.com/hotel/"),
+                    ("HP780", "https://example.com/hp780/"),
+                    ("润信达 LY198", "https://example.com/ly198/"),
                 ),
             ),
             ("你好", "direct", None, 0, 1, ()),
@@ -206,8 +215,8 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
                     response = self.post(question)
                 self.assert_ndjson(response, citations=(
-                    "HP780：https://example.com/hp780/",
-                    "润信达 LY198：https://example.com/ly198/",
+                    ("HP780", "https://example.com/hp780/"),
+                    ("润信达 LY198", "https://example.com/ly198/"),
                 ))
                 self.assertEqual(self.embedding.queries, [question])
                 self.assertEqual(self.create.call_count, 1)
@@ -228,8 +237,8 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             response,
             "候选产品，请联系专业技术人员确认选型。",
             (
-                "HP780：https://example.com/hp780/",
-                "润信达 LY198：https://example.com/ly198/",
+                ("HP780", "https://example.com/hp780/"),
+                ("润信达 LY198", "https://example.com/ly198/"),
             ),
         )
         self.assertEqual(self.embedding.queries, [question])
@@ -251,10 +260,10 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             response,
             "方案说明和联系渠道。",
             (
-                "酒店通信：https://example.com/hotel/",
-                "HP780：https://example.com/hp780/",
-                "润信达 LY198：https://example.com/ly198/",
-                "联系我们：https://www.shengborun.com/about/#contact",
+                ("酒店通信", "https://example.com/hotel/"),
+                ("HP780", "https://example.com/hp780/"),
+                ("润信达 LY198", "https://example.com/ly198/"),
+                ("联系我们", "https://www.shengborun.com/about/#contact"),
             ),
         )
         self.assertEqual(self.embedding.queries, [question])
@@ -284,7 +293,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assert_ndjson(
             response,
             "第二款 HP780 的防护等级是 IP68。",
-            ("海能达 HP780：https://www.shengborun.com/two-way-radio/hp780/",),
+            (("海能达 HP780", "https://www.shengborun.com/two-way-radio/hp780/"),),
         )
         self.assertEqual(self.embedding.queries, [])
         self.assertEqual(self.create.call_count, 3)
@@ -328,7 +337,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             response = self.post(private_question)
         self.assert_ndjson(
             response,
-            citations=("联系我们：https://www.shengborun.com/about/#contact",),
+            citations=(("联系我们", "https://www.shengborun.com/about/#contact"),),
         )
         message = logs.records[0].getMessage()
         for forbidden in (

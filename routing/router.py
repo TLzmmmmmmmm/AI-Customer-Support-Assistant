@@ -35,10 +35,10 @@ _CONTACT = re.compile(r"电话|邮箱|电子邮件|联系方式|怎么联系|如
 _PRODUCT_TERM = re.compile(r"产品|型号|对讲机|设备|候选|product|model|radio", re.I)
 _PRODUCT_DISCOVERY = re.compile(r"推荐|候选|有哪些|哪几款|怎么选|如何选|选择|适合|recommend|candidate", re.I)
 _KNOWLEDGE = re.compile(r"解决方案|通信方案|系统方案|售后服务|技术支持|支持服务|solution|support service", re.I)
-_EXACT_FACT = re.compile(r"功率|参数|规格|频率|防护|功能|特性|详情|介绍|区别|比较|认证|电池|尺寸|重量|是否支持|power|spec", re.I)
 _INVENTORY = re.compile(r"库存|存货|现货|有货|inventory|in stock|stock level|availability", re.I)
 _CURRENT_STATE = re.compile(r"今天|现在|当前|实时|还有|多少|有没有|是否|查询|查一下|today|current|real.?time", re.I)
 _CONTEXT_REFERENCE = re.compile(r"第二个|第[一二三四五六七八九十0-9]+个|刚才那个|它|这个产品|那个产品|the previous|that one", re.I)
+_PRODUCT_COMPARISON = re.compile(r"相比|比较|对比|区别|差异|哪(?:个|款).*(?:好|优)|versus|\bvs\.?\b", re.I)
 _OBSERVATION_DEPENDENT = re.compile(r"如果.+(?:多个|几款|有).+(?:再|然后|比较|选)|if .+ then", re.I)
 _TRAILING_PUNCTUATION = re.compile(r"[\s，。！？、,.!?]+")
 
@@ -95,12 +95,17 @@ class HybridRouter:
             and _PRODUCT_DISCOVERY.search(question)
         )
         knowledge = bool(_KNOWLEDGE.search(question))
-        exact_product = bool(matches and _EXACT_FACT.search(question))
+        exact_product = bool(matches)
         unsupported = bool(
             _INVENTORY.search(question)
             and (matches or _CURRENT_STATE.search(question))
         )
         contextual = bool(_CONTEXT_REFERENCE.search(question) and not matches)
+        comparative_reference = bool(
+            matches
+            and _CONTEXT_REFERENCE.search(question)
+            and _PRODUCT_COMPARISON.search(question)
+        )
         observation_dependent = bool(_OBSERVATION_DEPENDENT.search(question))
 
         capabilities = {
@@ -115,13 +120,15 @@ class HybridRouter:
         }
         agentic = (
             len(capabilities) > 1
+            or len(matches) > 1
+            or comparative_reference
             or observation_dependent
             or contextual
         )
 
         if normalized in _DIRECT_UTTERANCES and not capabilities:
             return RoutingResult(RouteDecision(route=Route.DIRECT))
-        if unsupported and not capabilities:
+        if unsupported:
             return RoutingResult(RouteDecision(
                 route=Route.FALLBACK,
                 product_id=product_id,

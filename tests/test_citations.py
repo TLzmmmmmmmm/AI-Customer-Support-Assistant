@@ -113,44 +113,22 @@ class GeneratedAnswerGuardTests(unittest.TestCase):
         )
 
 
-class CitationFormatterTests(unittest.TestCase):
-    def test_formats_chinese_and_english_headings_with_original_titles(self):
-        from citation import format_citations
+class CitationHeadingTests(unittest.TestCase):
+    def test_localizes_chinese_and_english_headings(self):
+        from citation import citation_heading
 
-        sources = (SourceRef(
-            title="LY198 产品详情",
-            url="https://example.com/ly198",
-        ),)
-
-        self.assertEqual(
-            format_citations(sources, language_text="产品回答"),
-            "参考资料：\nLY198 产品详情：https://example.com/ly198",
-        )
-        self.assertEqual(
-            format_citations(sources, language_text="Product answer"),
-            "References:\nLY198 产品详情: https://example.com/ly198",
-        )
-
-    def test_empty_sources_format_to_empty_text(self):
-        from citation import format_citations
-
-        self.assertEqual(format_citations((), language_text="answer"), "")
+        self.assertEqual(citation_heading(language_text="产品回答"), "参考资料：")
+        self.assertEqual(citation_heading(language_text="Product answer"), "References:")
 
     def test_ambiguous_answer_language_uses_latest_question_hint(self):
-        from citation import format_citations
-
-        sources = (SourceRef(
-            title="LY198",
-            url="https://example.com/ly198",
-        ),)
+        from citation import citation_heading
 
         self.assertEqual(
-            format_citations(
-                sources,
+            citation_heading(
                 language_text="LY198 5W",
                 language_hint="LY198 的功率是多少？",
             ),
-            "参考资料：\nLY198：https://example.com/ly198",
+            "参考资料：",
         )
 
 
@@ -173,7 +151,7 @@ class CitationRenderingTests(unittest.TestCase):
         self.assertEqual(result.invalid_source_count, 2)
         self.assertNotIn("References:", result.text)
 
-    def test_trusted_url_in_model_body_is_removed_then_backend_appends_it(self):
+    def test_trusted_url_in_model_body_is_removed_and_only_kept_as_source_data(self):
         from citation import render_answer
 
         source = SourceRef(
@@ -188,12 +166,10 @@ class CitationRenderingTests(unittest.TestCase):
             language_hint="question",
         )
 
-        self.assertEqual(
-            result.text,
-            "Read\n\nReferences:\n"
-            "Product: https://trusted.example/product",
-        )
-        self.assertEqual(result.text.count(source.url), 1)
+        self.assertEqual(result.text, "Read")
+        self.assertNotIn(source.url, result.text)
+        self.assertEqual(result.sources, (source,))
+        self.assertEqual(result.citation_heading, "References:")
 
     def test_renders_clean_answer_and_trusted_references(self):
         from citation import render_answer
@@ -210,12 +186,9 @@ class CitationRenderingTests(unittest.TestCase):
             language_hint="LY198 功率是多少？",
         )
 
-        self.assertEqual(
-            result.text,
-            "详情见\n\n参考资料：\n"
-            "LY198 产品详情：https://trusted.example/ly198",
-        )
+        self.assertEqual(result.text, "详情见")
         self.assertEqual(result.sources, (trusted,))
+        self.assertEqual(result.citation_heading, "参考资料：")
         self.assertEqual(result.invalid_source_count, 0)
         self.assertEqual(result.deduplicated_count, 0)
         self.assertTrue(result.answer_sanitized)
@@ -232,6 +205,7 @@ class CitationRenderingTests(unittest.TestCase):
         )
 
         self.assertEqual(result.text, "Safe fallback")
+        self.assertIsNone(result.citation_heading)
         self.assertTrue(result.answer_sanitized)
         self.assertTrue(result.used_fallback)
 

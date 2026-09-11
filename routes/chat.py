@@ -7,6 +7,7 @@ from typing import Protocol
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from knowledge_pipeline.retrieval import RetrievalError
+from knowledge_pipeline.models import SourceRef
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -49,6 +50,8 @@ def encode_event(event: dict[str, object]) -> str:
 
 def answer_events_with_slot(
     answer: str,
+    sources: Sequence[SourceRef],
+    citation_heading: str | None,
     request_id: str,
     started_at: float,
     trace: RouteTrace,
@@ -65,6 +68,15 @@ def answer_events_with_slot(
             started_at=started_at,
             trace=trace,
         )
+        if sources and citation_heading:
+            yield encode_event({
+                "type": "citations",
+                "heading": citation_heading,
+                "items": [
+                    {"title": source.title, "url": source.url}
+                    for source in sources
+                ],
+            })
         yield encode_event({
             "type": "done",
         })
@@ -183,6 +195,8 @@ def chat_stream(
     return StreamingResponse(
         answer_events_with_slot(
             rendered.text,
+            rendered.sources,
+            rendered.citation_heading,
             request_id,
             started_at,
             trace,

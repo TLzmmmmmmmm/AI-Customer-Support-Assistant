@@ -489,12 +489,29 @@ The backend adds trusted references after generation.
 """.strip()
 
 
+PLAIN_TEXT_COMPARISON_POLICY = """
+## 纯文本对比格式
+
+客户端保留普通换行，但不渲染 Markdown。比较两个或多个产品、型号、方案或其他对象时，不要使用 Markdown 表格或 HTML 表格，也不要输出竖线表格或 `---` 表头分隔符。
+
+多项对比时，每个属性独立成组：
+1. 属性名称单独占一行，不添加 Markdown 项目符号；
+2. 随后每个对象各占一行，格式为“型号或对象名称：资料值”；
+3. 属性组之间保留一个空行；
+4. 产品特点等汇总内容也按对象分别占一行。
+
+可以在开头使用一行简短的纯文本标题。保持用户所用语言，不要为了排版改变、删减或推断事实。
+""".strip()
+
+
 SYSTEM_PROMPT = (
     BASE_SYSTEM_PROMPT.rstrip()
     + "\n\n"
     + RAG_SYSTEM_INSTRUCTIONS.strip()
     + "\n\n"
     + CITATION_GENERATION_POLICY
+    + "\n\n"
+    + PLAIN_TEXT_COMPARISON_POLICY
 )
 
 RAG_DATA_NOTICE = (

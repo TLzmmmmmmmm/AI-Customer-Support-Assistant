@@ -159,11 +159,15 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         self.assertEqual(events, [
             {
                 "type": "delta",
-                "content": (
-                    "LY198 功率信息。详情见 产品页。\n\n"
-                    "参考资料：\n"
-                    "LY198 产品详情：https://trusted.example/products/ly198/"
-                ),
+                "content": "LY198 功率信息。详情见 产品页。",
+            },
+            {
+                "type": "citations",
+                "heading": "参考资料：",
+                "items": [{
+                    "title": "LY198 产品详情",
+                    "url": "https://trusted.example/products/ly198/",
+                }],
             },
             {"type": "done"},
         ])

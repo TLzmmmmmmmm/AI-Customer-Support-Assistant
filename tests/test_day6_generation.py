@@ -74,12 +74,9 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(summary["completed_cases"], 1)
         self.assertEqual(
             row["answer"],
-            "无法确认价格。\n\n参考资料：\n"
-            "noise：https://example.com/noise/\n"
-            "alpha：https://example.com/alpha/\n"
-            "beta：https://example.com/beta/",
+            "无法确认价格。",
         )
-        self.assertEqual(row["event_types"], ["delta", "done"])
+        self.assertEqual(row["event_types"], ["delta", "citations", "done"])
         self.assertEqual(row["http_status"], 200)
         self.assertEqual(provider.queries, [case.question])
         self.assertTrue(row["clean_hits"])
@@ -184,10 +181,7 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(rows[0]["query"], "alpha 参数")
         self.assertEqual(
             rows[0]["answer"],
-            "产品说明\n\n参考资料：\n"
-            "alpha：https://example.com/alpha/\n"
-            "noise：https://example.com/noise/\n"
-            "beta：https://example.com/beta/",
+            "产品说明",
         )
         self.assertEqual(provider.queries, ["alpha 参数"])
 

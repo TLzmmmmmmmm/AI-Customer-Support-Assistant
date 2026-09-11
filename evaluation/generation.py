@@ -204,7 +204,10 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
                         bool(active["answer"].strip()) and bool(events)
                         and active["event_types"][-1] == "done"
                         and active["event_types"].count("done") == 1
-                        and all(kind in ("delta", "done") for kind in active["event_types"])
+                        and all(
+                            kind in ("delta", "citations", "done")
+                            for kind in active["event_types"]
+                        )
                         and active["content_type"].startswith("application/x-ndjson")
                         and bool(active["finish_reasons"])
                         and active["finish_reasons"][-1] == "stop"

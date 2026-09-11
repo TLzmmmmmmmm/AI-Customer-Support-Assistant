@@ -25,7 +25,7 @@ from knowledge_pipeline.models import (
     TechnicalParameterGroup,
     TechnicalParameterItem,
 )
-from knowledge_pipeline.retrieval.models import RetrievalResult
+from knowledge_pipeline.retrieval.models import EntityMatch, RetrievalResult
 from models import ChatMessage
 from prompts import build_direct_messages
 from routing import (
@@ -1300,6 +1300,80 @@ class AgentGraphTests(unittest.TestCase):
             [trace.reused for trace in second.trace.tool_calls],
             [False],
         )
+
+    def test_repeated_explicit_product_question_uses_details_without_fallback(self):
+        source = SourceRef(
+            title="LY198 产品详情",
+            url="https://example.com/products/ly198/",
+        )
+        tool_calls = []
+
+        class ExplicitProductRetriever(RecordingRetriever):
+            def resolve_entities(self, query):
+                self.queries.append(query)
+                return [EntityMatch(
+                    parent_document_id="product:ly198",
+                    alias="ly198",
+                    start=0,
+                )]
+
+        def get_product_details(product_id):
+            tool_calls.append(product_id)
+            return ProductDetailsResult(
+                product_id=product_id,
+                name="LY198",
+                category_id="two-way-radio",
+                category_name="对讲机",
+                key_features=["小巧轻薄", "一键对频"],
+                product_features="适用于日常通信。",
+                technical_parameters=[TechnicalParameterGroup(
+                    group="基本参数",
+                    items=[TechnicalParameterItem(name="功率", value="2W")],
+                )],
+                sources=[source],
+            )
+
+        complete = RecordingCompletion([
+            _completion("LY198 小巧轻薄，并支持一键对频。")
+            for _ in range(5)
+        ])
+        retriever = ExplicitProductRetriever()
+        graph = build_agent_graph(AgentGraphNodes(
+            router=HybridRouter(
+                retriever=retriever,
+                complete_chat=complete,
+            ),
+            executor=ToolExecutor(MappingProxyType({
+                "get_product_details": get_product_details,
+            })),
+            retriever=retriever,
+            complete_chat=complete,
+        ))
+        orchestrator = GraphRouteOrchestrator(graph)
+        question = "LY198的优点是什么？"
+        history = []
+
+        for _ in range(5):
+            result = orchestrator.run(
+                [
+                    *history,
+                    ChatMessage(role="user", content=question),
+                ],
+                deadline=RecordingDeadline(),
+            )
+            self.assertEqual(result.trace.route, Route.EXACT_PRODUCT)
+            self.assertEqual(
+                [trace.name for trace in result.trace.tool_calls],
+                ["get_product_details"],
+            )
+            self.assertNotEqual(result.answer, SAFE_FALLBACK_ANSWER)
+            history.extend((
+                ChatMessage(role="user", content=question),
+                ChatMessage(role="assistant", content=result.answer),
+            ))
+
+        self.assertEqual(tool_calls, ["ly198"] * 5)
+        self.assertEqual(len(complete.calls), 5)
 
     def test_disabled_tools_completion_cannot_execute_fourth_call(self):
         visited = []
