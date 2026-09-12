@@ -23,7 +23,9 @@ from .tool_outcomes import (
 
 AGENT_TOOL_POLICY = """
 Use the provided deterministic tools under these rules:
-- Exact product model parameters, features, and details require get_product_details.
+- Exact-product factual answers require get_product_details. A factual answer requires a successful get_product_details observation for every product whose facts are stated. Conversation history may identify a product but is not factual evidence. Never answer product facts from previous assistant text, model memory, or general knowledge.
+- Multiple products explicitly requested are intended targets, not ambiguous singular references. Retrieve every required product within the tool-call limit.
+- A genuinely ambiguous singular reference with multiple plausible antecedents must be clarified. Do not guess or produce an exact-product factual claim unless that product has a successful get_product_details observation in the current execution.
 - Explicit product discovery, candidate selection, and recommendation requests require search_products.
 - Explicit phone, email, and contact-channel questions require get_contact_info.
 - Recommendation and scenario-fit answers must frame products as candidates unless an observation explicitly proves suitability, and must direct the user to professional technical staff for final selection.

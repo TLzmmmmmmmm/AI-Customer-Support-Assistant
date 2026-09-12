@@ -167,7 +167,7 @@ class HybridRouterTests(unittest.TestCase):
         self.assertIsNone(result.decision.product_id)
         self.assertEqual(complete.calls, [])
 
-    def test_any_explicit_product_pronoun_routes_to_agent(self):
+    def test_product_pronouns_distinguish_comparison_from_single_target(self):
         from routing import HybridRouter, Route
 
         comparison = "LY198 和刚才那个相比怎么样？"
@@ -191,10 +191,10 @@ class HybridRouterTests(unittest.TestCase):
         self.assertEqual(comparison_result.decision.route, Route.EXACT_PRODUCT)
         self.assertTrue(comparison_result.decision.agentic)
         self.assertEqual(same_product_result.decision.route, Route.EXACT_PRODUCT)
-        self.assertTrue(same_product_result.decision.agentic)
+        self.assertFalse(same_product_result.decision.agentic)
         self.assertEqual(complete.calls, [])
 
-    def test_unique_prior_user_product_reference_routes_to_agent_without_router_llm(self):
+    def test_unique_prior_user_product_reference_is_deterministic_without_router_llm(self):
         from routing import HybridRouter, Route
 
         question = "那它支持什么频段？"
@@ -217,9 +217,37 @@ class HybridRouterTests(unittest.TestCase):
         )
 
         self.assertEqual(result.decision.route, Route.EXACT_PRODUCT)
-        self.assertTrue(result.decision.agentic)
+        self.assertFalse(result.decision.agentic)
         self.assertEqual(result.decision.product_id, "ly198")
         self.assertEqual(retriever.queries, [question, prior_question])
+        self.assertEqual(complete.calls, [])
+
+    def test_two_prior_user_products_keep_singular_reference_agentic(self):
+        from routing import HybridRouter, Route
+
+        prior_question = "请比较 LY198 和 LY598。"
+        retriever = RecordingRetriever({
+            prior_question: ("ly198", "ly598"),
+        })
+        complete = RecordingCompletion([completion("exact_product")])
+
+        result = HybridRouter(
+            retriever=retriever,
+            complete_chat=complete,
+        ).route(
+            messages(
+                "那它的功率呢？",
+                (
+                    ("user", prior_question),
+                    ("assistant", "两款产品的参数不同。"),
+                ),
+            ),
+            deadline=RecordingDeadline(),
+        )
+
+        self.assertEqual(result.decision.route, Route.EXACT_PRODUCT)
+        self.assertTrue(result.decision.agentic)
+        self.assertIsNone(result.decision.product_id)
         self.assertEqual(complete.calls, [])
 
     def test_repeated_explicit_product_question_ignores_conversation_history(self):

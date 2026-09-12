@@ -1375,6 +1375,85 @@ class AgentGraphTests(unittest.TestCase):
         self.assertEqual(tool_calls, ["ly198"] * 5)
         self.assertEqual(len(complete.calls), 5)
 
+    def test_unique_contextual_product_uses_deterministic_details_before_generation(self):
+        prior_question = "LY198 的功率是多少？"
+        messages = (
+            ChatMessage(role="user", content=prior_question),
+            ChatMessage(
+                role="assistant",
+                content="LY198 的输出功率是 ≤2W。",
+            ),
+            ChatMessage(role="user", content="那它支持什么频段？"),
+        )
+        calls = []
+        observation = ToolObservation(
+            content=(
+                '{"ok":true,"result":{"product_id":"ly198",'
+                '"frequency_range":"400-480MHz"}}'
+            ),
+            success=True,
+            reused=False,
+            cache_key="get_product_details:ly198",
+            tool_name="get_product_details",
+        )
+
+        class ContextProductRetriever(RecordingRetriever):
+            def resolve_entities(self, query):
+                self.queries.append(query)
+                if query == prior_question:
+                    return [EntityMatch(
+                        parent_document_id="product:ly198",
+                        alias="LY198",
+                        start=0,
+                    )]
+                return []
+
+        class ContextProductExecutor(RecordingGraphExecutor):
+            def execute_named(self, name, arguments, cache):
+                self.visited.append("deterministic_tool")
+                calls.append((name, arguments, cache))
+                return observation
+
+        visited = []
+        retriever = ContextProductRetriever()
+        complete = RecordingCompletion(
+            [_completion("LY198 支持 400-480MHz。")],
+            visited=visited,
+            label="deterministic_generate",
+        )
+        graph = build_agent_graph(AgentGraphNodes(
+            router=HybridRouter(
+                retriever=retriever,
+                complete_chat=complete,
+            ),
+            executor=ContextProductExecutor(visited),
+            retriever=retriever,
+            complete_chat=complete,
+        ))
+
+        result = GraphRouteOrchestrator(graph).run(
+            messages,
+            deadline=RecordingDeadline(),
+        )
+
+        self.assertEqual(
+            visited,
+            ["deterministic_tool", "deterministic_generate"],
+        )
+        self.assertEqual(calls, [(
+            "get_product_details",
+            {"product_id": "ly198"},
+            {},
+        )])
+        self.assertEqual(len(complete.calls), 1)
+        self.assertIsNone(complete.calls[0][1])
+        self.assertIn("400-480MHz", complete.calls[0][0][-1]["content"])
+        self.assertEqual(result.trace.route, Route.EXACT_PRODUCT)
+        self.assertEqual(result.trace.tool_calls, (
+            ToolTrace("get_product_details", True),
+        ))
+        self.assertEqual(result.trace.tool_call_count, 1)
+
     def test_disabled_tools_completion_cannot_execute_fourth_call(self):
         visited = []
         complete = KeywordRecordingCompletion([

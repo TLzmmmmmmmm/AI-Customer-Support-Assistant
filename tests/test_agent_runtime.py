@@ -30,6 +30,17 @@ class ExpiredDeadline:
 
 
 class AgentRuntimeTests(unittest.TestCase):
+    def test_agent_policy_requires_current_details_evidence_for_product_facts(self):
+        self.assertIn(
+            "successful get_product_details observation",
+            AGENT_TOOL_POLICY,
+        )
+        self.assertIn("previous assistant text", AGENT_TOOL_POLICY)
+        self.assertIn("model memory", AGENT_TOOL_POLICY)
+        self.assertIn("general knowledge", AGENT_TOOL_POLICY)
+        self.assertIn("Multiple products explicitly requested", AGENT_TOOL_POLICY)
+        self.assertIn("genuinely ambiguous singular reference", AGENT_TOOL_POLICY)
+
     def test_build_agent_messages_copies_input_and_inserts_policy(self):
         original = [
             {"role": "system", "content": "trust boundary"},

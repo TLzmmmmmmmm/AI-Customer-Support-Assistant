@@ -9,8 +9,15 @@ from knowledge_pipeline.models import (
     TechnicalParameterGroup,
     TechnicalParameterItem,
 )
+from knowledge_pipeline.retrieval.models import EntityMatch
 from models import ChatMessage
-from routing import SAFE_FALLBACK_ANSWER, Route, RouteDecision, RouteOrchestrator
+from routing import (
+    SAFE_FALLBACK_ANSWER,
+    HybridRouter,
+    Route,
+    RouteDecision,
+    RouteOrchestrator,
+)
 from support_tools import ContactInfoResult, ProductDetailsResult, ProductSearchResult
 from tests.test_agent_graph import (
     RecordingCompletion,
@@ -304,6 +311,81 @@ PARITY_CASES = (
 
 
 class OrchestratorParityTests(unittest.TestCase):
+    def test_unique_contextual_exact_product_is_deterministic_in_raw_and_graph(self):
+        prior_question = "LY198 的功率是多少？"
+        contextual_messages = _messages(
+            "那它支持什么频段？",
+            (
+                ("user", prior_question),
+                ("assistant", "LY198 的输出功率是 ≤2W。"),
+            ),
+        )
+
+        class ContextProductRetriever(RecordingRetriever):
+            def resolve_entities(self, query):
+                self.queries.append(query)
+                if query == prior_question:
+                    return [EntityMatch(
+                        parent_document_id="product:ly198",
+                        alias="LY198",
+                        start=0,
+                    )]
+                return []
+
+        def build_dependencies():
+            executor = RecordingToolExecutor(_tool_registry())
+            complete = RecordingCompletion([_completion("支持 400-480MHz。")])
+            retriever = ContextProductRetriever()
+            router = HybridRouter(
+                retriever=retriever,
+                complete_chat=complete,
+            )
+            return executor, complete, retriever, router
+
+        raw_executor, raw_complete, raw_retriever, raw_router = build_dependencies()
+        raw = AgentEvaluationRunner(RouteOrchestrator(
+            router=raw_router,
+            retriever=raw_retriever,
+            executor=raw_executor,
+            agent_loop=AgentLoop(
+                executor=raw_executor,
+                complete_chat=raw_complete,
+            ),
+            complete_chat=raw_complete,
+        ), raw_executor).run(
+            contextual_messages,
+            deadline=RecordingDeadline(),
+        )
+
+        graph_executor, graph_complete, graph_retriever, graph_router = (
+            build_dependencies()
+        )
+        graph = build_agent_graph(AgentGraphNodes(
+            router=graph_router,
+            executor=graph_executor,
+            retriever=graph_retriever,
+            complete_chat=graph_complete,
+        ))
+        graph_result = AgentEvaluationRunner(
+            GraphRouteOrchestrator(graph),
+            graph_executor,
+        ).run(
+            contextual_messages,
+            deadline=RecordingDeadline(),
+        )
+
+        expected_calls = ({
+            "name": "get_product_details",
+            "arguments": {"product_id": "ly198"},
+        },)
+        self.assertEqual(raw["route"], Route.EXACT_PRODUCT)
+        self.assertEqual(graph_result["route"], raw["route"])
+        self.assertEqual(raw["tool_calls"], expected_calls)
+        self.assertEqual(graph_result["tool_calls"], expected_calls)
+        self.assertEqual(graph_result["final_answer"], raw["final_answer"])
+        self.assertEqual(len(raw_complete.calls), 1)
+        self.assertEqual(len(graph_complete.calls), 1)
+
     def test_raw_and_graph_preserve_observable_business_behavior(self):
         for case in PARITY_CASES:
             with self.subTest(case=case["name"]):

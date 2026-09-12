@@ -155,7 +155,7 @@ class HybridRouter:
             if historical_product_ids:
                 return RoutingResult(RouteDecision(
                     route=Route.EXACT_PRODUCT,
-                    agentic=True,
+                    agentic=len(historical_product_ids) != 1,
                     product_id=(
                         next(iter(historical_product_ids))
                         if len(historical_product_ids) == 1
@@ -170,9 +170,18 @@ class HybridRouter:
             Route.CONTACT,
         ):
             if route in capabilities:
+                route_agentic = agentic
+                if (
+                    route == Route.EXACT_PRODUCT
+                    and product_id is not None
+                    and capabilities == {Route.EXACT_PRODUCT}
+                    and not comparative_reference
+                    and not observation_dependent
+                ):
+                    route_agentic = False
                 return RoutingResult(RouteDecision(
                     route=route,
-                    agentic=agentic,
+                    agentic=route_agentic,
                     product_id=product_id,
                 ))
 
