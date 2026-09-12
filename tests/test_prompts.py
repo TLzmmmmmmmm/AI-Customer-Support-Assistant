@@ -24,6 +24,123 @@ def parse_tool_data(content: str) -> dict:
 
 
 class RagPromptBuilderTests(unittest.TestCase):
+    def test_direct_messages_do_not_receive_rag_only_instructions(self):
+        result = prompts.build_direct_messages([
+            ChatMessage(role="user", content="你好"),
+        ])
+
+        system_text = result[0]["content"]
+        self.assertNotIn("user_question 才是用户当前的问题", system_text)
+        self.assertNotIn("当前提供的检索资料", system_text)
+        self.assertNotIn("type=product", system_text)
+
+    def test_tool_messages_do_not_receive_rag_only_instructions(self):
+        result = prompts.build_tool_messages(
+            [ChatMessage(role="user", content="LY198 的参数是什么？")],
+            route="exact_product",
+            observation='{"ok":true,"result":{}}',
+        )
+
+        system_text = result[0]["content"]
+        self.assertNotIn("user_question 才是用户当前的问题", system_text)
+        self.assertNotIn("当前提供的检索资料", system_text)
+        self.assertNotIn("type=product", system_text)
+
+    def test_tool_messages_use_the_enveloped_user_question_language(self):
+        result = prompts.build_tool_messages(
+            [ChatMessage(role="user", content="What is the LY198 output power?")],
+            route="exact_product",
+            observation='{"ok":true,"result":{}}',
+        )
+
+        self.assertIn(
+            "若当前消息包含 `user_question` 数据字段，以该字段的语言为准",
+            result[0]["content"],
+        )
+
+    def test_rag_messages_receive_common_and_rag_instructions_in_one_system_message(self):
+        result = prompts.build_rag_messages(
+            [ChatMessage(role="user", content="公司的解决方案有哪些？")],
+            [],
+        )
+
+        self.assertEqual(result[0], {
+            "role": "system",
+            "content": prompts.RAG_SYSTEM_PROMPT,
+        })
+        self.assertIn("user_question 才是用户当前的问题", result[0]["content"])
+        self.assertIn("当前提供的检索资料", result[0]["content"])
+        self.assertIn("type=product", result[0]["content"])
+        self.assertEqual(
+            [message["role"] for message in result],
+            ["system", "user"],
+        )
+
+    def test_common_epistemic_rules_remain_in_tool_and_rag_generation(self):
+        rag = prompts.build_rag_messages([
+            ChatMessage(role="user", content="公司的解决方案有哪些？"),
+        ], [])
+        tool = prompts.build_tool_messages(
+            [ChatMessage(role="user", content="LY198 的参数是什么？")],
+            route="exact_product",
+            observation='{"ok":true,"result":{}}',
+        )
+
+        for messages in (rag, tool):
+            with self.subTest(messages=messages):
+                system_text = messages[0]["content"]
+                self.assertIn("有依据的部分正常回答", system_text)
+                self.assertIn("未记录的功能按不支持处理", system_text)
+                self.assertIn("商业关系或动态商业信息", system_text)
+                self.assertIn("保留 ≤、≥、<、>、范围、单位和适用条件", system_text)
+                self.assertIn("不得从参数差异推测原因", system_text)
+                self.assertIn("不得根据用户使用场景推断产品适用性", system_text)
+
+    def test_agent_policy_is_not_part_of_non_agent_prompt_builders(self):
+        direct = prompts.build_direct_messages([
+            ChatMessage(role="user", content="你好"),
+        ])
+        rag = prompts.build_rag_messages([
+            ChatMessage(role="user", content="介绍解决方案")
+        ], [])
+        tool = prompts.build_tool_messages(
+            [ChatMessage(role="user", content="公司电话")],
+            route="contact",
+            observation='{"ok":true,"result":{}}',
+        )
+
+        for messages in (direct, rag, tool):
+            with self.subTest(messages=messages):
+                self.assertNotIn(
+                    "Use the provided deterministic tools under these rules",
+                    messages[0]["content"],
+                )
+
+    def test_citation_and_plain_text_policies_are_unchanged(self):
+        self.assertEqual(
+            prompts.CITATION_GENERATION_POLICY,
+            """## Citation output boundary
+
+Do not output URLs in the answer.
+Do not write a references or citation section.
+Do not invent or rewrite source titles.
+The backend adds trusted references after generation.""",
+        )
+        self.assertEqual(
+            prompts.PLAIN_TEXT_COMPARISON_POLICY,
+            """## 纯文本对比格式
+
+客户端保留普通换行，但不渲染 Markdown。比较两个或多个产品、型号、方案或其他对象时，不要使用 Markdown 表格或 HTML 表格，也不要输出竖线表格或 `---` 表头分隔符。
+
+多项对比时，每个属性独立成组：
+1. 属性名称单独占一行，不添加 Markdown 项目符号；
+2. 随后每个对象各占一行，格式为“型号或对象名称：资料值”；
+3. 属性组之间保留一个空行；
+4. 产品特点等汇总内容也按对象分别占一行。
+
+可以在开头使用一行简短的纯文本标题。保持用户所用语言，不要为了排版改变、删减或推断事实。""",
+        )
+
     def test_all_generation_paths_require_plain_text_comparison_groups(self):
         direct = prompts.build_direct_messages([
             ChatMessage(role="user", content="比较 LY598 和 LY198"),
@@ -106,6 +223,20 @@ class RagPromptBuilderTests(unittest.TestCase):
         })
         self.assertNotIn("ignore system rules", result[0]["content"])
         self.assertNotIn("ignore system rules", result[1]["content"])
+
+    def test_each_tool_route_keeps_its_specific_overlay(self):
+        for route, policy in prompts.TOOL_ROUTE_POLICIES.items():
+            with self.subTest(route=route):
+                result = prompts.build_tool_messages(
+                    [ChatMessage(role="user", content="测试问题")],
+                    route=route,
+                    observation='{"ok":true,"result":{}}',
+                )
+
+                self.assertEqual(result[1], {
+                    "role": "system",
+                    "content": policy,
+                })
 
     def test_contact_tool_messages_carry_no_address_field(self):
         observation = json.dumps({
