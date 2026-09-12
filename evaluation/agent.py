@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import TypedDict
+from typing import Protocol, TypedDict
 
 from agent import AgentDeadline, ToolExecutor, ToolObservation
 from agent.models import TOOL_SPECS
-from agent_graph import GraphRouteOrchestrator
 from models import ChatMessage
-from routing import Route
+from routing import Route, RouteExecutionResult
+
+
+class RouteExecutionRunner(Protocol):
+    def run(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        deadline: AgentDeadline,
+    ) -> RouteExecutionResult:
+        ...
 
 
 class ValidatedToolCall(TypedDict):
@@ -67,7 +76,7 @@ class RecordingToolExecutor(ToolExecutor):
 class AgentEvaluationRunner:
     def __init__(
         self,
-        orchestrator: GraphRouteOrchestrator,
+        orchestrator: RouteExecutionRunner,
         executor: RecordingToolExecutor,
     ) -> None:
         self._orchestrator = orchestrator
@@ -130,6 +139,7 @@ __all__ = [
     "AgentEvaluationObservation",
     "AgentEvaluationRunner",
     "RecordingToolExecutor",
+    "RouteExecutionRunner",
     "ValidatedToolCall",
     "tool_calls_match",
 ]
