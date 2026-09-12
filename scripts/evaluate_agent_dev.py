@@ -1,4 +1,4 @@
-"""Run the frozen Dev24 agent evaluation through production LangGraph."""
+"""Run a frozen agent evaluation through production LangGraph."""
 
 from __future__ import annotations
 
@@ -34,6 +34,12 @@ def _validate_dev24(cases) -> None:
     counts = Counter(case.expected_route for case in cases)
     if len(cases) != 24 or counts != Counter({route: 4 for route in Route}):
         raise ValueError("Dev24 must contain exactly four cases per route")
+
+
+def _validate_holdout6(cases) -> None:
+    counts = Counter(case.expected_route for case in cases)
+    if len(cases) != 6 or counts != Counter({route: 1 for route in Route}):
+        raise ValueError("Holdout6 must contain exactly one case per route")
 
 
 def _build_production_runner() -> AgentEvaluationRunner:
@@ -87,11 +93,11 @@ def _new_deadline() -> AgentDeadline:
     )
 
 
-def _output_path(root: Path, requested: Path | None) -> Path:
+def _output_path(root: Path, requested: Path | None, *, split: str) -> Path:
     directory = (root / "eval/results").resolve()
     if requested is None:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        path = directory / f"agent-dev-v1-{stamp}-{uuid4().hex[:8]}.json"
+        path = directory / f"agent-{split}-v1-{stamp}-{uuid4().hex[:8]}.json"
     else:
         path = (requested if requested.is_absolute() else root / requested).resolve()
     if (
@@ -124,21 +130,29 @@ def _print_summary(summary: dict[str, object], destination: Path) -> None:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
+    parser.add_argument("--split", choices=("dev", "holdout"), default="dev")
+    parser.add_argument("--allow-holdout", action="store_true")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
     try:
         root = args.root.resolve()
-        dataset = root / "evaluation/agent_dev_v1.jsonl"
+        if args.split == "holdout" and not args.allow_holdout:
+            raise ValueError("holdout evaluation requires --allow-holdout")
+        dataset_name = f"agent_{args.split}_v1.jsonl"
+        dataset = root / "evaluation" / dataset_name
         cases = load_agent_eval_cases(dataset)
-        _validate_dev24(cases)
+        if args.split == "dev":
+            _validate_dev24(cases)
+        else:
+            _validate_holdout6(cases)
         if not args.execute:
             print(f"Total cases: {len(cases)}")
             print("Mode: preflight (no provider calls)")
             return 0
 
-        destination = _output_path(root, args.output)
+        destination = _output_path(root, args.output, split=args.split)
         runner = _build_production_runner()
         report = run_agent_evaluation(
             cases,
@@ -147,9 +161,9 @@ def main(argv=None) -> int:
         )
         payload = {
             "schema_version": "1.0",
-            "evaluation_type": "agent_dev",
+            "evaluation_type": f"agent_{args.split}",
             "metadata": {
-                "dataset_path": "evaluation/agent_dev_v1.jsonl",
+                "dataset_path": f"evaluation/{dataset_name}",
                 "dataset_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
                 **_configured_model_metadata(root),
             },

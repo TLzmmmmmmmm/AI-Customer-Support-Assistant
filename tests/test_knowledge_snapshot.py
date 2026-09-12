@@ -80,9 +80,9 @@ class KnowledgeSnapshotCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(stderr, "")
         self.assertIn("Knowledge snapshot validation: PASS", stdout)
-        self.assertIn("Documents: 61", stdout)
-        self.assertIn("Chunks: 73", stdout)
-        self.assertIn("Vector records: 73", stdout)
+        self.assertIn("Documents: 62", stdout)
+        self.assertIn("Chunks: 74", stdout)
+        self.assertIn("Vector records: 74", stdout)
         self.assertIn(
             "Embedding: dashscope / qwen3.7-text-embedding / 3",
             stdout,

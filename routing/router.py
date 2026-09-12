@@ -71,6 +71,18 @@ def _normalize_route(completion) -> Route | None:
         return None
 
 
+def _historical_product_ids(messages, retriever) -> set[str]:
+    product_ids: set[str] = set()
+    for message in messages[:-1]:
+        if message.role != "user":
+            continue
+        for match in retriever.resolve_entities(message.content):
+            product_ids.add(
+                match.parent_document_id.removeprefix("product:")
+            )
+    return product_ids
+
+
 class HybridRouter:
     def __init__(self, *, retriever, complete_chat) -> None:
         self._retriever = retriever
@@ -100,7 +112,8 @@ class HybridRouter:
             _INVENTORY.search(question)
             and (matches or _CURRENT_STATE.search(question))
         )
-        contextual = bool(_CONTEXT_REFERENCE.search(question) and not matches)
+        has_context_reference = bool(_CONTEXT_REFERENCE.search(question))
+        contextual = bool(has_context_reference and not matches)
         comparative_reference = bool(
             matches
             and _CONTEXT_REFERENCE.search(question)
@@ -123,7 +136,7 @@ class HybridRouter:
             or len(matches) > 1
             or comparative_reference
             or observation_dependent
-            or contextual
+            or has_context_reference
         )
 
         if normalized in _DIRECT_UTTERANCES and not capabilities:
@@ -133,6 +146,22 @@ class HybridRouter:
                 route=Route.FALLBACK,
                 product_id=product_id,
             ))
+
+        if contextual and not capabilities:
+            historical_product_ids = _historical_product_ids(
+                messages,
+                self._retriever,
+            )
+            if historical_product_ids:
+                return RoutingResult(RouteDecision(
+                    route=Route.EXACT_PRODUCT,
+                    agentic=True,
+                    product_id=(
+                        next(iter(historical_product_ids))
+                        if len(historical_product_ids) == 1
+                        else None
+                    ),
+                ))
 
         for route in (
             Route.KNOWLEDGE,

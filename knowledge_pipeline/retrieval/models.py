@@ -19,6 +19,7 @@ from knowledge_pipeline.models import (
     Metadata,
     ProductMetadata,
     SourceRef,
+    SolutionCatalogMetadata,
     SolutionMetadata,
     StrictModel,
     SupportMetadata,
@@ -121,7 +122,7 @@ class VectorRecord(StrictModel):
         if not self.chunk_id.startswith(f"{self.parent_document_id}:"):
             raise ValueError("chunk_id must extend parent_document_id")
         expected_metadata_type = {
-            "catalog": CatalogMetadata,
+            "catalog": (CatalogMetadata, SolutionCatalogMetadata),
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,

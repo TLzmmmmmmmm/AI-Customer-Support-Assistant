@@ -212,6 +212,14 @@ class AgentBatchCliTests(unittest.TestCase):
             "".join(json.dumps(payload) + "\n" for payload in payloads),
             encoding="utf-8",
         )
+        holdout_payloads = [
+            case_payload(f"holdout_{route}_01", route)
+            for route in routes
+        ]
+        (self.root / "evaluation/agent_holdout_v1.jsonl").write_text(
+            "".join(json.dumps(payload) + "\n" for payload in holdout_payloads),
+            encoding="utf-8",
+        )
 
     def invoke(self, *arguments):
         stdout = io.StringIO()
@@ -234,6 +242,79 @@ class AgentBatchCliTests(unittest.TestCase):
             "Mode: preflight (no provider calls)",
         ])
         self.assertFalse((self.root / "eval/results").exists())
+
+    def test_holdout_requires_explicit_unlock(self):
+        with patch.object(
+            self.command,
+            "_build_production_runner",
+            side_effect=AssertionError("provider path constructed"),
+        ):
+            code, output, error = self.invoke("--split", "holdout")
+
+        self.assertEqual(code, 1)
+        self.assertEqual(output, "")
+        self.assertIn("Agent evaluation stopped: ValueError", error)
+        self.assertFalse((self.root / "eval/results").exists())
+
+    def test_holdout_preflight_validates_six_cases_without_building_dependencies(self):
+        with patch.object(
+            self.command,
+            "_build_production_runner",
+            side_effect=AssertionError("provider path constructed"),
+        ):
+            code, output, error = self.invoke(
+                "--split",
+                "holdout",
+                "--allow-holdout",
+            )
+
+        self.assertEqual(code, 0, error)
+        self.assertEqual(output.splitlines(), [
+            "Total cases: 6",
+            "Mode: preflight (no provider calls)",
+        ])
+        self.assertFalse((self.root / "eval/results").exists())
+
+    def test_holdout_execute_writes_holdout_report(self):
+        outcomes = {
+            f"holdout_{route}_01": {
+                "route": Route(route),
+                "tool_calls": (),
+                "final_answer": f"answer:{route}",
+            }
+            for route in (
+                "direct",
+                "product_search",
+                "exact_product",
+                "contact",
+                "knowledge",
+                "fallback",
+            )
+        }
+        runner = RecordingObservationRunner(outcomes)
+        with (
+            patch.object(self.command, "_build_production_runner", return_value=runner),
+            patch.object(self.command, "_configured_model_metadata", return_value={}),
+        ):
+            code, output, error = self.invoke(
+                "--split",
+                "holdout",
+                "--allow-holdout",
+                "--execute",
+            )
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Total cases: 6", output)
+        result_files = list(
+            (self.root / "eval/results").glob("agent-holdout-v1-*.json")
+        )
+        self.assertEqual(len(result_files), 1)
+        report = json.loads(result_files[0].read_text(encoding="utf-8"))
+        self.assertEqual(report["evaluation_type"], "agent_holdout")
+        self.assertEqual(
+            report["metadata"]["dataset_path"],
+            "evaluation/agent_holdout_v1.jsonl",
+        )
 
     def test_execute_writes_report_and_prints_only_the_five_summary_lines(self):
         outcomes = {

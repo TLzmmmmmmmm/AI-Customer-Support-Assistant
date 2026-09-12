@@ -129,7 +129,6 @@ class HybridRouterTests(unittest.TestCase):
             "LY198的优点是什么？",
             "LY598 有哪些卖点？",
             "请说说 LY198",
-            "LY198 它有什么优点？",
         )
         retriever = RecordingRetriever({
             question: "ly598" if "LY598" in question else "ly198"
@@ -168,7 +167,7 @@ class HybridRouterTests(unittest.TestCase):
         self.assertIsNone(result.decision.product_id)
         self.assertEqual(complete.calls, [])
 
-    def test_comparative_pronoun_routes_to_agent_but_same_product_pronoun_does_not(self):
+    def test_any_explicit_product_pronoun_routes_to_agent(self):
         from routing import HybridRouter, Route
 
         comparison = "LY198 和刚才那个相比怎么样？"
@@ -192,7 +191,35 @@ class HybridRouterTests(unittest.TestCase):
         self.assertEqual(comparison_result.decision.route, Route.EXACT_PRODUCT)
         self.assertTrue(comparison_result.decision.agentic)
         self.assertEqual(same_product_result.decision.route, Route.EXACT_PRODUCT)
-        self.assertFalse(same_product_result.decision.agentic)
+        self.assertTrue(same_product_result.decision.agentic)
+        self.assertEqual(complete.calls, [])
+
+    def test_unique_prior_user_product_reference_routes_to_agent_without_router_llm(self):
+        from routing import HybridRouter, Route
+
+        question = "那它支持什么频段？"
+        prior_question = "LY198 的功率是多少？"
+        retriever = RecordingRetriever({prior_question: "ly198"})
+        complete = RecordingCompletion([])
+
+        result = HybridRouter(
+            retriever=retriever,
+            complete_chat=complete,
+        ).route(
+            messages(
+                question,
+                (
+                    ("user", prior_question),
+                    ("assistant", "LY198 的输出功率不超过 2W（≤2W）。"),
+                ),
+            ),
+            deadline=RecordingDeadline(),
+        )
+
+        self.assertEqual(result.decision.route, Route.EXACT_PRODUCT)
+        self.assertTrue(result.decision.agentic)
+        self.assertEqual(result.decision.product_id, "ly198")
+        self.assertEqual(retriever.queries, [question, prior_question])
         self.assertEqual(complete.calls, [])
 
     def test_repeated_explicit_product_question_ignores_conversation_history(self):

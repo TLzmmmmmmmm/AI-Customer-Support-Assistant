@@ -22,6 +22,7 @@ from .models import (
     ProductMetadata,
     ProductSource,
     SolutionMetadata,
+    SolutionCatalogMetadata,
     SolutionSource,
     SupportMetadata,
     SupportSource,
@@ -311,6 +312,41 @@ def normalize_product_catalog(
     )
 
 
+def normalize_solution_catalog(
+    solutions: Iterable[SolutionSource],
+    base_url: str,
+) -> KnowledgeDocument:
+    published = sorted(
+        (solution for solution in solutions if solution.published),
+        key=lambda solution: solution.id,
+    )
+    if not published:
+        raise BuildError("cannot build solution catalog without published solutions")
+    sections = "\n\n".join(
+        f"## {solution.name}\n\n{solution.summary}"
+        for solution in published
+    )
+    text = (
+        "# 解决方案\n\n"
+        f"网站目前展示以下 {len(published)} 个解决方案。\n\n"
+        f"{sections}"
+    )
+    metadata = SolutionCatalogMetadata(
+        catalog_id="solutions",
+        solution_ids=sorted(solution.id for solution in published),
+    )
+    return _document(
+        type_="catalog",
+        entity_id="solutions",
+        title="解决方案",
+        text=text,
+        source_path="/solutions/",
+        source_files=_source_files(*published),
+        metadata=metadata,
+        base_url=base_url,
+    )
+
+
 def normalize_solution(source: SolutionSource, base_url: str) -> KnowledgeDocument:
     needs = "\n".join(f"- {item}" for item in source.core_needs)
     features = "\n".join(f"- {item}" for item in source.features)
@@ -450,6 +486,7 @@ def build_documents(source_root: Path, base_url: str) -> list[KnowledgeDocument]
     inventory = load_source_inventory(source_root)
     documents: list[KnowledgeDocument] = []
     documents.append(normalize_product_catalog(inventory.categories.values(), base_url))
+    documents.append(normalize_solution_catalog(inventory.solutions.values(), base_url))
     for source in inventory.products.values():
         if source.published:
             documents.append(

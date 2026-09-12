@@ -60,7 +60,8 @@ Top-level fields provide stable identity and provenance. `chunk_id` identifies t
 
 | Type | Metadata fields |
 |---|---|
-| Catalog | `catalog_id`, `category_ids` |
+| Product Catalog | `catalog_id`, `category_ids` |
+| Solution Catalog | `catalog_id`, `solution_ids` |
 | Product | `product_id`, `slug`, `category_id`, `category_name` |
 | Solution | `solution_id`, `slug` |
 | Support | `service_id` |
@@ -76,6 +77,12 @@ All Chunks repeat the parent H1 title. When a section must be split, its relevan
 - The authoritative `catalog:products` Document remains one complete Chunk named `catalog:products:overview`.
 - Its inherited semantic `section` is `产品分类`; the label is not renamed by Day 4.
 - The Chunk preserves the four category names, short descriptions, metadata, and complete multi-file provenance together so category-overview questions have one exact retrieval target.
+
+### Solution Catalog
+
+- The authoritative `catalog:solutions` Document remains one complete Chunk named `catalog:solutions:overview`.
+- Its inherited semantic `section` is `解决方案`.
+- The Chunk preserves the six published solution names, source summaries, metadata, and complete multi-file provenance together so solution-overview questions have one exact retrieval target.
 
 ### Product
 
@@ -178,8 +185,8 @@ Output replacement is atomic. The builder writes a temporary file beside the des
 
 The CLI reports total Documents, total Chunks, average, median, minimum, and maximum `text` length, plus Chunk counts for every Document and type. All lengths are Unicode character counts. They are descriptive production statistics, not token estimates.
 
-The current checked-in artifacts contain 61 Documents and 73 Chunks, including
-one `catalog` Document and its one overview Chunk.
+The current checked-in artifacts contain 62 Documents and 74 Chunks, including
+two `catalog` Documents and their overview Chunks.
 
 ## Build and synchronization responsibility
 

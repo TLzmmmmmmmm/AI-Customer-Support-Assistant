@@ -13,7 +13,11 @@ from knowledge_pipeline.core import (
     serialize_documents,
     validate_documents,
 )
-from knowledge_pipeline.models import CatalogMetadata, ProductSource
+from knowledge_pipeline.models import (
+    CatalogMetadata,
+    ProductSource,
+    SolutionCatalogMetadata,
+)
 
 
 BASE_URL = "https://www.shengborun.com"
@@ -133,6 +137,25 @@ class KnowledgeSchemaTests(unittest.TestCase):
                         category_ids=category_ids,
                     )
 
+    def test_solution_catalog_metadata_requires_sorted_unique_solution_ids(self):
+        valid = SolutionCatalogMetadata(
+            catalog_id="solutions",
+            solution_ids=["civil-defense", "smart-emergency"],
+        )
+        self.assertEqual(valid.catalog_id, "solutions")
+
+        for solution_ids in (
+            ["smart-emergency", "civil-defense"],
+            ["civil-defense", "civil-defense"],
+            [],
+        ):
+            with self.subTest(solution_ids=solution_ids):
+                with self.assertRaises(ValidationError):
+                    SolutionCatalogMetadata(
+                        catalog_id="solutions",
+                        solution_ids=solution_ids,
+                    )
+
 
 class KnowledgePipelineTests(unittest.TestCase):
     def test_public_source_inventory_loader_applies_relationship_validation(self):
@@ -149,7 +172,7 @@ class KnowledgePipelineTests(unittest.TestCase):
             with self.assertRaises(BuildError):
                 load_source_inventory(root)
 
-    def test_curated_snapshot_builds_61_normalized_documents(self):
+    def test_curated_snapshot_builds_62_normalized_documents(self):
         source_root = Path(__file__).resolve().parents[1] / "knowledge" / "source"
 
         inventory = load_sources(source_root)
@@ -170,7 +193,7 @@ class KnowledgePipelineTests(unittest.TestCase):
         self.assertEqual(
             counts,
             {
-                "catalog": 1,
+                "catalog": 2,
                 "product": 49,
                 "solution": 6,
                 "support": 3,
@@ -178,9 +201,9 @@ class KnowledgePipelineTests(unittest.TestCase):
                 "contact": 1,
             },
         )
-        self.assertEqual(len(documents), 61)
+        self.assertEqual(len(documents), 62)
 
-    def test_build_normalizes_products_and_one_category_catalog(self):
+    def test_build_normalizes_product_and_solution_catalogs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             write_complete_fixture(root)
@@ -192,6 +215,7 @@ class KnowledgePipelineTests(unittest.TestCase):
                 set(by_id),
                 {
                     "catalog:products",
+                    "catalog:solutions",
                     "product:xir-p8668ex",
                     "solution:petrochemical",
                     "support:solution-design",
@@ -220,6 +244,28 @@ class KnowledgePipelineTests(unittest.TestCase):
             self.assertEqual(
                 catalog.source_files,
                 ["src/content/product-categories/two-way-radio.json"],
+            )
+            solution_catalog = by_id["catalog:solutions"]
+            self.assertEqual(solution_catalog.type, "catalog")
+            self.assertEqual(solution_catalog.title, "解决方案")
+            self.assertEqual(solution_catalog.source_path, "/solutions/")
+            self.assertEqual(
+                solution_catalog.text,
+                "# 解决方案\n\n"
+                "网站目前展示以下 1 个解决方案。\n\n"
+                "## 石油石化行业无线对讲解决方案\n\n"
+                "解决厂区通信问题。",
+            )
+            self.assertEqual(
+                solution_catalog.metadata.model_dump(mode="json"),
+                {
+                    "catalog_id": "solutions",
+                    "solution_ids": ["petrochemical"],
+                },
+            )
+            self.assertEqual(
+                solution_catalog.source_files,
+                ["src/content/solutions/petrochemical.md"],
             )
             product = by_id["product:xir-p8668ex"]
             self.assertEqual(
