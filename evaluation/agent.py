@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Protocol, TypedDict
 
 from agent import AgentDeadline, ToolExecutor, ToolObservation
 from agent.models import TOOL_SPECS
-from models import ChatMessage
+from models import ChatMessage, ChatRequest
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from routing import Route, RouteExecutionResult
 
 
@@ -30,6 +33,42 @@ class AgentEvaluationObservation(TypedDict):
     route: Route
     tool_calls: tuple[ValidatedToolCall, ...]
     final_answer: str
+
+
+class ExpectedToolCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    required_args: dict[str, object]
+
+    @field_validator("name")
+    @classmethod
+    def known_tool_name(cls, value: str) -> str:
+        if value not in TOOL_SPECS:
+            raise ValueError("unknown tool name")
+        return value
+
+
+class AgentEvalCase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    messages: tuple[ChatMessage, ...] = Field(min_length=1)
+    expected_route: Route
+    expected_tools: tuple[ExpectedToolCall, ...]
+    expected_answer: str
+
+    @field_validator("case_id", "expected_answer")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def valid_conversation(self) -> AgentEvalCase:
+        ChatRequest(messages=list(self.messages))
+        return self
 
 
 class RecordingToolExecutor(ToolExecutor):
@@ -135,11 +174,130 @@ def tool_calls_match(
     return match_remaining(0, tuple(actual))
 
 
+def load_agent_eval_cases(path: Path) -> tuple[AgentEvalCase, ...]:
+    cases = []
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(),
+        start=1,
+    ):
+        if not line.strip():
+            raise ValueError(f"blank JSONL line: {line_number}")
+        try:
+            cases.append(AgentEvalCase.model_validate(json.loads(line)))
+        except Exception as error:
+            raise ValueError(f"invalid agent evaluation case: {line_number}") from error
+    if not cases:
+        raise ValueError("agent evaluation dataset is empty")
+    case_ids = [case.case_id for case in cases]
+    if len(case_ids) != len(set(case_ids)):
+        raise ValueError("duplicate agent evaluation case_id")
+    return tuple(cases)
+
+
+def _expected_match_calls(
+    expected_tools: Sequence[ExpectedToolCall],
+) -> tuple[ValidatedToolCall, ...]:
+    return tuple(
+        {
+            "name": tool.name,
+            "arguments": dict(tool.required_args),
+        }
+        for tool in expected_tools
+    )
+
+
+def run_agent_evaluation(
+    cases: Sequence[AgentEvalCase],
+    runner: AgentEvaluationRunner,
+    *,
+    deadline_factory: Callable[[], AgentDeadline],
+) -> dict[str, object]:
+    if not cases:
+        raise ValueError("agent evaluation requires at least one case")
+    case_ids = [case.case_id for case in cases]
+    if len(case_ids) != len(set(case_ids)):
+        raise ValueError("duplicate agent evaluation case_id")
+
+    rows = []
+    for case in cases:
+        expected_tools = [
+            tool.model_dump(mode="json")
+            for tool in case.expected_tools
+        ]
+        try:
+            observation = runner.run(
+                case.messages,
+                deadline=deadline_factory(),
+            )
+            actual_route = observation["route"].value
+            actual_tool_calls = [
+                {
+                    "name": call["name"],
+                    "arguments": dict(call["arguments"]),
+                }
+                for call in observation["tool_calls"]
+            ]
+            route_pass = observation["route"] == case.expected_route
+            action_pass = tool_calls_match(
+                observation["tool_calls"],
+                _expected_match_calls(case.expected_tools),
+            )
+            row = {
+                "case_id": case.case_id,
+                "status": "completed",
+                "expected_route": case.expected_route.value,
+                "actual_route": actual_route,
+                "expected_tools": expected_tools,
+                "actual_tool_calls": actual_tool_calls,
+                "route_pass": route_pass,
+                "action_pass": action_pass,
+                "final_answer": observation["final_answer"],
+                "error_type": None,
+            }
+        except Exception as error:
+            row = {
+                "case_id": case.case_id,
+                "status": "error",
+                "expected_route": case.expected_route.value,
+                "actual_route": None,
+                "expected_tools": expected_tools,
+                "actual_tool_calls": None,
+                "route_pass": False,
+                "action_pass": False,
+                "final_answer": None,
+                "error_type": type(error).__name__,
+            }
+        rows.append(row)
+
+    total = len(rows)
+    route_passed = sum(row["route_pass"] for row in rows)
+    action_passed = sum(row["action_pass"] for row in rows)
+    return {
+        "summary": {
+            "total_cases": total,
+            "route_passed": route_passed,
+            "route_accuracy": route_passed / total,
+            "action_passed": action_passed,
+            "action_accuracy": action_passed / total,
+            "failed_case_ids": [
+                row["case_id"]
+                for row in rows
+                if not row["route_pass"] or not row["action_pass"]
+            ],
+        },
+        "cases": rows,
+    }
+
+
 __all__ = [
+    "AgentEvalCase",
     "AgentEvaluationObservation",
     "AgentEvaluationRunner",
+    "ExpectedToolCall",
     "RecordingToolExecutor",
     "RouteExecutionRunner",
     "ValidatedToolCall",
+    "load_agent_eval_cases",
+    "run_agent_evaluation",
     "tool_calls_match",
 ]

@@ -1,4 +1,6 @@
+import io
 import unittest
+from contextlib import redirect_stdout
 
 from agent import AgentDeadline
 from agent_graph import GraphRouteOrchestrator
@@ -31,9 +33,12 @@ class GraphRouteOrchestratorTests(unittest.TestCase):
         ]
         deadline = AgentDeadline(expires_at=10.0, clock=lambda: 0.0)
 
-        actual = orchestrator.run(messages, deadline=deadline)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            actual = orchestrator.run(messages, deadline=deadline)
 
         self.assertIs(actual, result)
+        self.assertEqual(output.getvalue(), "")
         self.assertEqual(len(graph.states), 1)
         state = graph.states[0]
         self.assertEqual(set(state), {
