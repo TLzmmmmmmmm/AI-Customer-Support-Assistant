@@ -557,3 +557,105 @@ STATUS: PASS
 ```
 
 当前不存在阻止进入下一阶段的已知问题。
+
+## 15. Day 7 Release Closeout
+
+### 15.1 Release Identity
+
+Week 3 最终发布提交为：
+
+```text
+2190afd80d06df81c2d146abe9491bb8ee9b7ef5
+```
+
+closeout 检查时：
+
+```text
+local HEAD  = 2190afd80d06df81c2d146abe9491bb8ee9b7ef5
+local main  = 2190afd80d06df81c2d146abe9491bb8ee9b7ef5
+origin/main = 2190afd80d06df81c2d146abe9491bb8ee9b7ef5
+git status before this documentation edit = clean
+```
+
+`origin/main` 通过远端只读查询确认，不仅依赖本地 tracking ref。
+
+现有仓库 release notes 和本地输出没有保存服务器 checkout 的 SHA，因而不能从仓库独立证明服务器 SHA。生产部署及 post-deploy validation 已由 operator 确认为通过；该事实不应被误写成已取得服务器 SHA 证据。
+
+### 15.2 Final Verification Evidence
+
+最终确认的 Week 3 证据如下：
+
+| Verification | Result |
+|---|---:|
+| Full offline regression | 567 / 567 PASS |
+| Dev24 final regression | 100% |
+| Targeted provider verification A-E | 5 / 5 PASS |
+| Original production smoke validator | 5 / 8 PASS |
+| Corrected production smoke verification | 8 / 8 PASS |
+| Post-deploy `/health` | PASS |
+| Post-deploy exact-product request | PASS |
+| Post-deploy fallback request | PASS |
+
+原始 production smoke 记录保留为不可变历史证据：
+
+```text
+eval/results/day7-week3-production-smoke-v1.jsonl
+SHA-256: D6B95B6224C06CF919BBE6644C773BAD6AE8D9899B5F714E325344B22F50A1C7
+result: 5 / 8 under the original validator
+```
+
+该文件记录的是原 validator 的真实 5 / 8 结果。后续 validator 修复及 8 / 8 验证不会覆盖、修改或把该历史文件重新解释为 8 / 8。
+
+Holdout V1 状态保持：
+
+```text
+agent_holdout_v1 = consumed
+```
+
+不得重新运行 Holdout6 并将结果作为新的 unseen Holdout performance。
+
+### 15.3 Final Week 3 Architecture
+
+Week 3 最终架构具有以下已实现边界：
+
+- `HybridRouter` 使用六个生产 route：`direct`、`product_search`、`exact_product`、`contact`、`knowledge`、`fallback`。
+- 唯一解析的 contextual exact-product 请求进入 deterministic execution，复用 Router 已解析的产品身份。
+- compound、multi-product 和 genuinely ambiguous 请求继续进入 agentic execution。
+- Agent runtime 支持 provider 合法返回的 multi-tool completion batch，并保持每个工具调用与 observation 的协议配对。
+- `MAX_TOOL_CALLS` 保持为 3；成功、失败 observation 和 cache reuse 均分别占用一个 execution budget slot。
+- Raw Orchestrator 与 LangGraph 保持外部可观察 parity，Raw 实现继续作为 reference 和 regression oracle。
+- Prompt 职责分为 common policy、RAG、route-specific tool 和 agent tool-selection overlays。
+- 生产请求路径使用 LangGraph orchestration。
+- 当前 NDJSON 仍在完整模型回答生成后输出单个 answer delta；true token streaming 尚未实现。
+
+### 15.4 Known Non-Blocking Issue
+
+Contextual exact-product follow-up 可能冗余执行：
+
+```text
+search_products
+→ get_product_details
+```
+
+只要 `get_product_details` 成功且最终产品事实正确，该行为不影响 correctness，但会增加一次不必要的工具调用并可能产生额外 citations。该问题作为未来 tool-selection optimization 处理，不构成 Week 3 release blocker。
+
+### 15.5 Deferred Work
+
+以下工作明确延期，不属于 Week 3 release：
+
+- true token streaming；
+- citation-quality improvement；
+- redundant tool-selection optimization；
+- MCP；
+- multi-agent；
+- planning / reflection；
+- reranker / query rewriting。
+
+### 15.6 Repository Closeout
+
+`week3-tool` 的 tip `9a8ed51` 已完整合并进 `main` 的 `2190afd`。在保留正常 Git 历史的前提下，该 feature branch 已无未合并提交，可以安全删除；本 closeout 不执行删除。
+
+```text
+WEEK 3 RELEASE CLOSEOUT
+STATUS: PASS
+```
