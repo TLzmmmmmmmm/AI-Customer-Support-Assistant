@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
-from knowledge_pipeline.models import ProductMetadata
+from knowledge_pipeline.models import ProductMetadata, ProductSource
 
 from .models import EntityCatalogError, EntityMatch, VectorRecord
 
@@ -31,8 +31,16 @@ def _has_alphanumeric_boundaries(text: str, start: int, length: int) -> bool:
 class ExactEntityResolver:
     """Resolve explicit product/model identifiers without fuzzy matching."""
 
-    def __init__(self, aliases: dict[str, str]) -> None:
+    def __init__(
+        self,
+        aliases: dict[str, str],
+        canonical_aliases: dict[str, Sequence[str]] | None = None,
+    ) -> None:
         self._aliases = dict(aliases)
+        self._canonical_aliases = {
+            alias: tuple(sorted(set(parent_document_ids)))
+            for alias, parent_document_ids in (canonical_aliases or {}).items()
+        }
 
     @classmethod
     def from_records(
@@ -40,6 +48,7 @@ class ExactEntityResolver:
         records: Sequence[VectorRecord],
     ) -> "ExactEntityResolver":
         aliases: dict[str, str] = {}
+        canonical_aliases: dict[str, set[str]] = {}
         for record in records:
             if record.type != "product":
                 continue
@@ -55,6 +64,15 @@ class ExactEntityResolver:
                 record.metadata.slug,
                 heading_match.group(1) if heading_match else "",
             )
+            for candidate in (
+                record.metadata.product_id,
+                record.metadata.slug,
+            ):
+                canonical_alias = _normalize(candidate)
+                if canonical_alias:
+                    canonical_aliases.setdefault(canonical_alias, set()).add(
+                        record.parent_document_id
+                    )
             for candidate in candidates:
                 alias = _normalize(candidate)
                 if not alias:
@@ -69,7 +87,33 @@ class ExactEntityResolver:
                         f"{existing_parent!r} and {record.parent_document_id!r}"
                     )
                 aliases[alias] = record.parent_document_id
-        return cls(aliases)
+        return cls(aliases, canonical_aliases)
+
+    @classmethod
+    def from_product_sources(
+        cls,
+        products: Iterable[ProductSource],
+    ) -> "ExactEntityResolver":
+        canonical_aliases: dict[str, set[str]] = {}
+        for product in products:
+            if not product.published:
+                continue
+            parent_document_id = f"product:{product.id}"
+            for candidate in (product.id, product.slug):
+                alias = _normalize(candidate)
+                if alias:
+                    canonical_aliases.setdefault(alias, set()).add(
+                        parent_document_id
+                    )
+        return cls({}, canonical_aliases)
+
+    def resolve_canonical_identifier(self, value: str) -> list[str]:
+        """Resolve a complete canonical product ID or slug without fuzziness."""
+
+        alias = _normalize(value)
+        if not alias:
+            return []
+        return list(self._canonical_aliases.get(alias, ()))
 
     def resolve(self, query: str) -> list[EntityMatch]:
         normalized_query = _normalize(query)

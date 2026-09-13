@@ -26,15 +26,17 @@ The build does not automatically detect drift between the website and the snapsh
 |---|---:|---:|
 | Product | 49 | 49 |
 | Product Category | 4 | 1 catalog overview |
-| Solution | 6 | 6 |
+| Solution | 6 | 6 + 1 catalog overview |
 | Support Service | 3 | 3 |
 | Company | 1 | 1 |
 | Contact | 1 | 1 |
-| Total | 64 | 61 |
+| Total | 64 | 62 |
 
 The four Product Categories validate and enrich Products and are also
 deterministically aggregated into one authoritative product-catalog overview
-Document. Individual categories do not become separate Documents.
+Document. The six Solutions are likewise aggregated into one solution-catalog
+overview containing each published name and source summary. Individual source
+Documents remain authoritative for full details.
 
 ## Included knowledge
 
@@ -196,7 +198,8 @@ metadata is small, type-specific filtering and debugging information:
 
 | Type | Metadata |
 |---|---|
-| Catalog | catalog_id, category_ids |
+| Product Catalog | catalog_id, category_ids |
+| Solution Catalog | catalog_id, solution_ids |
 | Product | product_id, slug, category_id, category_name |
 | Solution | solution_id, slug |
 | Support | service_id |
@@ -217,6 +220,17 @@ all published Product Categories in reviewed business order
 
 Its source URL is `/products/`, and its provenance is the sorted union of all
 four contributing Product Category source files.
+
+Solution Catalog:
+
+~~~text
+all published Solutions in stable source-ID order
++ solution names + summaries
+→ one catalog:solutions Document
+~~~
+
+Its source URL is `/solutions/`, and its provenance is the sorted union of all
+six contributing Solution source files.
 
 Product:
 

@@ -18,9 +18,12 @@ from knowledge_pipeline.models import (
     KnowledgeChunk,
     Metadata,
     ProductMetadata,
+    SourceRef,
+    SolutionCatalogMetadata,
     SolutionMetadata,
     StrictModel,
     SupportMetadata,
+    source_ref_from_text,
 )
 
 
@@ -119,7 +122,7 @@ class VectorRecord(StrictModel):
         if not self.chunk_id.startswith(f"{self.parent_document_id}:"):
             raise ValueError("chunk_id must extend parent_document_id")
         expected_metadata_type = {
-            "catalog": CatalogMetadata,
+            "catalog": (CatalogMetadata, SolutionCatalogMetadata),
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,
@@ -203,6 +206,25 @@ class RetrievalResult(StrictModel):
     metadata: Metadata
     source_url: str = Field(min_length=1)
     source_files: list[str] = Field(min_length=1)
+    sources: list[SourceRef] = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_legacy_source_ref(cls, value):
+        if isinstance(value, Mapping) and "sources" not in value:
+            payload = dict(value)
+            try:
+                source = source_ref_from_text(
+                    payload.get("text", ""),
+                    payload.get("source_url", ""),
+                )
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    "retrieval result requires valid source provenance"
+                ) from error
+            payload["sources"] = [source]
+            return payload
+        return value
 
     @field_validator("score")
     @classmethod
@@ -216,6 +238,17 @@ class RetrievalResult(StrictModel):
     def validate_entity_ids(cls, value: list[str]) -> list[str]:
         if len(value) != len(set(value)):
             raise ValueError("matched_entity_ids must be unique")
+        return value
+
+    @field_validator("sources")
+    @classmethod
+    def validate_unique_source_urls(
+        cls,
+        value: list[SourceRef],
+    ) -> list[SourceRef]:
+        urls = [source.url for source in value]
+        if len(urls) != len(set(urls)):
+            raise ValueError("sources must have unique URLs")
         return value
 
 

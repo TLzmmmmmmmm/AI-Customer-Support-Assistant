@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
+
+from knowledge_pipeline.models import source_ref_from_text
 
 from .embedding import EmbeddingProvider
 from .entities import ExactEntityResolver
 from .index import VectorIndex
-from .models import EmbeddingAPIError, RetrievalResult, SearchHit
+from .models import (
+    EmbeddingAPIError,
+    EntityMatch,
+    RetrievalResult,
+    SearchHit,
+    VectorRecordValidationError,
+)
 
 
 class Retriever:
@@ -30,6 +38,9 @@ class Retriever:
         self,
         query: str,
         top_k: int | None = None,
+        *,
+        allowed_types: Collection[str] | None = None,
+        unique_parent_documents: bool = False,
     ) -> list[RetrievalResult]:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query must be a non-blank string")
@@ -48,6 +59,12 @@ class Retriever:
 
         assembled: list[tuple[SearchHit, str, list[str]]] = []
         seen_chunk_ids: set[str] = set()
+        seen_parent_document_ids: set[str] = set()
+
+        def seen_result_count() -> int:
+            if unique_parent_documents:
+                return len(seen_parent_document_ids)
+            return len(seen_chunk_ids)
 
         def append_hit(
             hit: SearchHit,
@@ -57,9 +74,15 @@ class Retriever:
             if (
                 len(assembled) >= resolved_top_k
                 or hit.record.chunk_id in seen_chunk_ids
+                or (
+                    unique_parent_documents
+                    and hit.record.parent_document_id
+                    in seen_parent_document_ids
+                )
             ):
                 return
             seen_chunk_ids.add(hit.record.chunk_id)
+            seen_parent_document_ids.add(hit.record.parent_document_id)
             assembled.append((hit, origin, matched_entity_ids))
 
         for entity_id in entity_ids:
@@ -67,6 +90,8 @@ class Retriever:
                 query_vector,
                 top_k=1,
                 parent_document_ids={entity_id},
+                record_types=allowed_types,
+                unique_parent_documents=unique_parent_documents,
             )
             if hits:
                 append_hit(hits[0], "exact_entity", [entity_id])
@@ -74,8 +99,10 @@ class Retriever:
         if entity_ids and len(assembled) < resolved_top_k:
             entity_hits = self._vector_index.search(
                 query_vector,
-                top_k=resolved_top_k + len(seen_chunk_ids),
+                top_k=resolved_top_k + seen_result_count(),
                 parent_document_ids=set(entity_ids),
+                record_types=allowed_types,
+                unique_parent_documents=unique_parent_documents,
             )
             for hit in entity_hits:
                 append_hit(
@@ -87,7 +114,9 @@ class Retriever:
         if len(assembled) < resolved_top_k:
             dense_hits = self._vector_index.search(
                 query_vector,
-                top_k=resolved_top_k + len(seen_chunk_ids),
+                top_k=resolved_top_k + seen_result_count(),
+                record_types=allowed_types,
+                unique_parent_documents=unique_parent_documents,
             )
             for hit in dense_hits:
                 append_hit(hit, "dense", [])
@@ -105,6 +134,9 @@ class Retriever:
             )
         ]
 
+    def resolve_entities(self, query: str) -> list[EntityMatch]:
+        return self._entity_resolver.resolve(query)
+
 
 def _to_result(
     hit: SearchHit,
@@ -114,6 +146,12 @@ def _to_result(
     matched_entity_ids: list[str],
 ) -> RetrievalResult:
     record = hit.record
+    try:
+        source = source_ref_from_text(record.text, record.source_url)
+    except ValueError as error:
+        raise VectorRecordValidationError(
+            f"record {record.chunk_id} has invalid source title provenance"
+        ) from error
     return RetrievalResult.model_validate({
         "rank": rank,
         "score": hit.score,
@@ -128,6 +166,7 @@ def _to_result(
         "metadata": record.metadata,
         "source_url": record.source_url,
         "source_files": list(record.source_files),
+        "sources": [source],
     })
 
 

@@ -98,8 +98,8 @@ class KnowledgeBuildCommandTests(unittest.TestCase):
 
             self.assertEqual(result, 0, stderr)
             self.assertIn("Mode: plan only", stdout)
-            self.assertIn("Documents: 61", stdout)
-            self.assertIn("Chunks: 73", stdout)
+            self.assertIn("Documents: 62", stdout)
+            self.assertIn("Chunks: 74", stdout)
             self.assertIn("No API request was made", stdout)
             self.assertFalse((root / "documents.jsonl").exists())
             self.assertFalse((root / "chunks.jsonl").exists())
@@ -131,8 +131,8 @@ class KnowledgeBuildCommandTests(unittest.TestCase):
                 chunks,
                 provider.config,
             )
-            self.assertEqual(len(chunks), 73)
-            self.assertEqual(len(vectors), 73)
+            self.assertEqual(len(chunks), 74)
+            self.assertEqual(len(vectors), 74)
 
     def test_provider_failure_preserves_all_live_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -235,7 +235,7 @@ class KnowledgeBuildCommandTests(unittest.TestCase):
                 )
 
             self.assertEqual(second, 0, stderr)
-            self.assertIn("Reused: 73", stdout)
+            self.assertIn("Reused: 74", stdout)
             self.assertIn("To embed: 0", stdout)
             self.assertEqual(
                 (root / "vector_records.jsonl").read_bytes(),

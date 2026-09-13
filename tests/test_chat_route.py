@@ -4,82 +4,70 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx2 as httpx
 from fastapi import HTTPException
+from openai import APIConnectionError, APIStatusError, APITimeoutError
+
+from agent import AgentDeadlineExceeded
+from knowledge_pipeline.models import SourceRef
 from knowledge_pipeline.retrieval.models import (
     EmbeddingAPIError,
     EntityCatalogError,
-    RetrievalError,
-    RetrievalResult,
     VectorIndexNotReadyError,
 )
 from models import ChatMessage, ChatRequest
 from routes import chat
+from routing import Route, RouteExecutionResult, RouteTrace
+from trace_models import FailureLayer, ToolTrace
 
 
-def retrieval_result() -> RetrievalResult:
-    return RetrievalResult.model_validate({
-        "rank": 1,
-        "score": -0.25,
-        "match_origin": "exact_entity",
-        "matched_entity_ids": ["product:hp780"],
-        "chunk_id": "product:hp780:specifications",
-        "parent_document_id": "product:hp780",
-        "type": "product",
-        "section": "技术参数",
-        "text": "# HP780\n\n防护等级：IP68",
-        "content_hash": "a" * 64,
-        "metadata": {
-            "product_id": "hp780",
-            "slug": "hp780",
-            "category_id": "two-way-radio",
-            "category_name": "对讲机通信",
-        },
-        "source_url": "https://example.com/hp780/",
-        "source_files": ["src/content/products/hp780.json"],
-    })
+def status_error(status_code: int) -> APIStatusError:
+    request = httpx.Request("POST", "https://example.com/chat")
+    return APIStatusError(
+        "private provider error",
+        response=httpx.Response(status_code, request=request),
+        body=None,
+    )
 
 
-class FakeRetriever:
-    def __init__(
-        self,
-        *,
-        events: list[str],
-        error: Exception | None = None,
-        results: list[RetrievalResult] | None = None,
-    ):
+class FakeOrchestrator:
+    def __init__(self, *, events, answer="完整回答", error=None, sources=()):
         self.events = events
+        self.answer = answer
         self.error = error
-        self.results = results if results is not None else [retrieval_result()]
-        self.queries: list[str] = []
+        self.sources = sources
+        self.calls = []
 
-    def retrieve(self, query: str):
-        self.events.append("retrieve")
-        self.queries.append(query)
+    def run(self, messages, *, deadline):
+        self.events.append("orchestrate")
+        self.calls.append({"messages": messages, "deadline": deadline})
         if self.error is not None:
             raise self.error
-        return self.results
+        return RouteExecutionResult(
+            answer=self.answer,
+            trace=RouteTrace(
+                route=Route.PRODUCT_SEARCH,
+                tool_calls=(ToolTrace(name="search_products", success=True),),
+                tool_call_count=1,
+            ),
+            sources=tuple(self.sources),
+        )
 
 
 async def consume_response(response) -> str:
-    parts: list[str] = []
+    parts = []
     async for part in response.body_iterator:
         parts.append(part.decode("utf-8") if isinstance(part, bytes) else part)
     return "".join(parts)
 
 
-def parse_rag_payload(content: str) -> dict:
-    begin = "BEGIN_RAG_DATA\n"
-    end = "\nEND_RAG_DATA"
-    start = content.index(begin) + len(begin)
-    finish = content.rindex(end)
-    return json.loads(content[start:finish])
-
-
-class ChatRouteRagOrchestrationTests(unittest.TestCase):
+class ChatRouteOrchestrationTests(unittest.TestCase):
     def setUp(self):
         self.request = SimpleNamespace(state=SimpleNamespace(
             started_at=1.0,
             request_id="request-1",
+            route_trace=None,
+            failure_layer=None,
         ))
         self.payload = ChatRequest(messages=[
             ChatMessage(role="user", content="介绍 HP780。"),
@@ -87,190 +75,221 @@ class ChatRouteRagOrchestrationTests(unittest.TestCase):
             ChatMessage(role="user", content="它的防护等级是什么？"),
         ])
 
-    def test_retrieves_latest_question_and_preserves_ndjson_stream(self):
-        events: list[str] = []
-        result = retrieval_result()
-        retriever = FakeRetriever(events=events, results=[result])
-        captured_messages: list[dict[str, str]] = []
-        captured_results: list[RetrievalResult] = []
-        real_context_builder = chat.build_retrieved_context
+    def test_one_slot_covers_orchestration_and_complete_ndjson_response(self):
+        events = []
+        orchestrator = FakeOrchestrator(events=events)
 
-        def capture_context(results):
-            captured_results.extend(results)
-            return real_context_builder(results)
-
-        def acquire() -> bool:
+        def acquire():
             events.append("acquire")
             return True
 
-        def open_stream(messages):
-            events.append("open")
-            captured_messages.extend(messages)
-            return []
+        def clock():
+            events.append("clock")
+            return 10.0
 
-        def release() -> None:
+        def release():
             events.append("release")
 
         with (
             patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
-            patch.object(chat, "open_chat_stream", side_effect=open_stream),
             patch.object(chat, "release_llm_slot", side_effect=release),
-            patch.object(
-                chat,
-                "build_retrieved_context",
-                side_effect=capture_context,
-            ),
+            patch.object(chat.time, "monotonic", side_effect=clock),
             patch.object(chat, "log_request") as logged,
         ):
-            try:
-                response = chat.chat_stream(
-                    self.payload,
-                    self.request,
-                    None,
-                    retriever,
-                )
-            except TypeError:
-                self.fail("chat_stream has no Retriever orchestration input")
+            response = chat.chat_stream(
+                self.payload,
+                self.request,
+                None,
+                orchestrator,
+            )
+            self.assertEqual(
+                events,
+                ["acquire", "clock", "clock", "orchestrate"],
+            )
             body = asyncio.run(consume_response(response))
 
+        self.assertEqual(events.count("release"), 1)
+        self.assertEqual(orchestrator.calls[0]["messages"], self.payload.messages)
         self.assertEqual(
-            retriever.queries,
-            ["它的防护等级是什么？"],
+            [json.loads(line) for line in body.splitlines()],
+            [
+                {"type": "delta", "content": "完整回答"},
+                {"type": "done"},
+            ],
         )
-        self.assertEqual(events, ["acquire", "retrieve", "open", "release"])
-        self.assertEqual(len(captured_results), 1)
-        self.assertIs(captured_results[0], result)
-        self.assertEqual(captured_results[0].rank, 1)
-        self.assertEqual(captured_results[0].score, -0.25)
-        self.assertEqual(captured_results[0].match_origin, "exact_entity")
-        self.assertEqual(captured_results[0].matched_entity_ids, ["product:hp780"])
-        self.assertEqual(captured_results[0].chunk_id, "product:hp780:specifications")
-        self.assertEqual(captured_results[0].parent_document_id, "product:hp780")
-        self.assertEqual(captured_results[0].content_hash, "a" * 64)
-        self.assertEqual(captured_results[0].metadata.product_id, "hp780")
-        self.assertEqual(captured_results[0].source_url, "https://example.com/hp780/")
-        self.assertEqual(
-            captured_results[0].source_files,
-            ["src/content/products/hp780.json"],
-        )
+        trace = self.request.state.route_trace
+        self.assertEqual(trace.route, Route.PRODUCT_SEARCH)
         logged.assert_called_once_with(
             request_id="request-1",
             http_status=200,
             outcome="success",
             started_at=1.0,
-        )
-        self.assertEqual(response.media_type, "application/x-ndjson")
-        self.assertEqual(
-            [json.loads(line) for line in body.splitlines()],
-            [{"type": "done"}],
-        )
-        self.assertEqual(
-            captured_messages[1:3],
-            [
-                {"role": "user", "content": "介绍 HP780。"},
-                {
-                    "role": "assistant",
-                    "content": "HP780 是一款对讲机。",
-                },
-            ],
-        )
-        self.assertEqual(
-            parse_rag_payload(captured_messages[-1]["content"]),
-            {
-                "retrieved_context": [{
-                    "type": "product",
-                    "section": "技术参数",
-                    "text": "# HP780\n\n防护等级：IP68",
-                }],
-                "user_question": "它的防护等级是什么？",
-            },
+            trace=trace,
         )
 
-    def test_pre_stream_orchestration_error_releases_slot_without_generation(self):
-        events: list[str] = []
-        retriever = FakeRetriever(
-            events=events,
-            error=RuntimeError("context unavailable"),
+    def test_final_delta_removes_model_urls_and_appends_only_trusted_citations(self):
+        trusted = SourceRef(
+            title="LY198 产品详情",
+            url="https://trusted.example/products/ly198/",
         )
-
-        def acquire() -> bool:
-            events.append("acquire")
-            return True
-
-        def release() -> None:
-            events.append("release")
+        orchestrator = FakeOrchestrator(
+            events=[],
+            answer=(
+                "LY198 功率信息。详情见 "
+                "[产品页](https://fake.example/ly198)。\n\n"
+                "参考资料：\nFake：https://fake.example/source"
+            ),
+            sources=(trusted,),
+        )
 
         with (
-            patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
-            patch.object(chat, "release_llm_slot", side_effect=release) as released,
-            patch.object(chat, "open_chat_stream") as open_stream,
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot"),
+            patch.object(chat, "log_request"),
         ):
-            try:
-                with self.assertRaises(RuntimeError):
-                    chat.chat_stream(
-                        self.payload,
-                        self.request,
-                        None,
-                        retriever,
-                    )
-            except TypeError:
-                self.fail("chat_stream has no Retriever orchestration input")
+            response = chat.chat_stream(
+                self.payload,
+                self.request,
+                None,
+                orchestrator,
+            )
+            body = asyncio.run(consume_response(response))
 
-        self.assertEqual(events, ["acquire", "retrieve", "release"])
-        released.assert_called_once_with()
-        open_stream.assert_not_called()
+        events = [json.loads(line) for line in body.splitlines()]
+        self.assertEqual(events, [
+            {
+                "type": "delta",
+                "content": "LY198 功率信息。详情见 产品页。",
+            },
+            {
+                "type": "citations",
+                "heading": "参考资料：",
+                "items": [{
+                    "title": "LY198 产品详情",
+                    "url": "https://trusted.example/products/ly198/",
+                }],
+            },
+            {"type": "done"},
+        ])
+        self.assertNotIn("fake.example", body)
+        self.assertEqual(self.request.state.route_trace.citation_count, 1)
+        self.assertTrue(self.request.state.route_trace.answer_sanitized)
 
-    def test_known_retrieval_failures_return_503_without_generation(self):
-        for retrieval_error in (
-            EmbeddingAPIError("provider failed"),
-            VectorIndexNotReadyError("index failed"),
-            EntityCatalogError("entity resolver failed"),
+    def test_empty_sanitized_answer_uses_safe_answer_without_references(self):
+        from agent import SAFE_AGENT_ANSWER
+
+        orchestrator = FakeOrchestrator(
+            events=[],
+            answer="References:\nhttps://fake.example",
+            sources=(SourceRef(
+                title="Trusted",
+                url="https://trusted.example/source",
+            ),),
+        )
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot"),
+            patch.object(chat, "log_request"),
         ):
-            with self.subTest(error_type=type(retrieval_error).__name__):
-                events: list[str] = []
-                retriever = FakeRetriever(events=events, error=retrieval_error)
+            response = chat.chat_stream(
+                self.payload, self.request, None, orchestrator
+            )
+            body = asyncio.run(consume_response(response))
 
-                def acquire() -> bool:
-                    events.append("acquire")
-                    return True
+        events = [json.loads(line) for line in body.splitlines()]
+        self.assertEqual(events[0], {
+            "type": "delta",
+            "content": SAFE_AGENT_ANSWER,
+        })
+        self.assertNotIn("References:", body)
+        self.assertEqual(self.request.state.route_trace.citation_count, 0)
 
-                def release() -> None:
-                    events.append("release")
-
+    def test_known_errors_keep_existing_http_mapping_and_release_slot(self):
+        request = httpx.Request("POST", "https://example.com/chat")
+        cases = (
+            (EmbeddingAPIError("provider failed"), 503, "retrieval_unavailable"),
+            (VectorIndexNotReadyError("index failed"), 503, "retrieval_unavailable"),
+            (EntityCatalogError("resolver failed"), 503, "retrieval_unavailable"),
+            (AgentDeadlineExceeded("expired"), 504, "timeout"),
+            (APITimeoutError(request=request), 504, "timeout"),
+            (APIConnectionError(request=request), 503, "provider_unavailable"),
+            (status_error(400), 502, "provider_error"),
+        )
+        for error, status, code in cases:
+            with self.subTest(error=type(error).__name__):
+                error.route = Route.KNOWLEDGE
+                error.failure_layer = (
+                    FailureLayer.RETRIEVAL
+                    if isinstance(error, (
+                        EmbeddingAPIError,
+                        VectorIndexNotReadyError,
+                        EntityCatalogError,
+                    ))
+                    else FailureLayer.GENERATION
+                )
+                orchestrator = FakeOrchestrator(events=[], error=error)
                 with (
-                    patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
-                    patch.object(
-                        chat,
-                        "release_llm_slot",
-                        side_effect=release,
-                    ) as released,
-                    patch.object(chat, "open_chat_stream") as open_stream,
+                    patch.object(chat, "try_acquire_llm_slot", return_value=True),
+                    patch.object(chat, "release_llm_slot") as release,
                 ):
-                    try:
-                        with self.assertRaises(HTTPException) as caught:
-                            chat.chat_stream(
-                                self.payload,
-                                self.request,
-                                None,
-                                retriever,
-                            )
-                    except RetrievalError:
-                        self.fail(
-                            "known retrieval failure was not mapped to HTTP 503"
+                    with self.assertRaises(HTTPException) as caught:
+                        chat.chat_stream(
+                            self.payload,
+                            self.request,
+                            None,
+                            orchestrator,
                         )
 
-                self.assertEqual(caught.exception.status_code, 503)
+                self.assertEqual(caught.exception.status_code, status)
+                self.assertEqual(caught.exception.detail["code"], code)
                 self.assertEqual(
-                    caught.exception.detail,
-                    {
-                        "code": "retrieval_unavailable",
-                        "message": "服务暂时不可用，请稍后再试。",
-                        "internal_error": type(retrieval_error).__name__,
-                    },
+                    self.request.state.route_trace.failure_layer,
+                    error.failure_layer,
                 )
-                self.assertEqual(events, ["acquire", "retrieve", "release"])
-                released.assert_called_once_with()
-                open_stream.assert_not_called()
+                release.assert_called_once_with()
+
+    def test_unexpected_error_propagates_records_safe_trace_and_releases_slot(self):
+        error = RuntimeError("private defect")
+        error.route = Route.DIRECT
+        error.failure_layer = FailureLayer.GENERATION
+        orchestrator = FakeOrchestrator(events=[], error=error)
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot") as release,
+        ):
+            with self.assertRaises(RuntimeError):
+                chat.chat_stream(
+                    self.payload,
+                    self.request,
+                    None,
+                    orchestrator,
+                )
+
+        self.assertEqual(self.request.state.route_trace.route, Route.DIRECT)
+        release.assert_called_once_with()
+
+    def test_busy_slot_rejects_before_deadline_or_orchestration(self):
+        orchestrator = FakeOrchestrator(events=[])
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=False),
+            patch.object(chat, "release_llm_slot") as release,
+            patch.object(chat.time, "monotonic") as clock,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                chat.chat_stream(
+                    self.payload,
+                    self.request,
+                    None,
+                    orchestrator,
+                )
+
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual(orchestrator.calls, [])
+        self.assertIsNone(self.request.state.route_trace)
+        clock.assert_not_called()
+        release.assert_not_called()
 
 
 if __name__ == "__main__":

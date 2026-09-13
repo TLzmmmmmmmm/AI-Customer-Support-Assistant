@@ -1473,7 +1473,7 @@ class RealInventoryIntegrationTests(unittest.TestCase):
         output_path = repository_root / "knowledge" / "chunks.jsonl"
         documents = load_documents(input_path)
         chunks = build_chunks(documents)
-        self.assertEqual(len(documents), 61)
+        self.assertEqual(len(documents), 62)
         self.assertEqual(
             {chunk.parent_document_id for chunk in chunks},
             {document.document_id for document in documents},

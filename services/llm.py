@@ -29,9 +29,52 @@ def is_retryable_status(error: APIStatusError) -> bool:
 
 
 def _copy_messages(
-    messages: Sequence[Mapping[str, str]],
-) -> list[dict[str, str]]:
+    messages: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
     return [dict(message) for message in messages]
+
+
+def complete_chat(
+    messages: Sequence[Mapping[str, object]],
+    *,
+    tools: Sequence[Mapping[str, object]] | None = None,
+):
+    provider_messages = _copy_messages(messages)
+    provider_tools = None if tools is None else [dict(tool) for tool in tools]
+    attempt = 0
+
+    while True:
+        try:
+            request: dict[str, object] = {
+                "model": DEEPSEEK_MODEL,
+                "messages": provider_messages,
+                "stream": False,
+                "extra_body": {
+                    "thinking": {
+                        "type": "disabled",
+                    },
+                },
+            }
+            if provider_tools is not None:
+                request["tools"] = provider_tools
+            return client.chat.completions.create(**request)
+
+        except APITimeoutError:
+            raise
+
+        except APIConnectionError:
+            if attempt >= LLM_APP_MAX_RETRIES:
+                raise
+
+        except APIStatusError as error:
+            if (
+                not is_retryable_status(error)
+                or attempt >= LLM_APP_MAX_RETRIES
+            ):
+                raise
+
+        attempt += 1
+        time.sleep(LLM_RETRY_DELAY_SECONDS)
 
 
 def open_chat_stream(messages: Sequence[Mapping[str, str]]):

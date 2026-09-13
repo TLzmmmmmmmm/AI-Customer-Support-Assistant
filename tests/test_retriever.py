@@ -125,6 +125,30 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(self.provider.query_calls, ["HP780 参数"])
         self.assertEqual(len(results), 5)
 
+    def test_entity_resolution_reuses_catalog_without_embedding(self):
+        matches = self.retriever.resolve_entities("HP780 功率")
+
+        self.assertEqual(
+            [match.parent_document_id for match in matches],
+            ["product:hp780"],
+        )
+        self.assertEqual(self.provider.query_calls, [])
+
+    def test_unique_product_top_k_counts_final_parent_documents(self):
+        results = self.retriever.retrieve(
+            "推荐对讲机",
+            top_k=5,
+            allowed_types={"product"},
+            unique_parent_documents=True,
+        )
+
+        self.assertEqual(len(results), 5)
+        self.assertEqual(
+            len({item.parent_document_id for item in results}),
+            5,
+        )
+        self.assertTrue(all(item.type == "product" for item in results))
+
     def test_results_preserve_record_fields_and_entity_ids(self):
         result = self.retriever.retrieve("HP790Ex 参数", top_k=1)[0]
         source = next(
@@ -139,6 +163,10 @@ class RetrieverTests(unittest.TestCase):
         self.assertEqual(result.content_hash, source.content_hash)
         self.assertEqual(result.source_url, source.source_url)
         self.assertEqual(result.source_files, source.source_files)
+        self.assertEqual(
+            [item.model_dump(mode="json") for item in result.sources],
+            [{"title": "hp790ex", "url": source.source_url}],
+        )
 
     def test_blank_query_and_non_positive_k_are_rejected_before_embedding(self):
         for query, top_k in (("   ", 5), ("有效查询", 0)):

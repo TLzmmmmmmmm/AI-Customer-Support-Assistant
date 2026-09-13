@@ -21,6 +21,30 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class SourceRef(StrictModel):
+    """Human-readable, backend-owned public source provenance."""
+
+    title: NonEmptyStr
+    url: NonEmptyStr
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("must be an absolute HTTP(S) URL")
+        return value
+
+
+def source_ref_from_text(text: str, source_url: str) -> SourceRef:
+    """Build provenance from the normalized H1 invariant and trusted URL."""
+
+    first_line = text.split("\n", 1)[0]
+    if not first_line.startswith("# ") or not first_line[2:].strip():
+        raise ValueError("text must start with a non-empty H1 source title")
+    return SourceRef(title=first_line[2:].strip(), url=source_url)
+
+
 class WebsiteFileProvenance(StrictModel):
     kind: Literal["website_file"]
     reference: NonEmptyStr
@@ -179,6 +203,27 @@ class CatalogMetadata(StrictModel):
         return value
 
 
+class SolutionCatalogMetadata(StrictModel):
+    catalog_id: NonEmptyStr
+    solution_ids: list[NonEmptyStr] = Field(min_length=1)
+
+    @field_validator("catalog_id")
+    @classmethod
+    def validate_catalog_id(cls, value: str) -> str:
+        if not KEBAB_CASE.fullmatch(value):
+            raise ValueError("must be lowercase kebab-case")
+        return value
+
+    @field_validator("solution_ids")
+    @classmethod
+    def validate_solution_ids(cls, value: list[str]) -> list[str]:
+        if value != sorted(set(value)):
+            raise ValueError("must be sorted and unique")
+        if any(not KEBAB_CASE.fullmatch(item) for item in value):
+            raise ValueError("items must be lowercase kebab-case")
+        return value
+
+
 class SolutionMetadata(StrictModel):
     solution_id: NonEmptyStr
     slug: NonEmptyStr
@@ -198,6 +243,7 @@ class ContactMetadata(StrictModel):
 
 Metadata = (
     CatalogMetadata
+    | SolutionCatalogMetadata
     | ProductMetadata
     | SolutionMetadata
     | SupportMetadata
@@ -255,7 +301,7 @@ class KnowledgeDocument(StrictModel):
         if not self.document_id.startswith(f"{self.type}:"):
             raise ValueError("document_id must start with '<type>:'")
         expected = {
-            "catalog": CatalogMetadata,
+            "catalog": (CatalogMetadata, SolutionCatalogMetadata),
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,
@@ -326,7 +372,7 @@ class KnowledgeChunk(StrictModel):
         if not self.chunk_id.startswith(f"{self.parent_document_id}:"):
             raise ValueError("chunk_id must extend parent_document_id")
         expected = {
-            "catalog": CatalogMetadata,
+            "catalog": (CatalogMetadata, SolutionCatalogMetadata),
             "product": ProductMetadata,
             "solution": SolutionMetadata,
             "support": SupportMetadata,

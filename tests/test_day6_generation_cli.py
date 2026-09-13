@@ -7,7 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 from tests import test_day6_retrieval_cli as fixtures
-from tests.test_day6_generation import ProviderStream
+from tests.test_day6_generation import ProviderCompletion
 from tests.test_day6_retrieval import ControlledQueryProvider
 
 
@@ -67,7 +67,7 @@ class GenerationCliTests(unittest.TestCase):
         from services import llm
         provider = ControlledQueryProvider()
         with patch("services.retrieval.create_embedding_provider", return_value=provider), patch.object(
-            llm.client.chat.completions, "create", side_effect=lambda **kwargs: ProviderStream()
+            llm.client.chat.completions, "create", side_effect=lambda **kwargs: ProviderCompletion()
         ):
             code, out, err = self.invoke("--execute")
         self.assertEqual(code, 0, err)
@@ -89,7 +89,7 @@ class GenerationCliTests(unittest.TestCase):
         from services import llm
         provider = ControlledQueryProvider()
         with patch("services.retrieval.create_embedding_provider", return_value=provider), patch.object(
-            llm.client.chat.completions, "create", side_effect=lambda **kwargs: ProviderStream()
+            llm.client.chat.completions, "create", side_effect=lambda **kwargs: ProviderCompletion()
         ):
             code, out, err = self.invoke("--split", "frozen", "--execute")
         self.assertEqual(code, 0, err)
@@ -165,7 +165,7 @@ class GenerationCliTests(unittest.TestCase):
             self.assertEqual(freeze["metadata"]["top_k"], 1)
             self.assertIn("prompts.py", freeze["metadata"]["code_sha256"])
             self.assertIn("INJECT", json.dumps(kwargs["messages"]))
-            return ProviderStream()
+            return ProviderCompletion()
         with patch("services.retrieval.create_embedding_provider", return_value=ControlledQueryProvider()), patch.object(
             llm.client.chat.completions, "create", side_effect=create
         ):
@@ -212,7 +212,7 @@ class GenerationCliTests(unittest.TestCase):
             return original_hash(path)
         def create(**kwargs):
             completed.append(True)
-            return ProviderStream()
+            return ProviderCompletion()
         with patch("services.retrieval.create_embedding_provider", return_value=provider), patch.object(
             llm.client.chat.completions, "create", side_effect=create
         ), patch.object(self.command, "_sha256", side_effect=checked_hash):

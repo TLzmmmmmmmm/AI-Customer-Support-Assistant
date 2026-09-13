@@ -3,6 +3,7 @@ from .core import (
     build_and_write,
     build_documents,
     compute_content_hash,
+    load_source_inventory,
     serialize_documents,
     validate_documents,
 )
@@ -14,18 +15,20 @@ from .chunking import (
     serialize_chunks,
     validate_chunks,
 )
-from .models import KnowledgeChunk, KnowledgeDocument
+from .models import KnowledgeChunk, KnowledgeDocument, SourceRef
 
 __all__ = [
     "BuildError",
     "ChunkStatistics",
     "KnowledgeChunk",
     "KnowledgeDocument",
+    "SourceRef",
     "build_and_write",
     "build_and_write_chunks",
     "build_chunks",
     "build_documents",
     "compute_content_hash",
+    "load_source_inventory",
     "load_documents",
     "serialize_documents",
     "serialize_chunks",

@@ -3,6 +3,7 @@ import unittest
 
 from pydantic import ValidationError
 
+from knowledge_pipeline.models import SourceRef, source_ref_from_text
 from knowledge_pipeline.retrieval.config import (
     DashScopeCredentials,
     EmbeddingConfig,
@@ -118,13 +119,68 @@ class RetrievalConfigurationTests(unittest.TestCase):
 
 
 class RetrievalResultTests(unittest.TestCase):
+    def test_source_ref_requires_human_title_and_absolute_http_url(self):
+        source = SourceRef(
+            title="润信达 LY198",
+            url="https://www.shengborun.com/two-way-radio/ly198/",
+        )
+
+        self.assertEqual(source.title, "润信达 LY198")
+        for payload in (
+            {"title": "", "url": "https://example.com/product"},
+            {"title": "产品", "url": "/products/item"},
+            {"title": "产品", "url": "javascript:alert(1)"},
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValidationError):
+                    SourceRef.model_validate(payload)
+
+    def test_source_ref_is_derived_from_validated_h1_and_url(self):
+        source = source_ref_from_text(
+            "# 润信达 LY198\n\n产品说明",
+            "https://www.shengborun.com/two-way-radio/ly198/",
+        )
+
+        self.assertEqual(
+            source.model_dump(mode="json"),
+            {
+                "title": "润信达 LY198",
+                "url": "https://www.shengborun.com/two-way-radio/ly198/",
+            },
+        )
+        with self.assertRaises(ValueError):
+            source_ref_from_text(
+                "润信达 LY198\n\n产品说明",
+                "https://www.shengborun.com/two-way-radio/ly198/",
+            )
+
     def test_retrieval_result_requires_explicit_knowledge_type(self):
         payload = retrieval_result_payload()
+        payload["sources"] = [{
+            "title": "海能达 HP780",
+            "url": "https://www.shengborun.com/two-way-radio/hp780/",
+        }]
         result = RetrievalResult.model_validate(payload)
 
         self.assertEqual(result.type, "product")
 
         payload.pop("type")
+        with self.assertRaises(ValidationError):
+            RetrievalResult.model_validate(payload)
+
+    def test_retrieval_result_rejects_duplicate_source_urls(self):
+        payload = retrieval_result_payload()
+        payload["sources"] = [
+            {
+                "title": "海能达 HP780",
+                "url": "https://www.shengborun.com/two-way-radio/hp780/",
+            },
+            {
+                "title": "重复标题",
+                "url": "https://www.shengborun.com/two-way-radio/hp780/",
+            },
+        ]
+
         with self.assertRaises(ValidationError):
             RetrievalResult.model_validate(payload)
 

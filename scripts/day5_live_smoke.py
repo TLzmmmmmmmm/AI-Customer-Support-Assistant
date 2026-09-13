@@ -38,6 +38,19 @@ CASES = (
 )
 
 
+def _completion_observation(completion):
+    usage = completion.usage
+    return {
+        "provider_model": completion.model,
+        "generation_usage": (
+            usage.model_dump(mode="json")
+            if usage is not None
+            else None
+        ),
+        "finish_reason": completion.choices[0].finish_reason,
+    }
+
+
 def artifact_hashes():
     return {
         name: hashlib.sha256((ROOT / "knowledge" / name).read_bytes()).hexdigest()
@@ -111,7 +124,14 @@ def run(
         return batch
 
     def bounded_create(**kwargs):
-        size = sum(len(message["content"].encode("utf-8")) for message in kwargs["messages"])
+        size = len(json.dumps(
+            {
+                "messages": kwargs["messages"],
+                "tools": kwargs.get("tools"),
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8"))
         if (
             size + 512 > max_prompt_utf8_bytes
             or totals["generation_attempts"] >= 2 * len(cases)
@@ -120,22 +140,9 @@ def run(
         active["prompt_utf8_bytes"] = size
         totals["generation_attempts"] += 1
         active["generation_attempts"] = active.get("generation_attempts", 0) + 1
-        stream = real_create(**kwargs, max_tokens=1024, stream_options={"include_usage": True})
-
-        def observed_stream():
-            try:
-                for chunk in stream:
-                    if getattr(chunk, "usage", None) is not None:
-                        active["generation_usage"] = chunk.usage.model_dump(mode="json")
-                    active["provider_model"] = getattr(chunk, "model", None)
-                    for choice in chunk.choices:
-                        if choice.finish_reason:
-                            active["finish_reason"] = choice.finish_reason
-                    yield chunk
-            finally:
-                stream.close()
-
-        return observed_stream()
+        completion = real_create(**kwargs, max_tokens=1024)
+        active.update(_completion_observation(completion))
+        return completion
 
     with audit.open("x", encoding="utf-8", newline="\n") as output:
         def emit(row):
