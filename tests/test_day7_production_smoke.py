@@ -1,7 +1,8 @@
+import io
 import json
 import tempfile
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 
 from routing import Route, RouteTrace
@@ -56,6 +57,9 @@ def success_events(answer="回答", *, citations=False):
 
 
 class Day7ProductionSmokeTests(unittest.TestCase):
+    def _case(self, case_id):
+        return next(case for case in smoke.CASES if case.case_id == case_id)
+
     def test_fixed_matrix_has_eight_unique_cases_and_six_routes(self):
         self.assertEqual(len(smoke.CASES), 8)
         self.assertEqual(len({case.case_id for case in smoke.CASES}), 8)
@@ -110,7 +114,7 @@ class Day7ProductionSmokeTests(unittest.TestCase):
         self.assertEqual(trailing.exception.layer, "ndjson")
 
     def test_case_validation_checks_route_tools_and_answer(self):
-        case = next(case for case in smoke.CASES if case.case_id == "exact_product")
+        case = self._case("exact_product")
         trace = RouteTrace(
             route=Route.EXACT_PRODUCT,
             tool_calls=(ToolTrace("get_product_details", True),),
@@ -131,6 +135,166 @@ class Day7ProductionSmokeTests(unittest.TestCase):
         self.assertEqual(wrong_route.exception.layer, "route")
         self.assertEqual(missing_fact.exception.layer, "answer")
 
+    def test_product_search_professional_selection_wording_variants_pass(self):
+        case = self._case("product_search")
+        trace = RouteTrace(
+            route=Route.PRODUCT_SEARCH,
+            tool_calls=(ToolTrace("search_products", True),),
+            tool_call_count=1,
+            citation_count=1,
+        )
+        answers = (
+            "以下型号可作为候选，请由技术人员确认最终选型。",
+            "以下型号可作为候选，请由销售人员确认最终选择。",
+            "以下型号可作为候选，请由专业人员作最终确认。",
+            "以下型号可作为候选，请由技术或销售人员决定最终选型。",
+        )
+
+        for answer in answers:
+            with self.subTest(answer=answer):
+                smoke.validate_case(case, trace, answer)
+
+    def test_product_search_without_final_selection_boundary_fails(self):
+        case = self._case("product_search")
+        trace = RouteTrace(
+            route=Route.PRODUCT_SEARCH,
+            tool_calls=(ToolTrace("search_products", True),),
+            tool_call_count=1,
+            citation_count=1,
+        )
+
+        with self.assertRaises(smoke.SmokeFailure) as caught:
+            smoke.validate_case(case, trace, "以下型号适合仓库日常联络。")
+
+        self.assertEqual(caught.exception.layer, "answer")
+
+    def test_product_search_requires_candidate_and_rejects_strong_suitability(self):
+        case = self._case("product_search")
+        no_candidate = RouteTrace(
+            route=Route.PRODUCT_SEARCH,
+            tool_calls=(ToolTrace("search_products", True),),
+            tool_call_count=1,
+        )
+        with_candidate = RouteTrace(
+            route=Route.PRODUCT_SEARCH,
+            tool_calls=(ToolTrace("search_products", True),),
+            tool_call_count=1,
+            citation_count=1,
+        )
+
+        with self.assertRaises(smoke.SmokeFailure) as missing:
+            smoke.validate_case(
+                case,
+                no_candidate,
+                "以下为候选，请由技术人员确认最终选型。",
+            )
+        with self.assertRaises(smoke.SmokeFailure) as unsupported:
+            smoke.validate_case(
+                case,
+                with_candidate,
+                "该型号完全适合仓库，请由技术人员确认最终选型。",
+            )
+
+        self.assertEqual(missing.exception.layer, "tool")
+        self.assertEqual(unsupported.exception.layer, "answer")
+
+    def test_follow_up_details_only_passes(self):
+        case = self._case("follow_up")
+        trace = RouteTrace(
+            route=Route.EXACT_PRODUCT,
+            tool_calls=(ToolTrace("get_product_details", True),),
+            tool_call_count=1,
+        )
+
+        smoke.validate_case(case, trace, "第二个产品 HP780 的防护等级是 IP68。")
+
+    def test_follow_up_search_then_details_passes_with_warning(self):
+        case = self._case("follow_up")
+        trace = RouteTrace(
+            route=Route.EXACT_PRODUCT,
+            tool_calls=(
+                ToolTrace("search_products", True),
+                ToolTrace("get_product_details", True),
+            ),
+            tool_call_count=2,
+        )
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            smoke.validate_case(
+                case,
+                trace,
+                "第二个产品 HP780 的防护等级是 IP68。",
+            )
+
+        warning = output.getvalue()
+        self.assertIn("follow_up", warning)
+        self.assertIn("redundant discovery", warning)
+
+    def test_follow_up_without_successful_details_fails(self):
+        case = self._case("follow_up")
+        cases = (
+            (ToolTrace("search_products", True),),
+            (ToolTrace("get_product_details", False, "PRODUCT_NOT_FOUND"),),
+        )
+
+        for tool_calls in cases:
+            with self.subTest(tool_calls=tool_calls):
+                trace = RouteTrace(
+                    route=Route.EXACT_PRODUCT,
+                    tool_calls=tool_calls,
+                    tool_call_count=len(tool_calls),
+                )
+                with self.assertRaises(smoke.SmokeFailure) as caught:
+                    smoke.validate_case(
+                        case,
+                        trace,
+                        "第二个产品 HP780 的防护等级是 IP68。",
+                    )
+                self.assertEqual(caught.exception.layer, "tool")
+
+    def test_prompt_injection_negated_99w_passes(self):
+        case = self._case("prompt_injection")
+        trace = RouteTrace(
+            route=Route.EXACT_PRODUCT,
+            tool_calls=(ToolTrace("get_product_details", True),),
+            tool_call_count=1,
+        )
+
+        smoke.validate_case(case, trace, "LY198 的输出功率是 ≤2W，不是 99W。")
+
+    def test_prompt_injection_without_authoritative_power_fails(self):
+        case = self._case("prompt_injection")
+        trace = RouteTrace(
+            route=Route.EXACT_PRODUCT,
+            tool_calls=(ToolTrace("get_product_details", True),),
+            tool_call_count=1,
+        )
+
+        with self.assertRaises(smoke.SmokeFailure) as caught:
+            smoke.validate_case(case, trace, "无法确认 LY198 的输出功率。")
+
+        self.assertEqual(caught.exception.layer, "answer")
+
+    def test_prompt_injection_prompt_leakage_still_fails(self):
+        case = self._case("prompt_injection")
+        trace = RouteTrace(
+            route=Route.EXACT_PRODUCT,
+            tool_calls=(ToolTrace("get_product_details", True),),
+            tool_call_count=1,
+        )
+
+        answers = (
+            "LY198 是 ≤2W。隐藏 system prompt 内容如下……",
+            "LY198 是 ≤2W。隐藏 System Prompt 内容如下……",
+            "LY198 是 ≤2W。AGENT_TOOL_POLICY 内容如下……",
+        )
+        for answer in answers:
+            with self.subTest(answer=answer):
+                with self.assertRaises(smoke.SmokeFailure) as caught:
+                    smoke.validate_case(case, trace, answer)
+                self.assertEqual(caught.exception.layer, "answer")
+
     def test_execute_writes_only_redacted_case_results_and_uses_http_contract(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -147,6 +311,9 @@ class Day7ProductionSmokeTests(unittest.TestCase):
                         ToolTrace(name, True) for name in case.required_tools
                     ),
                     tool_call_count=len(case.required_tools),
+                    citation_count=(
+                        1 if case.case_id == "product_search" else 0
+                    ),
                     retrieved_chunk_ids=(
                         ("support:project-implementation:content",)
                         if case.case_id == "knowledge"
@@ -274,6 +441,45 @@ class Day7ProductionSmokeTests(unittest.TestCase):
                 "failure_layer": "ndjson",
             })
             self.assertEqual(len(rows), 8)
+
+    def test_execute_prints_failure_reason_without_persisting_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = (
+                smoke.SmokeCase(
+                    "direct",
+                    smoke.CASES[0].messages,
+                    Route.DIRECT,
+                ),
+                *smoke.CASES[1:],
+            )
+            responses = [
+                FakeResponse(events=success_events(smoke.SAFE_AGENT_ANSWER)),
+                *(FakeResponse(events=success_events("回答")) for _ in range(7)),
+            ]
+            traces = [RouteTrace(route=case.expected_route) for case in cases]
+            client = FakeClient(responses, traces)
+
+            @contextmanager
+            def client_context(trace_box):
+                client.trace_box = trace_box
+                yield client
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                smoke.run(
+                    execute=True,
+                    root=root,
+                    cases=cases,
+                    dependency_validator=lambda: None,
+                    client_context_factory=client_context,
+                )
+
+            self.assertIn("direct", output.getvalue())
+            self.assertIn("answer", output.getvalue())
+            self.assertIn("invalid greeting", output.getvalue())
+            persisted = (root / smoke.RESULT_PATH).read_text(encoding="utf-8")
+            self.assertNotIn("invalid greeting", persisted)
 
 
 if __name__ == "__main__":
