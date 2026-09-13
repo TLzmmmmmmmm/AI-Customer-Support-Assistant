@@ -21,6 +21,7 @@ from agent.runtime import (
     finalize_agent_result,
     invalid_tool_call_traces,
     record_agent_observation,
+    tool_call_batch_rejection,
 )
 from agent.tool_outcomes import (
     successful_tool_sources,
@@ -314,12 +315,18 @@ def agent_step_node(
             return update
 
         if turn.tool_calls:
-            if not tools_enabled or len(turn.tool_calls) != 1:
+            rejection = tool_call_batch_rejection(
+                turn.tool_calls,
+                processed_calls=processed_calls,
+                max_tool_calls=MAX_TOOL_CALLS,
+            )
+            if not tools_enabled or rejection is not None:
                 update.update({
                     "agent_tool_traces": (
                         *tool_traces,
                         *invalid_tool_call_traces(turn.tool_calls),
                     ),
+                    "agent_pending_tool_calls": (),
                     "tool_call": None,
                     "answer": SAFE_AGENT_ANSWER,
                     "agent_failure": (
@@ -335,7 +342,8 @@ def agent_step_node(
                     *agent_messages,
                     assistant_tool_message(turn),
                 ],
-                "agent_processed_calls": processed_calls + 1,
+                "agent_processed_calls": processed_calls + len(turn.tool_calls),
+                "agent_pending_tool_calls": turn.tool_calls[1:],
                 "tool_call": turn.tool_calls[0],
                 "answer": None,
                 "agent_failure": None,
@@ -380,45 +388,56 @@ def execute_tool_node(
     executor: ToolExecutor,
 ) -> dict[str, object]:
     try:
-        call = cast(AgentToolCall, state["tool_call"])
+        calls = (
+            cast(AgentToolCall, state["tool_call"]),
+            *state.get("agent_pending_tool_calls", ()),
+        )
         tool_traces = state["agent_tool_traces"]
         successful_observations = dict(
             state["agent_successful_observations"]
         )
-        ensure_agent_active(
-            state["deadline"],
-            layer=FailureLayer.TOOL_EXECUTION,
-            tool_traces=tool_traces,
-        )
-        observation = executor.execute(call, successful_observations)
-        (
-            updated_traces,
-            updated_sources,
-            updated_failures,
-        ) = record_agent_observation(
-            observation,
-            tool_traces=tool_traces,
-            successful_sources=state["agent_successful_sources"],
-            pending_failures=state["agent_pending_failures"],
-        )
-        ensure_agent_active(
-            state["deadline"],
-            layer=FailureLayer.TOOL_EXECUTION,
-            tool_traces=updated_traces,
-        )
+        updated_traces = tool_traces
+        updated_sources = state["agent_successful_sources"]
+        updated_failures = state["agent_pending_failures"]
+        tool_messages = []
+        observation = None
+        for call in calls:
+            ensure_agent_active(
+                state["deadline"],
+                layer=FailureLayer.TOOL_EXECUTION,
+                tool_traces=updated_traces,
+            )
+            observation = executor.execute(call, successful_observations)
+            (
+                updated_traces,
+                updated_sources,
+                updated_failures,
+            ) = record_agent_observation(
+                observation,
+                tool_traces=updated_traces,
+                successful_sources=updated_sources,
+                pending_failures=updated_failures,
+            )
+            ensure_agent_active(
+                state["deadline"],
+                layer=FailureLayer.TOOL_EXECUTION,
+                tool_traces=updated_traces,
+            )
+            tool_messages.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": observation.content,
+            })
         return {
             "agent_messages": [
                 *state["agent_messages"],
-                {
-                    "role": "tool",
-                    "tool_call_id": call.id,
-                    "content": observation.content,
-                },
+                *tool_messages,
             ],
             "agent_successful_observations": successful_observations,
             "agent_tool_traces": updated_traces,
             "agent_pending_failures": updated_failures,
             "agent_successful_sources": updated_sources,
+            "agent_pending_tool_calls": (),
             "tool_call": None,
             "tool_result": observation,
         }

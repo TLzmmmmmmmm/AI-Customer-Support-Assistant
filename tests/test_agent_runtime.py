@@ -16,6 +16,7 @@ from agent.runtime import (
     finalize_agent_result,
     invalid_tool_call_traces,
     record_agent_observation,
+    tool_call_batch_rejection,
 )
 from knowledge_pipeline.models import SourceRef
 from trace_models import FailureLayer, ToolTrace
@@ -79,6 +80,59 @@ class AgentRuntimeTests(unittest.TestCase):
                 },
             }],
         })
+
+    def test_assistant_tool_message_serializes_all_proposals_in_order(self):
+        turn = AgentTurn(
+            content=None,
+            tool_calls=(
+                AgentToolCall("call-1", "get_product_details", '{"product_id":"ly198"}'),
+                AgentToolCall("call-2", "get_contact_info", "{}"),
+            ),
+            finish_reason="tool_calls",
+        )
+
+        message = assistant_tool_message(turn)
+
+        self.assertEqual(
+            [item["id"] for item in message["tool_calls"]],
+            ["call-1", "call-2"],
+        )
+        self.assertEqual(
+            [item["function"]["name"] for item in message["tool_calls"]],
+            ["get_product_details", "get_contact_info"],
+        )
+        self.assertEqual(
+            [item["function"]["arguments"] for item in message["tool_calls"]],
+            ['{"product_id":"ly198"}', "{}"],
+        )
+
+    def test_tool_call_batch_rejection_checks_unique_ids_and_whole_budget(self):
+        one = (AgentToolCall("call-1", "get_contact_info", "{}"),)
+        three = (
+            *one,
+            AgentToolCall("call-2", "get_contact_info", "{}"),
+            AgentToolCall("call-3", "get_contact_info", "{}"),
+        )
+        duplicate = (
+            AgentToolCall("call-1", "get_contact_info", "{}"),
+            AgentToolCall("call-1", "get_product_details", "{}"),
+        )
+
+        self.assertIsNone(tool_call_batch_rejection(
+            one, processed_calls=0, max_tool_calls=3,
+        ))
+        self.assertIsNone(tool_call_batch_rejection(
+            three, processed_calls=0, max_tool_calls=3,
+        ))
+        self.assertIn("duplicate", tool_call_batch_rejection(
+            duplicate, processed_calls=0, max_tool_calls=3,
+        ).lower())
+        self.assertEqual(
+            tool_call_batch_rejection(
+                three[:2], processed_calls=2, max_tool_calls=3,
+            ),
+            "Tool-call batch size 2 exceeds remaining budget 1.",
+        )
 
     def test_invalid_proposal_traces_preserve_order_and_hide_unknown_name(self):
         calls = (

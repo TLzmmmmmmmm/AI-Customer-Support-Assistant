@@ -18,6 +18,7 @@ class AgentState(TypedDict):
     routing_failure: NotRequired[FailureLayer | None]
     agent_messages: NotRequired[list[dict[str, object]]]
     agent_processed_calls: NotRequired[int]
+    agent_pending_tool_calls: NotRequired[tuple[AgentToolCall, ...]]
     agent_successful_observations: NotRequired[dict[str, ToolObservation]]
     agent_tool_traces: NotRequired[tuple[ToolTrace, ...]]
     agent_pending_failures: NotRequired[

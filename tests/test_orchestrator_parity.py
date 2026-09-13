@@ -19,13 +19,16 @@ from routing import (
     RouteOrchestrator,
 )
 from support_tools import ContactInfoResult, ProductDetailsResult, ProductSearchResult
+from trace_models import FailureLayer
 from tests.test_agent_graph import (
     RecordingCompletion,
     RecordingDeadline,
     RecordingRetriever,
     RecordingRouter,
     _completion,
+    _multiple_tool_completion,
     _retrieval_result,
+    _tool_call,
     _tool_completion,
 )
 
@@ -311,6 +314,92 @@ PARITY_CASES = (
 
 
 class OrchestratorParityTests(unittest.TestCase):
+    def _run_agentic_pair(self, responses, *, route=Route.EXACT_PRODUCT):
+        messages = _messages("LY198 的输出功率是多少？另外怎么联系你们？")
+
+        def run_raw():
+            executor = RecordingToolExecutor(_tool_registry())
+            complete = RecordingCompletion(list(responses))
+            decision = RouteDecision(route, agentic=True, product_id="ly198")
+            result = RouteOrchestrator(
+                router=RecordingRouter(decision, []),
+                retriever=RecordingRetriever(),
+                executor=executor,
+                agent_loop=AgentLoop(executor=executor, complete_chat=complete),
+                complete_chat=complete,
+            ).run(messages, deadline=RecordingDeadline())
+            return result, executor.validated_tool_calls
+
+        def run_graph():
+            executor = RecordingToolExecutor(_tool_registry())
+            complete = RecordingCompletion(list(responses))
+            decision = RouteDecision(route, agentic=True, product_id="ly198")
+            graph = build_agent_graph(AgentGraphNodes(
+                router=RecordingRouter(decision, []),
+                executor=executor,
+                retriever=RecordingRetriever(),
+                complete_chat=complete,
+            ))
+            result = GraphRouteOrchestrator(graph).run(
+                messages,
+                deadline=RecordingDeadline(),
+            )
+            return result, executor.validated_tool_calls
+
+        return run_raw(), run_graph()
+
+    def test_multi_tool_completion_matches_raw_and_graph(self):
+        responses = (
+            _multiple_tool_completion(
+                _tool_call("call-1", "get_product_details", '{"product_id":"ly198"}'),
+                _tool_call("call-2", "get_contact_info", "{}"),
+            ),
+            _completion("LY198 的功率与联系方式。"),
+        )
+
+        (raw, raw_calls), (graph, graph_calls) = self._run_agentic_pair(responses)
+
+        self.assertEqual(graph.trace.route, raw.trace.route)
+        self.assertEqual(graph.trace.tool_calls, raw.trace.tool_calls)
+        self.assertEqual(graph.trace.tool_call_count, 2)
+        self.assertEqual(graph_calls, raw_calls)
+        self.assertEqual(graph.answer, raw.answer)
+
+    def test_mixed_multi_tool_outcome_matches_raw_and_graph(self):
+        responses = (
+            _multiple_tool_completion(
+                _tool_call("call-1", "get_product_details", '{"product_id":"ly198"}'),
+                _tool_call("call-2", "get_contact_info", '{"unexpected":true}'),
+            ),
+            _completion("产品事实已取得，但联系方式参数无效。"),
+        )
+
+        (raw, raw_calls), (graph, graph_calls) = self._run_agentic_pair(responses)
+
+        self.assertEqual(graph.trace.tool_calls, raw.trace.tool_calls)
+        self.assertEqual(
+            [trace.error_code for trace in graph.trace.tool_calls],
+            [None, "INVALID_ARGUMENT"],
+        )
+        self.assertEqual(graph.trace.failure_layer, raw.trace.failure_layer)
+        self.assertEqual(graph_calls, raw_calls)
+        self.assertEqual(graph.answer, raw.answer)
+
+    def test_oversized_multi_tool_batch_rejection_matches_raw_and_graph(self):
+        responses = (_multiple_tool_completion(*(
+            _tool_call(f"call-{index}", "get_contact_info", "{}")
+            for index in range(1, 5)
+        )),)
+
+        (raw, raw_calls), (graph, graph_calls) = self._run_agentic_pair(responses)
+
+        self.assertEqual(graph.trace.tool_calls, raw.trace.tool_calls)
+        self.assertEqual(graph.trace.tool_call_count, 4)
+        self.assertEqual(graph.trace.failure_layer, FailureLayer.TOOL_SELECTION)
+        self.assertEqual(raw_calls, ())
+        self.assertEqual(graph_calls, raw_calls)
+        self.assertEqual(graph.answer, raw.answer)
+
     def test_unique_contextual_exact_product_is_deterministic_in_raw_and_graph(self):
         prior_question = "LY198 的功率是多少？"
         contextual_messages = _messages(

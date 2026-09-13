@@ -18,6 +18,7 @@ from .runtime import (
     finalize_agent_result,
     invalid_tool_call_traces,
     record_agent_observation,
+    tool_call_batch_rejection,
 )
 from trace_models import FailureLayer, ToolTrace
 
@@ -93,7 +94,12 @@ class AgentLoop:
                 )
 
             if turn.tool_calls:
-                if not tools_enabled or len(turn.tool_calls) != 1:
+                rejection = tool_call_batch_rejection(
+                    turn.tool_calls,
+                    processed_calls=processed_calls,
+                    max_tool_calls=MAX_TOOL_CALLS,
+                )
+                if not tools_enabled or rejection is not None:
                     tool_traces = (
                         *tool_traces,
                         *invalid_tool_call_traces(turn.tool_calls),
@@ -110,38 +116,39 @@ class AgentLoop:
                         ),
                     )
 
-                processed_calls += 1
+                processed_calls += len(turn.tool_calls)
                 state.append(assistant_tool_message(turn))
 
-                ensure_agent_active(
-                    deadline,
-                    layer=FailureLayer.TOOL_EXECUTION,
-                    tool_traces=tool_traces,
-                )
-                observation = self._executor.execute(
-                    turn.tool_calls[0],
-                    successful_observations,
-                )
-                (
-                    tool_traces,
-                    successful_sources,
-                    pending_failures,
-                ) = record_agent_observation(
-                    observation,
-                    tool_traces=tool_traces,
-                    successful_sources=successful_sources,
-                    pending_failures=pending_failures,
-                )
-                ensure_agent_active(
-                    deadline,
-                    layer=FailureLayer.TOOL_EXECUTION,
-                    tool_traces=tool_traces,
-                )
-                state.append({
-                    "role": "tool",
-                    "tool_call_id": turn.tool_calls[0].id,
-                    "content": observation.content,
-                })
+                for call in turn.tool_calls:
+                    ensure_agent_active(
+                        deadline,
+                        layer=FailureLayer.TOOL_EXECUTION,
+                        tool_traces=tool_traces,
+                    )
+                    observation = self._executor.execute(
+                        call,
+                        successful_observations,
+                    )
+                    (
+                        tool_traces,
+                        successful_sources,
+                        pending_failures,
+                    ) = record_agent_observation(
+                        observation,
+                        tool_traces=tool_traces,
+                        successful_sources=successful_sources,
+                        pending_failures=pending_failures,
+                    )
+                    ensure_agent_active(
+                        deadline,
+                        layer=FailureLayer.TOOL_EXECUTION,
+                        tool_traces=tool_traces,
+                    )
+                    state.append({
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": observation.content,
+                    })
                 continue
 
             if turn.content is None or not turn.content.strip():

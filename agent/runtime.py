@@ -34,7 +34,6 @@ Use the provided deterministic tools under these rules:
 - Generic guidance does not require get_contact_info. Never invent contact facts.
 - Do not repeat a successful invocation merely because the original request still matches a must-use category.
 - A failed invocation may be retried with corrected arguments or replaced with another appropriate tool.
-- Propose at most one tool call per response.
 """.strip()
 
 
@@ -50,19 +49,40 @@ def build_agent_messages(
 
 
 def assistant_tool_message(turn: AgentTurn) -> dict[str, object]:
-    call = turn.tool_calls[0]
     return {
         "role": "assistant",
         "content": turn.content,
-        "tool_calls": [{
-            "id": call.id,
-            "type": "function",
-            "function": {
-                "name": call.name,
-                "arguments": call.arguments,
-            },
-        }],
+        "tool_calls": [
+            {
+                "id": call.id,
+                "type": "function",
+                "function": {
+                    "name": call.name,
+                    "arguments": call.arguments,
+                },
+            }
+            for call in turn.tool_calls
+        ],
     }
+
+
+def tool_call_batch_rejection(
+    tool_calls: Sequence[AgentToolCall],
+    *,
+    processed_calls: int,
+    max_tool_calls: int,
+) -> str | None:
+    call_ids = [call.id for call in tool_calls]
+    if len(set(call_ids)) != len(call_ids):
+        return "Tool-call batch contains duplicate tool_call_id values."
+
+    remaining = max_tool_calls - processed_calls
+    if len(tool_calls) > remaining:
+        return (
+            f"Tool-call batch size {len(tool_calls)} exceeds remaining "
+            f"budget {remaining}."
+        )
+    return None
 
 
 def invalid_tool_call_traces(
@@ -181,4 +201,5 @@ __all__ = [
     "finalize_agent_result",
     "invalid_tool_call_traces",
     "record_agent_observation",
+    "tool_call_batch_rejection",
 ]

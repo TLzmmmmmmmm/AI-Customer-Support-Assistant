@@ -42,6 +42,13 @@ def tool_completion(call_id, name, arguments, content=None):
     )])
 
 
+def multiple_tool_completion(*calls, content=None):
+    return SimpleNamespace(choices=[SimpleNamespace(
+        finish_reason="tool_calls",
+        message=SimpleNamespace(content=content, tool_calls=list(calls)),
+    )])
+
+
 class FakeCompleteChat:
     def __init__(self, responses):
         self.responses = deque(responses)
@@ -374,7 +381,7 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual(result.tool_calls[0].error_code, "TOOL_EXECUTION_ERROR")
         self.assertEqual(result.failure_layer, FailureLayer.TOOL_EXECUTION)
 
-    def test_multiple_tool_proposals_are_paired_as_selection_failures(self):
+    def test_duplicate_tool_call_ids_are_rejected_without_execution(self):
         from agent.loop import AgentLoop
         from trace_models import FailureLayer
 
@@ -384,7 +391,7 @@ class AgentLoopTests(unittest.TestCase):
                 content=None,
                 tool_calls=[
                     tool_call("call-1", "get_contact_info", "{}"),
-                    tool_call("call-2", "private_tool", "{}"),
+                    tool_call("call-1", "private_tool", "{}"),
                 ],
             ),
         )])
@@ -645,28 +652,133 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual(len(complete.calls), 4)
         self.assertIsNone(complete.calls[-1]["tools"])
 
-    def test_multiple_tool_calls_terminate_without_execution(self):
-        from agent.loop import SAFE_AGENT_ANSWER, AgentLoop
+    def test_multiple_tool_calls_execute_before_next_provider_turn(self):
+        from agent.loop import AgentLoop
 
-        response = SimpleNamespace(choices=[SimpleNamespace(
-            finish_reason="tool_calls",
-            message=SimpleNamespace(
-                content=None,
-                tool_calls=[
-                    tool_call("call-1", "get_contact_info", "{}"),
-                    tool_call("call-2", "get_contact_info", "{}"),
-                ],
-            ),
-        )])
         executor = RecordingExecutor()
+        complete = FakeCompleteChat([
+            multiple_tool_completion(
+                tool_call("call-1", "get_product_details", '{"product_id":"ly198"}'),
+                tool_call("call-2", "get_contact_info", "{}"),
+            ),
+            text_completion("产品和联系方式"),
+        ])
 
         result = AgentLoop(
             executor=executor,
-            complete_chat=FakeCompleteChat([response]),
+            complete_chat=complete,
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(result.answer, "产品和联系方式")
+        self.assertEqual([call.id for call in executor.calls], ["call-1", "call-2"])
+        self.assertEqual(len(result.tool_calls), 2)
+        self.assertEqual(
+            [message["tool_call_id"] for message in complete.calls[1]["messages"][-2:]],
+            ["call-1", "call-2"],
+        )
+        self.assertEqual(
+            [item["id"] for item in complete.calls[1]["messages"][-3]["tool_calls"]],
+            ["call-1", "call-2"],
+        )
+
+    def test_oversized_remaining_batch_executes_nothing(self):
+        from agent.loop import SAFE_AGENT_ANSWER, AgentLoop
+
+        executor = RecordingExecutor()
+        complete = FakeCompleteChat([
+            tool_completion("call-1", "get_contact_info", "{}"),
+            multiple_tool_completion(
+                tool_call("call-2", "get_contact_info", "{}"),
+                tool_call("call-3", "get_contact_info", "{}"),
+                tool_call("call-4", "get_contact_info", "{}"),
+            ),
+        ])
+
+        result = AgentLoop(
+            executor=executor,
+            complete_chat=complete,
         ).run(BASE_MESSAGES, deadline=RecordingDeadline())
 
         self.assertEqual(result.answer, SAFE_AGENT_ANSWER)
-        self.assertEqual(executor.calls, [])
+        self.assertEqual([call.id for call in executor.calls], ["call-1"])
+        self.assertEqual(len(result.tool_calls), 4)
+        self.assertEqual(result.failure_layer, FailureLayer.TOOL_SELECTION)
+
+    def test_three_call_batch_consumes_budget_and_disables_tools(self):
+        from agent.loop import AgentLoop
+
+        executor = RecordingExecutor()
+        complete = FakeCompleteChat([
+            multiple_tool_completion(*(
+                tool_call(f"call-{index}", "get_contact_info", "{}")
+                for index in range(1, 4)
+            )),
+            text_completion("最终回答"),
+        ])
+
+        result = AgentLoop(
+            executor=executor,
+            complete_chat=complete,
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(result.answer, "最终回答")
+        self.assertEqual(len(executor.calls), 3)
+        self.assertIsNone(complete.calls[1]["tools"])
+
+    def test_duplicate_valid_calls_in_batch_reuse_cache_but_consume_two_slots(self):
+        from agent.loop import AgentLoop
+
+        calls = []
+
+        def search_products(query):
+            calls.append(query)
+            return ProductSearchResult(products=[])
+
+        complete = FakeCompleteChat([
+            multiple_tool_completion(
+                tool_call("call-1", "search_products", '{"query":" 酒店 "}'),
+                tool_call("call-2", "search_products", '{"query":"酒店"}'),
+            ),
+            text_completion("候选结果"),
+        ])
+        result = AgentLoop(
+            executor=ToolExecutor(MappingProxyType({
+                "search_products": search_products,
+            })),
+            complete_chat=complete,
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(calls, ["酒店"])
+        self.assertEqual([trace.reused for trace in result.tool_calls], [False, True])
+        self.assertIsNotNone(complete.calls[1]["tools"])
+
+    def test_mixed_batch_preserves_success_and_failure_observations(self):
+        from agent.loop import AgentLoop
+
+        complete = FakeCompleteChat([
+            multiple_tool_completion(
+                tool_call("call-1", "search_products", '{"query":"酒店"}'),
+                tool_call("call-2", "get_contact_info", '{"unexpected":true}'),
+            ),
+            text_completion("保留候选结果，联系参数无效。"),
+        ])
+        result = AgentLoop(
+            executor=ToolExecutor(MappingProxyType({
+                "search_products": lambda query: ProductSearchResult(products=[]),
+                "get_contact_info": lambda: None,
+            })),
+            complete_chat=complete,
+        ).run(BASE_MESSAGES, deadline=RecordingDeadline())
+
+        self.assertEqual(
+            [(trace.success, trace.error_code) for trace in result.tool_calls],
+            [(True, None), (False, "INVALID_ARGUMENT")],
+        )
+        self.assertEqual(result.failure_layer, FailureLayer.ARGUMENT_GENERATION)
+        self.assertEqual(
+            [message["tool_call_id"] for message in complete.calls[1]["messages"][-2:]],
+            ["call-1", "call-2"],
+        )
 
     def test_malformed_or_incomplete_provider_turn_terminates_safely(self):
         from agent.loop import SAFE_AGENT_ANSWER, AgentLoop
