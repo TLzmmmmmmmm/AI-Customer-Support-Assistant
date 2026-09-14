@@ -101,29 +101,36 @@ Product-search requests with more than one execution: 0.
 
 Coverage: 132 of 132 successful requests; excluded: 0. Currency: CNY.
 
+Pricing snapshot for `deepseek-v4-flash` per 1,000,000 tokens:
+
+| Period | Cache-hit input | Cache-miss input | Output |
+| --- | ---: | ---: | ---: |
+| Off-peak | 0.02 | 1.00 | 4.00 |
+| Peak | 0.04 | 2.00 | 8.00 |
+
 | Sample count | Total estimated CNY | Mean CNY | P50 CNY | P95 CNY |
 | ---: | ---: | ---: | ---: | ---: |
-| 132 | 0.260226 | 0.001971 | 0.000920 | 0.006694 |
+| 132 | 0.196565 | 0.001489 | 0.000641 | 0.005255 |
 
 | Actual route | Sample count | Total estimated CNY | Mean CNY | P50 CNY | P95 CNY |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| contact | 21 | 0.017801 | 0.000848 | 0.000814 | 0.000961 |
-| direct | 20 | 0.015043 | 0.000752 | 0.000754 | 0.000906 |
-| exact_product | 22 | 0.029438 | 0.001338 | 0.001010 | 0.002288 |
-| fallback | 24 | 0.012947 | 0.000539 | 0.000000 | 0.003118 |
-| knowledge | 21 | 0.061850 | 0.002945 | 0.002489 | 0.006320 |
-| product_search | 24 | 0.123146 | 0.005131 | 0.004493 | 0.010480 |
+| contact | 21 | 0.011858 | 0.000565 | 0.000551 | 0.000681 |
+| direct | 20 | 0.010084 | 0.000504 | 0.000505 | 0.000641 |
+| exact_product | 22 | 0.020472 | 0.000931 | 0.000676 | 0.001802 |
+| fallback | 24 | 0.010297 | 0.000429 | 0.000000 | 0.002579 |
+| knowledge | 21 | 0.046863 | 0.002232 | 0.001874 | 0.004709 |
+| product_search | 24 | 0.096990 | 0.004041 | 0.003718 | 0.007651 |
 
 ## Estimated cost/conversation
 
-Complete cost sample count: 4; mean CNY: 0.013324; P50 CNY: 0.010488.
+Complete cost sample count: 4; mean CNY: 0.010015; P50 CNY: 0.007840.
 
 | conversation_id | Complete | Estimated or partial CNY |
 | --- | --- | ---: |
-| conversation-capability-boundary | true | 0.008555 |
-| conversation-product-selection | true | 0.012200 |
-| conversation-product-to-contact | true | 0.010488 |
-| conversation-solution-consultation | true | 0.022054 |
+| conversation-capability-boundary | true | 0.006302 |
+| conversation-product-selection | true | 0.009122 |
+| conversation-product-to-contact | true | 0.007840 |
+| conversation-solution-consultation | true | 0.016799 |
 
 ## Failures
 
@@ -152,7 +159,7 @@ Failed 0 of 132 attempts (rate 0.0000). Layers: {}. Codes: {}.
 - Router-type comparison is descriptive, not causal: {"deterministic": {"count": 123, "mean": 1287.5853658536585, "p50": 1000.0, "p95": 2984.0}, "llm": {"count": 9, "mean": 1732.6666666666667, "p50": 1235.0, "p95": 3953.0}}.
 - Retrieval and tool materiality are represented by their route-level non-null sample counts and latency percentiles in the stage table.
 - Repeated product-search execution: 0 successful product-search requests executed more than one tool; 0 were in the listed slow rows.
-- Highest-token route by average total tokens: product_search (3506.2); highest-cost route by mean estimated CNY: product_search (0.005131).
+- Highest-token route by average total tokens: product_search (3506.2); highest-cost route by mean estimated CNY: product_search (0.004041).
 
 ## Day 3 recommendation
 

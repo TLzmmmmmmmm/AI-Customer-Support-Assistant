@@ -231,8 +231,8 @@ of 2026-09-14, currency CNY, for configured model `deepseek-v4-flash`:
 
 | Period | Cache-hit input / 1M | Cache-miss input / 1M | Output / 1M |
 | --- | ---: | ---: | ---: |
-| Off-peak | CNY 0.05 | CNY 1.50 | CNY 4.50 |
-| Peak | CNY 0.10 | CNY 3.00 | CNY 9.00 |
+| Off-peak | CNY 0.02 | CNY 1.00 | CNY 4.00 |
+| Peak | CNY 0.04 | CNY 2.00 | CNY 8.00 |
 
 Peak time is Monday-Friday, 09:00-12:00 and 14:00-18:00 Asia/Shanghai. The
 implementation treats these as half-open intervals `[09:00, 12:00)` and

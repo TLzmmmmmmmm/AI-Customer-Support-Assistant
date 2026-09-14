@@ -22,14 +22,14 @@ PRICING_SNAPSHOT = {
     "timezone": "Asia/Shanghai",
     "peak_windows": ["weekday 09:00-12:00", "weekday 14:00-18:00"],
     "off_peak": {
-        "cache_hit_input": 0.05,
-        "cache_miss_input": 1.50,
-        "output": 4.50,
+        "cache_hit_input": 0.02,
+        "cache_miss_input": 1.00,
+        "output": 4.00,
     },
     "peak": {
-        "cache_hit_input": 0.10,
-        "cache_miss_input": 3.00,
-        "output": 9.00,
+        "cache_hit_input": 0.04,
+        "cache_miss_input": 2.00,
+        "output": 8.00,
     },
 }
 
@@ -787,6 +787,7 @@ def render_markdown(analysis: Mapping[str, object]) -> str:
     tokens = analysis["tokens"]
     tools = analysis["tools"]
     costs = analysis["estimated_cost_cny"]
+    pricing = costs["pricing_snapshot"]
     conversations = analysis["conversations"]
     failures = analysis["failures"]
     workload = analysis.get("workload", {})
@@ -933,6 +934,24 @@ def render_markdown(analysis: Mapping[str, object]) -> str:
             f"Coverage: {costs['coverage']['complete']} of "
             f"{costs['coverage']['eligible']} successful requests; excluded: "
             f"{costs['coverage']['excluded']}. Currency: CNY."
+        ),
+        "",
+        (
+            f"Pricing snapshot for `{pricing['configured_model']}` per "
+            f"{pricing['unit_tokens']:,} tokens:"
+        ),
+        "",
+        "| Period | Cache-hit input | Cache-miss input | Output |",
+        "| --- | ---: | ---: | ---: |",
+        (
+            f"| Off-peak | {pricing['off_peak']['cache_hit_input']:.2f} | "
+            f"{pricing['off_peak']['cache_miss_input']:.2f} | "
+            f"{pricing['off_peak']['output']:.2f} |"
+        ),
+        (
+            f"| Peak | {pricing['peak']['cache_hit_input']:.2f} | "
+            f"{pricing['peak']['cache_miss_input']:.2f} | "
+            f"{pricing['peak']['output']:.2f} |"
         ),
         "",
         "| Sample count | Total estimated CNY | Mean CNY | P50 CNY | P95 CNY |",

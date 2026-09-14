@@ -1099,14 +1099,14 @@
         "weekday 14:00-18:00"
       ],
       "off_peak": {
-        "cache_hit_input": 0.05,
-        "cache_miss_input": 1.5,
-        "output": 4.5
+        "cache_hit_input": 0.02,
+        "cache_miss_input": 1.0,
+        "output": 4.0
       },
       "peak": {
-        "cache_hit_input": 0.1,
-        "cache_miss_input": 3.0,
-        "output": 9.0
+        "cache_hit_input": 0.04,
+        "cache_miss_input": 2.0,
+        "output": 8.0
       }
     },
     "coverage": {
@@ -1116,110 +1116,110 @@
     },
     "overall": {
       "count": 132,
-      "mean": 0.001971409090909091,
-      "p50": 0.0009202,
-      "p95": 0.0066944,
-      "total": 0.260226
+      "mean": 0.0014891272727272729,
+      "p50": 0.0006414,
+      "p95": 0.0052546400000000005,
+      "total": 0.1965648
     },
     "by_route": {
       "contact": {
         "count": 21,
-        "mean": 0.0008476857142857142,
-        "p50": 0.0008144,
-        "p95": 0.0009614,
-        "total": 0.0178014
+        "mean": 0.000564655238095238,
+        "p50": 0.00055056,
+        "p95": 0.00068056,
+        "total": 0.011857759999999998
       },
       "direct": {
         "count": 20,
-        "mean": 0.00075215,
-        "p50": 0.0007535,
-        "p95": 0.0009065,
-        "total": 0.015043
+        "mean": 0.0005042,
+        "p50": 0.0005053999999999999,
+        "p95": 0.0006414,
+        "total": 0.010084
       },
       "exact_product": {
         "count": 22,
-        "mean": 0.0013381,
-        "p50": 0.0010102,
-        "p95": 0.0022881999999999998,
-        "total": 0.0294382
+        "mean": 0.0009305672727272728,
+        "p50": 0.0006756800000000001,
+        "p95": 0.0018016800000000002,
+        "total": 0.02047248
       },
       "fallback": {
         "count": 24,
-        "mean": 0.000539475,
+        "mean": 0.0004290566666666666,
         "p50": 0.0,
-        "p95": 0.0031178,
-        "total": 0.0129474
+        "p95": 0.00257912,
+        "total": 0.010297359999999998
       },
       "knowledge": {
         "count": 21,
-        "mean": 0.002945257142857143,
-        "p50": 0.002489,
-        "p95": 0.006319600000000001,
-        "total": 0.0618504
+        "mean": 0.0022315885714285716,
+        "p50": 0.00187424,
+        "p95": 0.00470904,
+        "total": 0.04686336
       },
       "product_search": {
         "count": 24,
-        "mean": 0.005131066666666666,
-        "p50": 0.0044928,
-        "p95": 0.010480399999999999,
-        "total": 0.1231456
+        "mean": 0.004041243333333334,
+        "p50": 0.0037175199999999998,
+        "p95": 0.007650560000000001,
+        "total": 0.09698984000000001
       }
     },
     "requests": [
       {
         "request_id": "ce8172b21daa4a65af5478736f64dbc5",
         "route": "direct",
-        "estimated_cost_cny": 0.0009155
+        "estimated_cost_cny": 0.0006494
       },
       {
         "request_id": "33d92e33d3974c0096ca9ba116086f0e",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0018284
+        "estimated_cost_cny": 0.00129456
       },
       {
         "request_id": "21826a894fd34461b39e6274208ae0fc",
         "route": "direct",
-        "estimated_cost_cny": 0.0007175
+        "estimated_cost_cny": 0.00047339999999999996
       },
       {
         "request_id": "35d1ad64798e4cf9b84df65898448def",
         "route": "product_search",
-        "estimated_cost_cny": 0.006169399999999999
+        "estimated_cost_cny": 0.00433056
       },
       {
         "request_id": "d54286ffd55e49ad96c98c492fd879a3",
         "route": "direct",
-        "estimated_cost_cny": 0.0007535
+        "estimated_cost_cny": 0.0005053999999999999
       },
       {
         "request_id": "3b7d10182591477c9106d19c7cd5a039",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0025778000000000003
+        "estimated_cost_cny": 0.0018059200000000001
       },
       {
         "request_id": "c7cf7774afef4686b64d26870fd95c70",
         "route": "contact",
-        "estimated_cost_cny": 0.0006284
+        "estimated_cost_cny": 0.00038656
       },
       {
         "request_id": "d11219d03a014457b738277fa11a55d4",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0010218
+        "estimated_cost_cny": 0.00065352
       },
       {
         "request_id": "a947687a4a1e45d69b8ff37a009e085c",
         "route": "contact",
-        "estimated_cost_cny": 0.0006134
+        "estimated_cost_cny": 0.00037256
       },
       {
         "request_id": "6f3c20d3da7e40c495e4773356832e48",
         "route": "knowledge",
-        "estimated_cost_cny": 0.008660200000000002
+        "estimated_cost_cny": 0.00654768
       },
       {
         "request_id": "7f59595364a84ceea7e59126376c1083",
         "route": "direct",
-        "estimated_cost_cny": 0.0008795
+        "estimated_cost_cny": 0.0006173999999999999
       },
       {
         "request_id": "e7432c02e2bf405fa7d969da66bca27c",
@@ -1229,27 +1229,27 @@
       {
         "request_id": "901f5c97245a4df685430e4d886d9e5b",
         "route": "knowledge",
-        "estimated_cost_cny": 0.004298
+        "estimated_cost_cny": 0.00354
       },
       {
         "request_id": "ae16d0f5bd10410686c9ae0bfe66c63f",
         "route": "direct",
-        "estimated_cost_cny": 0.0007535
+        "estimated_cost_cny": 0.0005053999999999999
       },
       {
         "request_id": "abd2e52a59f44085a918d120ee1c5567",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0054676
+        "estimated_cost_cny": 0.00379104
       },
       {
         "request_id": "c2b5ff9ab67b49c4bbd1379aa33c60b3",
         "route": "product_search",
-        "estimated_cost_cny": 0.0119054
+        "estimated_cost_cny": 0.00941856
       },
       {
         "request_id": "7597f4662b2447b28366e20c3c0453eb",
         "route": "product_search",
-        "estimated_cost_cny": 0.0027342
+        "estimated_cost_cny": 0.0021468800000000003
       },
       {
         "request_id": "5b497ca5b46d444fbbeb69c259104701",
@@ -1259,122 +1259,122 @@
       {
         "request_id": "ce141bf0123d47caa771c2a10070b7ef",
         "route": "direct",
-        "estimated_cost_cny": 0.0006725
+        "estimated_cost_cny": 0.00043339999999999996
       },
       {
         "request_id": "f3afb5a9ab2f4a1182c8314fc89b3581",
         "route": "direct",
-        "estimated_cost_cny": 0.0006185
+        "estimated_cost_cny": 0.0003854
       },
       {
         "request_id": "819c3a868e2e4e2eb2b48daf2e43314f",
         "route": "contact",
-        "estimated_cost_cny": 0.0006134
+        "estimated_cost_cny": 0.00037256
       },
       {
         "request_id": "3698cf6dadd0473293f7b8a06e13096c",
         "route": "product_search",
-        "estimated_cost_cny": 0.0020232
+        "estimated_cost_cny": 0.0015148800000000001
       },
       {
         "request_id": "4370404a532542f79edfab0183eab059",
         "route": "direct",
-        "estimated_cost_cny": 0.0006905
+        "estimated_cost_cny": 0.0004494
       },
       {
         "request_id": "eae1216c11ac4d33b59b6727d0998f78",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0010102
+        "estimated_cost_cny": 0.0006756800000000001
       },
       {
         "request_id": "1f2c5f20e4f840788487c3d98e886f4a",
         "route": "fallback",
-        "estimated_cost_cny": 0.000543
+        "estimated_cost_cny": 0.000366
       },
       {
         "request_id": "c8bb209e7d264bb5a8436fe57411685a",
         "route": "product_search",
-        "estimated_cost_cny": 0.0067874
+        "estimated_cost_cny": 0.005124559999999999
       },
       {
         "request_id": "23fa09db3f8e4ccc9ba65cc84502a9b8",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0012914
+        "estimated_cost_cny": 0.00083656
       },
       {
         "request_id": "0caa6ee93f5947ac9074f90d090667e2",
         "route": "contact",
-        "estimated_cost_cny": 0.0008684
+        "estimated_cost_cny": 0.0005985599999999999
       },
       {
         "request_id": "171a96d8594241f7b136bc2341efd07a",
         "route": "direct",
-        "estimated_cost_cny": 0.0009065
+        "estimated_cost_cny": 0.0006414
       },
       {
         "request_id": "debdd0cf1e9947e4a1a113dd6ea1a62f",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0008182
+        "estimated_cost_cny": 0.0005216800000000001
       },
       {
         "request_id": "96e88752d20340c9a676ad13ad464352",
         "route": "knowledge",
-        "estimated_cost_cny": 0.002489
+        "estimated_cost_cny": 0.001932
       },
       {
         "request_id": "b3ce07643c304bce9e660aa480bc7258",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0022922
+        "estimated_cost_cny": 0.00178928
       },
       {
         "request_id": "7f099e924c1c4a679811151c07aa185d",
         "route": "product_search",
-        "estimated_cost_cny": 0.0044928
+        "estimated_cost_cny": 0.0037175199999999998
       },
       {
         "request_id": "87b55008434847e78875a7234095f55f",
         "route": "fallback",
-        "estimated_cost_cny": 0.000543
+        "estimated_cost_cny": 0.000366
       },
       {
         "request_id": "a6c6715105a04249b5e83d4511f47eed",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0009202
+        "estimated_cost_cny": 0.0005856800000000001
       },
       {
         "request_id": "ae9913c34caa45adb02718f2ac74cc9b",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0019592
+        "estimated_cost_cny": 0.00149328
       },
       {
         "request_id": "c6e52e40742b4b29aa6bdc5032a7416d",
         "route": "direct",
-        "estimated_cost_cny": 0.0006275
+        "estimated_cost_cny": 0.00039339999999999997
       },
       {
         "request_id": "a8d65d4e4926410aa3549e11ca14b3bf",
         "route": "product_search",
-        "estimated_cost_cny": 0.0062576
+        "estimated_cost_cny": 0.0052546400000000005
       },
       {
         "request_id": "50ef71e1839f4afaac710d35431d94e6",
         "route": "product_search",
-        "estimated_cost_cny": 0.004033800000000001
+        "estimated_cost_cny": 0.00330952
       },
       {
         "request_id": "a562219de32343aaba9c9bdd5cbe5bdf",
         "route": "contact",
-        "estimated_cost_cny": 0.0009614
+        "estimated_cost_cny": 0.00068056
       },
       {
         "request_id": "7b82828be8014779a6b952dc1c54609d",
         "route": "product_search",
-        "estimated_cost_cny": 0.0025308
+        "estimated_cost_cny": 0.00197352
       },
       {
         "request_id": "4f49cd7c51e24c3d9a494fcf72361292",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0010012
+        "estimated_cost_cny": 0.00066768
       },
       {
         "request_id": "f85abde747864599a32b00b2966b03a0",
@@ -1384,22 +1384,22 @@
       {
         "request_id": "becc6fc2a57f4458967bd429a9cb2531",
         "route": "direct",
-        "estimated_cost_cny": 0.0007175
+        "estimated_cost_cny": 0.00047339999999999996
       },
       {
         "request_id": "bf013d5f9d3646f78f06b6dc4a0a4ed0",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0008092
+        "estimated_cost_cny": 0.0005136800000000001
       },
       {
         "request_id": "2e8f4c4abe6040b2a68646518b786ab3",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0027995999999999997
+        "estimated_cost_cny": 0.0022102399999999996
       },
       {
         "request_id": "b8c964ef0d97487287ad328a077e26c0",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0019502
+        "estimated_cost_cny": 0.00148528
       },
       {
         "request_id": "d6d235191f4f42e5b16fa5691375d661",
@@ -1409,7 +1409,7 @@
       {
         "request_id": "ebed56b6f15d46389263c47b6bf5660e",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0013582
+        "estimated_cost_cny": 0.0009556800000000001
       },
       {
         "request_id": "f814af7987de4864bad3479f4d0cd687",
@@ -1419,22 +1419,22 @@
       {
         "request_id": "c6d7da4105fd4f95be2a7aeb530f1f23",
         "route": "fallback",
-        "estimated_cost_cny": 0.000543
+        "estimated_cost_cny": 0.000366
       },
       {
         "request_id": "2380b6b9480f4574881b8b634f9293bc",
         "route": "direct",
-        "estimated_cost_cny": 0.0008975
+        "estimated_cost_cny": 0.0006334
       },
       {
         "request_id": "a73c6331e1c64d09b6458fcc2dc5b946",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0010102
+        "estimated_cost_cny": 0.0006756800000000001
       },
       {
         "request_id": "d18ce623f1674393820fada2ff8d4a16",
         "route": "product_search",
-        "estimated_cost_cny": 0.0062832
+        "estimated_cost_cny": 0.00529088
       },
       {
         "request_id": "e49b7506e78a4bccb3418bcfc45ffb6d",
@@ -1449,52 +1449,52 @@
       {
         "request_id": "4db85b7cd80b45a39e2bd3fd209454e0",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0025926
+        "estimated_cost_cny": 0.00202624
       },
       {
         "request_id": "c5aa382daef849aaad7ce4db19e54393",
         "route": "product_search",
-        "estimated_cost_cny": 0.0068322
+        "estimated_cost_cny": 0.00577888
       },
       {
         "request_id": "cc404961f05b4b42a48dfbee7bcd2c0f",
         "route": "contact",
-        "estimated_cost_cny": 0.0007304
+        "estimated_cost_cny": 0.00047656
       },
       {
         "request_id": "212ab31c956640cdb8f600d0044abfc4",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0010218
+        "estimated_cost_cny": 0.00065352
       },
       {
         "request_id": "b7b4234acb9846f7bc4de0ba94a5f1df",
         "route": "direct",
-        "estimated_cost_cny": 0.0006185
+        "estimated_cost_cny": 0.0003854
       },
       {
         "request_id": "9c5fd2773904461283f2cd968993d5a6",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0008362
+        "estimated_cost_cny": 0.00053768
       },
       {
         "request_id": "2f36bbe2639244468cfdce268af79bb7",
         "route": "contact",
-        "estimated_cost_cny": 0.0006284
+        "estimated_cost_cny": 0.00038656
       },
       {
         "request_id": "48769ea905894197ba5bc761ed6330d8",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0013492
+        "estimated_cost_cny": 0.0009476800000000001
       },
       {
         "request_id": "c54ce19a071a49159c9f1101967468b2",
         "route": "contact",
-        "estimated_cost_cny": 0.0008684
+        "estimated_cost_cny": 0.0005985599999999999
       },
       {
         "request_id": "b28071acc6014afd9bd84518d3ba72a9",
         "route": "product_search",
-        "estimated_cost_cny": 0.0040076
+        "estimated_cost_cny": 0.00325464
       },
       {
         "request_id": "6166233ac72b41b29369817641cac523",
@@ -1504,52 +1504,52 @@
       {
         "request_id": "292bbcb2886044088a7ff9fcb0a63efa",
         "route": "contact",
-        "estimated_cost_cny": 0.0008684
+        "estimated_cost_cny": 0.0005985599999999999
       },
       {
         "request_id": "7dc4f443d15c4ddbbc4738e5c1ac3ee7",
         "route": "contact",
-        "estimated_cost_cny": 0.0008713999999999999
+        "estimated_cost_cny": 0.00060056
       },
       {
         "request_id": "c0b42d04b47f4a3bb1b41478b8dadae3",
         "route": "product_search",
-        "estimated_cost_cny": 0.0040526
+        "estimated_cost_cny": 0.0032946399999999997
       },
       {
         "request_id": "b584819f0e174ea794c34fe8e38ed55b",
         "route": "product_search",
-        "estimated_cost_cny": 0.0074712
+        "estimated_cost_cny": 0.00634688
       },
       {
         "request_id": "2a9be18d983845d8bf81114ef9b2ad19",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0010102
+        "estimated_cost_cny": 0.0006756800000000001
       },
       {
         "request_id": "9bc05572c54c40b09d3bae8ccf9a0c97",
         "route": "contact",
-        "estimated_cost_cny": 0.0008983999999999999
+        "estimated_cost_cny": 0.0006245599999999999
       },
       {
         "request_id": "f47214a79cb64d2c82298559bc64f4cf",
         "route": "contact",
-        "estimated_cost_cny": 0.0009614
+        "estimated_cost_cny": 0.00068056
       },
       {
         "request_id": "4396adf658084a439a88228e2dc61430",
         "route": "direct",
-        "estimated_cost_cny": 0.0005735
+        "estimated_cost_cny": 0.0003454
       },
       {
         "request_id": "d7511025f77948848fd80041c151e9b3",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0013548
+        "estimated_cost_cny": 0.00094952
       },
       {
         "request_id": "b8f744aaa2354591a088f0d049130a0c",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0008092
+        "estimated_cost_cny": 0.0005136800000000001
       },
       {
         "request_id": "ce10efbc0c7041aeaf554381e642d7cd",
@@ -1559,27 +1559,27 @@
       {
         "request_id": "8b83bcb470c3480b9b12a650eaaae408",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0024216
+        "estimated_cost_cny": 0.00187424
       },
       {
         "request_id": "3464362e32344e30a03a4d1164eda676",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0009202
+        "estimated_cost_cny": 0.0005856800000000001
       },
       {
         "request_id": "a6c5c88b205f4833a06197f66129e2ef",
         "route": "contact",
-        "estimated_cost_cny": 0.0006284
+        "estimated_cost_cny": 0.00038656
       },
       {
         "request_id": "b018294bdca24f5782aedb5b99f23057",
         "route": "knowledge",
-        "estimated_cost_cny": 0.003893
+        "estimated_cost_cny": 0.00318
       },
       {
         "request_id": "211f4afbc17b46ab9766e751e789fac9",
         "route": "direct",
-        "estimated_cost_cny": 0.0007625
+        "estimated_cost_cny": 0.0005134
       },
       {
         "request_id": "99324f8bc54e44389a8e885449bcfb46",
@@ -1589,22 +1589,22 @@
       {
         "request_id": "a139f666d7d4499793f4e743ee0fb2a6",
         "route": "direct",
-        "estimated_cost_cny": 0.0007445
+        "estimated_cost_cny": 0.0004974
       },
       {
         "request_id": "8c605f0c676b4f65b9f3a860dcaa140d",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0011602000000000001
+        "estimated_cost_cny": 0.00077968
       },
       {
         "request_id": "ed84ca9821e243028061ddde8e73e5cc",
         "route": "product_search",
-        "estimated_cost_cny": 0.0028466
+        "estimated_cost_cny": 0.0022226399999999997
       },
       {
         "request_id": "01d6fd7afb364381899b2314708a7cf8",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0025835999999999997
+        "estimated_cost_cny": 0.00201824
       },
       {
         "request_id": "fd161814abb249b69d2eecd1cd4fb48a",
@@ -1614,47 +1614,47 @@
       {
         "request_id": "99e0be7890e0419eac1ea6a30ee24828",
         "route": "product_search",
-        "estimated_cost_cny": 0.0051776
+        "estimated_cost_cny": 0.004294640000000001
       },
       {
         "request_id": "c84c5899cf074a409c7d3525848e6d06",
         "route": "direct",
-        "estimated_cost_cny": 0.0007625
+        "estimated_cost_cny": 0.0005134
       },
       {
         "request_id": "3436a15f6e834b4cb5b57f51b359f97e",
         "route": "direct",
-        "estimated_cost_cny": 0.0007805
+        "estimated_cost_cny": 0.0005294
       },
       {
         "request_id": "2eacfe1c83e74fc3bb60c52a6248490b",
         "route": "knowledge",
-        "estimated_cost_cny": 0.004082
+        "estimated_cost_cny": 0.003348
       },
       {
         "request_id": "889c150f54234ff6908593613b1db612",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0009202
+        "estimated_cost_cny": 0.0005856800000000001
       },
       {
         "request_id": "e94f533fbdeb45f995fa2e549063e7f2",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0010218
+        "estimated_cost_cny": 0.00065352
       },
       {
         "request_id": "45ebaf4a8b9c46208ca96e730ea76a20",
         "route": "contact",
-        "estimated_cost_cny": 0.0008144
+        "estimated_cost_cny": 0.00055056
       },
       {
         "request_id": "91e1722eb3da4cfd94de3f36c5d1253f",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0010102
+        "estimated_cost_cny": 0.0006756800000000001
       },
       {
         "request_id": "b9955e4b56a7453caa275287353547cf",
         "route": "direct",
-        "estimated_cost_cny": 0.0007535
+        "estimated_cost_cny": 0.0005053999999999999
       },
       {
         "request_id": "d5ba810b0bdc406f82c725cbbe0d4741",
@@ -1664,37 +1664,37 @@
       {
         "request_id": "f46e3e8a6c614640b7bc8ff1bc8e5fc0",
         "route": "contact",
-        "estimated_cost_cny": 0.0007124
+        "estimated_cost_cny": 0.00046056
       },
       {
         "request_id": "49677189feb84192b0aefa1d222c642c",
         "route": "product_search",
-        "estimated_cost_cny": 0.0020862
+        "estimated_cost_cny": 0.0015708800000000002
       },
       {
         "request_id": "81e0c2755e3a4e7597fb72ac50954e2e",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0013277999999999999
+        "estimated_cost_cny": 0.00092552
       },
       {
         "request_id": "5e1915f825d74e7b840b23f2d7a0fc9d",
         "route": "contact",
-        "estimated_cost_cny": 0.0006734
+        "estimated_cost_cny": 0.00042656
       },
       {
         "request_id": "a2cf6f0a1e24464bad55390fc8c97332",
         "route": "product_search",
-        "estimated_cost_cny": 0.0017082
+        "estimated_cost_cny": 0.00123488
       },
       {
         "request_id": "a0d1a4eba48045cb8c4d1785dd3c32d2",
         "route": "knowledge",
-        "estimated_cost_cny": 0.0017162
+        "estimated_cost_cny": 0.00127728
       },
       {
         "request_id": "fd77cb9d1eee4b98a7d9d8ecfdd5d109",
         "route": "contact",
-        "estimated_cost_cny": 0.0007124
+        "estimated_cost_cny": 0.00046056
       },
       {
         "request_id": "e772c46113524e0faae1df209cdb861b",
@@ -1704,12 +1704,12 @@
       {
         "request_id": "833f3a594f704bd1a79589e88326daea",
         "route": "fallback",
-        "estimated_cost_cny": 0.000543
+        "estimated_cost_cny": 0.000366
       },
       {
         "request_id": "c5ced00a1c5d410e916420cb6b286a7d",
         "route": "fallback",
-        "estimated_cost_cny": 0.000543
+        "estimated_cost_cny": 0.000366
       },
       {
         "request_id": "911b2df5e23e4764b99f19a0745f6783",
@@ -1719,7 +1719,7 @@
       {
         "request_id": "1e46c5b7ff7d4e7c912ae0688a887888",
         "route": "direct",
-        "estimated_cost_cny": 0.0008975
+        "estimated_cost_cny": 0.0006334
       },
       {
         "request_id": "b1b325eca48f4cbbae1b9af07e7da270",
@@ -1729,77 +1729,77 @@
       {
         "request_id": "0a3af6c1c5dd4220a59d337bb7e6d830",
         "route": "contact",
-        "estimated_cost_cny": 0.0009434
+        "estimated_cost_cny": 0.0006645599999999999
       },
       {
         "request_id": "d48417c74dc44a10953b2335f944429c",
         "route": "product_search",
-        "estimated_cost_cny": 0.0057612
+        "estimated_cost_cny": 0.00482688
       },
       {
         "request_id": "db01b3e9894e4b648ef9164afca41a3c",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0009202
+        "estimated_cost_cny": 0.0005856800000000001
       },
       {
         "request_id": "1ad0512cd7c647dd94a23491486c52bd",
         "route": "contact",
-        "estimated_cost_cny": 0.0006284
+        "estimated_cost_cny": 0.00038656
       },
       {
         "request_id": "5c6f55f0fd8e4afb8e2e71411a498a71",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0014302
+        "estimated_cost_cny": 0.00101968
       },
       {
         "request_id": "115871566da8488b8e569ac77defc4b4",
         "route": "product_search",
-        "estimated_cost_cny": 0.0037278000000000003
+        "estimated_cost_cny": 0.00303752
       },
       {
         "request_id": "59c5b2fe2061461aaffb1fdd04f882cf",
         "route": "contact",
-        "estimated_cost_cny": 0.0008954
+        "estimated_cost_cny": 0.00062256
       },
       {
         "request_id": "a420ad7ebc7549f88b321e0267282c52",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0008182
+        "estimated_cost_cny": 0.0005216800000000001
       },
       {
         "request_id": "e3a0b1628c2c4a5aa0730c5487193d37",
         "route": "product_search",
-        "estimated_cost_cny": 0.0065422
+        "estimated_cost_cny": 0.00473768
       },
       {
         "request_id": "cb0b5965c8b84d8bb12b38848bb67c39",
         "route": "knowledge",
-        "estimated_cost_cny": 0.006319600000000001
+        "estimated_cost_cny": 0.00470904
       },
       {
         "request_id": "f343d3dd84fa48fea75fdb0a62401570",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0022881999999999998
+        "estimated_cost_cny": 0.0018016800000000002
       },
       {
         "request_id": "6419faaa13754d10a1cb8ee0a3b78adb",
         "route": "product_search",
-        "estimated_cost_cny": 0.0066944
+        "estimated_cost_cny": 0.00485256
       },
       {
         "request_id": "577eec7928a140da9a8e459e5969b118",
         "route": "fallback",
-        "estimated_cost_cny": 0.0031178
+        "estimated_cost_cny": 0.00257912
       },
       {
         "request_id": "1c8751230bbf4328b676aeef51c0cdfc",
         "route": "fallback",
-        "estimated_cost_cny": 0.0052538
+        "estimated_cost_cny": 0.0044391199999999995
       },
       {
         "request_id": "d2041217bedd419fbcec0907a68d7fa2",
         "route": "exact_product",
-        "estimated_cost_cny": 0.0059186
+        "estimated_cost_cny": 0.004515440000000001
       },
       {
         "request_id": "f029083e5d7e43a7b76f9f9f3ae77a3e",
@@ -1809,22 +1809,22 @@
       {
         "request_id": "26613d2fa8af41da8e848014faaf396a",
         "route": "product_search",
-        "estimated_cost_cny": 0.0025396
+        "estimated_cost_cny": 0.00180504
       },
       {
         "request_id": "12efd458447442498e2bc3f9580b27d3",
         "route": "product_search",
-        "estimated_cost_cny": 0.010480399999999999
+        "estimated_cost_cny": 0.007650560000000001
       },
       {
         "request_id": "e0d0f32948954ddeb527009d8b81620d",
         "route": "contact",
-        "estimated_cost_cny": 0.0022814000000000003
+        "estimated_cost_cny": 0.0015225599999999998
       },
       {
         "request_id": "5aa9fd1eab384e88b8c6ec6db46f94f1",
         "route": "fallback",
-        "estimated_cost_cny": 0.0018608
+        "estimated_cost_cny": 0.00144912
       }
     ],
     "failed_requests": {
@@ -1837,9 +1837,9 @@
     "partial_count": 0,
     "estimated_cost_cny": {
       "count": 4,
-      "mean": 0.0133242,
-      "p50": 0.0104882,
-      "p95": 0.0220538
+      "mean": 0.01001548,
+      "p50": 0.007839680000000002,
+      "p95": 0.01679872
     },
     "items": [
       {
@@ -1851,7 +1851,7 @@
           3
         ],
         "skipped_turn_indices": [],
-        "estimated_cost_cny": 0.008555199999999999
+        "estimated_cost_cny": 0.00630168
       },
       {
         "conversation_id": "conversation-product-selection",
@@ -1862,7 +1862,7 @@
           3
         ],
         "skipped_turn_indices": [],
-        "estimated_cost_cny": 0.0121996
+        "estimated_cost_cny": 0.009121839999999999
       },
       {
         "conversation_id": "conversation-product-to-contact",
@@ -1873,7 +1873,7 @@
           3
         ],
         "skipped_turn_indices": [],
-        "estimated_cost_cny": 0.0104882
+        "estimated_cost_cny": 0.007839680000000002
       },
       {
         "conversation_id": "conversation-solution-consultation",
@@ -1884,7 +1884,7 @@
           3
         ],
         "skipped_turn_indices": [],
-        "estimated_cost_cny": 0.0220538
+        "estimated_cost_cny": 0.01679872
       }
     ]
   },

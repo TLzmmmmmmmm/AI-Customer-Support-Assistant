@@ -301,7 +301,7 @@ class AggregationTests(unittest.TestCase):
 
         self.assertAlmostEqual(
             estimate_request_cost_cny(summary),
-            0.8 * 0.10 + 0.2 * 3.00 + 0.1 * 9.00,
+            0.8 * 0.04 + 0.2 * 2.00 + 0.1 * 8.00,
         )
         self.assertEqual(estimate_request_cost_cny({
             **summary,
@@ -330,14 +330,14 @@ class AggregationTests(unittest.TestCase):
         self.assertEqual(PRICING_SNAPSHOT["configured_model"], "deepseek-v4-flash")
         self.assertNotIn("version", PRICING_SNAPSHOT)
         self.assertEqual(PRICING_SNAPSHOT["off_peak"], {
-            "cache_hit_input": 0.05,
-            "cache_miss_input": 1.50,
-            "output": 4.50,
+            "cache_hit_input": 0.02,
+            "cache_miss_input": 1.00,
+            "output": 4.00,
         })
         self.assertEqual(PRICING_SNAPSHOT["peak"], {
-            "cache_hit_input": 0.10,
-            "cache_miss_input": 3.00,
-            "output": 9.00,
+            "cache_hit_input": 0.04,
+            "cache_miss_input": 2.00,
+            "output": 8.00,
         })
         self.assertEqual(cost["coverage"], {
             "complete": 2,
@@ -409,6 +409,8 @@ class AggregationTests(unittest.TestCase):
         self.assertIn("overlap", report)
         self.assertIn("sample count", report)
         self.assertIn("Total estimated CNY", report)
+        self.assertIn("| Off-peak | 0.02 | 1.00 | 4.00 |", report)
+        self.assertIn("| Peak | 0.04 | 2.00 | 8.00 |", report)
         self.assertIn("conversation_id", report)
         self.assertIn("product_search", report)
         self.assertIn(
