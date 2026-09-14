@@ -345,6 +345,10 @@ class AggregationTests(unittest.TestCase):
             "excluded": 1,
         })
         self.assertEqual(cost["overall"]["count"], 2)
+        self.assertEqual(
+            cost["overall"]["total"],
+            sum(item["estimated_cost_cny"] for item in cost["requests"]),
+        )
         self.assertEqual(cost["failed_requests"]["count"], 1)
         self.assertGreater(cost["failed_requests"]["total"], 0)
         self.assertNotIn("actual", json.dumps(cost).lower())
@@ -362,6 +366,12 @@ class AggregationTests(unittest.TestCase):
             0,
         )
         self.assertNotIn("estimated_cost_cny", conversations["items"][1])
+        self.assertEqual(
+            analysis["tools"][
+                "product_search_requests_with_multiple_executions"
+            ],
+            1,
+        )
 
     def test_report_has_required_sections_and_exact_final_label(self):
         analysis = analyze_join(self._joined_fixture())
@@ -398,6 +408,9 @@ class AggregationTests(unittest.TestCase):
         self.assertIn("nearest-rank", report)
         self.assertIn("overlap", report)
         self.assertIn("sample count", report)
+        self.assertIn("Total estimated CNY", report)
+        self.assertIn("conversation_id", report)
+        self.assertIn("product_search", report)
         self.assertIn(
             "Repeated test cases may increase prompt cache reuse; observed "
             "estimated cost reflects the measured cache behavior of this "

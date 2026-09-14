@@ -542,6 +542,11 @@ def analyze_join(
         for pair in successful
         if pair["summary"].get("executed_tool_names")
     )
+    repeated_product_search_executions = sum(
+        pair["summary"].get("route") == "product_search"
+        and (pair["summary"].get("tool_execution_count") or 0) > 1
+        for pair in successful
+    )
     failure_layers = Counter(
         pair["summary"].get("failure_layer")
         for pair in unsuccessful
@@ -572,6 +577,14 @@ def analyze_join(
             pair["summary"], selected_pricing
         )) is not None
     ]
+    overall_costs = [cost for _, cost in complete_successful_cost_rows]
+    overall_cost_stats = numeric_stats(overall_costs)
+    overall_cost_stats["total"] = sum(overall_costs)
+    route_cost_stats = {}
+    for route, route_costs in sorted(cost_by_route.items()):
+        metrics = numeric_stats(route_costs)
+        metrics["total"] = sum(route_costs)
+        route_cost_stats[route] = metrics
     diagnostics_by_request = {
         row["request_id"]: row for row in dominant_rows
     }
@@ -684,6 +697,9 @@ def analyze_join(
                     key=lambda item: (-item[1], item[0]),
                 )
             ],
+            "product_search_requests_with_multiple_executions": (
+                repeated_product_search_executions
+            ),
         },
         "failures": {
             "attempted": attempted,
@@ -699,13 +715,8 @@ def analyze_join(
                 "eligible": len(successful),
                 "excluded": len(successful) - len(complete_successful_cost_rows),
             },
-            "overall": numeric_stats([
-                cost for _, cost in complete_successful_cost_rows
-            ]),
-            "by_route": {
-                route: numeric_stats(costs)
-                for route, costs in sorted(cost_by_route.items())
-            },
+            "overall": overall_cost_stats,
+            "by_route": route_cost_stats,
             "requests": [
                 {
                     "request_id": pair["summary"]["request_id"],
@@ -739,6 +750,7 @@ def _display(value: object, decimals: int = 1) -> str:
 def _route_with_highest(
     groups: Mapping[str, Mapping[str, object]],
     field: str,
+    decimals: int = 1,
 ) -> str:
     eligible = [
         (name, metrics.get(field))
@@ -748,7 +760,7 @@ def _route_with_highest(
     if not eligible:
         return "No observations"
     name, value = max(eligible, key=lambda item: item[1])
-    return f"{name} ({_display(value)})"
+    return f"{name} ({_display(value, decimals)})"
 
 
 def render_markdown(analysis: Mapping[str, object]) -> str:
@@ -910,6 +922,11 @@ def render_markdown(analysis: Mapping[str, object]) -> str:
         "Ordered executed-tool sequences: "
         + json.dumps(tools["ordered_name_sequences"], ensure_ascii=False),
         "",
+        (
+            "Product-search requests with more than one execution: "
+            f"{tools['product_search_requests_with_multiple_executions']}."
+        ),
+        "",
         "## Estimated cost/request",
         "",
         (
@@ -918,13 +935,26 @@ def render_markdown(analysis: Mapping[str, object]) -> str:
             f"{costs['coverage']['excluded']}. Currency: CNY."
         ),
         "",
-        "| Sample count | Mean CNY | P50 CNY | P95 CNY |",
-        "| ---: | ---: | ---: | ---: |",
+        "| Sample count | Total estimated CNY | Mean CNY | P50 CNY | P95 CNY |",
+        "| ---: | ---: | ---: | ---: | ---: |",
         (
-            f"| {costs['overall']['count']} | {_display(costs['overall']['mean'], 6)} | "
+            f"| {costs['overall']['count']} | "
+            f"{_display(costs['overall']['total'], 6)} | "
+            f"{_display(costs['overall']['mean'], 6)} | "
             f"{_display(costs['overall']['p50'], 6)} | "
             f"{_display(costs['overall']['p95'], 6)} |"
         ),
+        "",
+        "| Actual route | Sample count | Total estimated CNY | Mean CNY | P50 CNY | P95 CNY |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ))
+    for route, metrics in costs["by_route"].items():
+        lines.append(
+            f"| {route} | {metrics['count']} | {_display(metrics['total'], 6)} | "
+            f"{_display(metrics['mean'], 6)} | {_display(metrics['p50'], 6)} | "
+            f"{_display(metrics['p95'], 6)} |"
+        )
+    lines.extend((
         "",
         "## Estimated cost/conversation",
         "",
@@ -933,6 +963,20 @@ def render_markdown(analysis: Mapping[str, object]) -> str:
             f"mean CNY: {_display(conversations['estimated_cost_cny']['mean'], 6)}; "
             f"P50 CNY: {_display(conversations['estimated_cost_cny']['p50'], 6)}."
         ),
+        "",
+        "| conversation_id | Complete | Estimated or partial CNY |",
+        "| --- | --- | ---: |",
+    ))
+    for item in conversations["items"]:
+        item_cost = item.get(
+            "estimated_cost_cny",
+            item.get("partial_estimated_cost_cny"),
+        )
+        lines.append(
+            f"| {item['conversation_id']} | {str(item['complete']).lower()} | "
+            f"{_display(item_cost, 6)} |"
+        )
+    lines.extend((
         "",
         "## Failures",
         "",
@@ -996,14 +1040,16 @@ def render_markdown(analysis: Mapping[str, object]) -> str:
             "non-null sample counts and latency percentiles in the stage table."
         ),
         (
-            f"- Repeated product-search execution: {product_repeats} listed slow "
-            "requests executed more than one tool."
+            "- Repeated product-search execution: "
+            f"{tools['product_search_requests_with_multiple_executions']} successful "
+            "product-search requests executed more than one tool; "
+            f"{product_repeats} were in the listed slow rows."
         ),
         (
             "- Highest-token route by average total tokens: "
             f"{_route_with_highest(tokens['by_route'], 'average_total')}; "
             "highest-cost route by mean estimated CNY: "
-            f"{_route_with_highest(costs['by_route'], 'mean')}."
+            f"{_route_with_highest(costs['by_route'], 'mean', 6)}."
         ),
         "",
         "## Day 3 recommendation",
