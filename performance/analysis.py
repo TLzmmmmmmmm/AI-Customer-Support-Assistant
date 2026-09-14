@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
-from collections import defaultdict
-from collections.abc import Mapping
+import math
+from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -239,3 +240,315 @@ def join_attempts(
         if request_id not in attempted_request_ids
     )
     return joined
+
+
+def nearest_rank(
+    values: Sequence[float],
+    percentile: int,
+) -> float | None:
+    if not 0 <= percentile <= 100:
+        raise ValueError("percentile must be between 0 and 100")
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(1, math.ceil(percentile / 100 * len(ordered)))
+    return ordered[rank - 1]
+
+
+def numeric_stats(values: Sequence[float]) -> dict[str, object]:
+    numeric_values = [float(value) for value in values]
+    if not numeric_values:
+        return {"count": 0, "mean": None, "p50": None, "p95": None}
+    return {
+        "count": len(numeric_values),
+        "mean": sum(numeric_values) / len(numeric_values),
+        "p50": nearest_rank(numeric_values, 50),
+        "p95": nearest_rank(numeric_values, 95),
+    }
+
+
+def _is_success(pair: Mapping[str, object]) -> bool:
+    summary = pair["summary"]
+    return (
+        summary.get("http_status") == 200
+        and summary.get("outcome") == "success"
+    )
+
+
+def _group_pairs(
+    pairs: Sequence[Mapping[str, object]],
+    field: str,
+) -> dict[str, list[Mapping[str, object]]]:
+    grouped: dict[str, list[Mapping[str, object]]] = defaultdict(list)
+    for pair in pairs:
+        value = pair["summary"].get(field)
+        grouped[str(value) if value is not None else "unknown"].append(pair)
+    return dict(grouped)
+
+
+def _latency_stats(
+    pairs: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    return numeric_stats([
+        pair["summary"]["total_latency_ms"]
+        for pair in pairs
+        if isinstance(pair["summary"].get("total_latency_ms"), (int, float))
+    ])
+
+
+def _stage_latency(
+    pairs: Sequence[Mapping[str, object]],
+) -> dict[str, dict[str, object]]:
+    return {
+        stage: numeric_stats([
+            pair["summary"][field]
+            for pair in pairs
+            if isinstance(pair["summary"].get(field), (int, float))
+        ])
+        for stage, field in (
+            ("router", "router_latency_ms"),
+            ("retrieval", "retrieval_latency_ms"),
+            ("tool", "tool_latency_ms"),
+            ("model", "model_latency_ms"),
+        )
+    }
+
+
+def _token_metrics(
+    pairs: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    complete = [
+        pair
+        for pair in pairs
+        if isinstance(pair["summary"].get("input_tokens"), int)
+        and isinstance(pair["summary"].get("output_tokens"), int)
+    ]
+    count = len(complete)
+    if not count:
+        return {
+            "count": 0,
+            "average_input": None,
+            "average_output": None,
+            "average_total": None,
+        }
+    inputs = [pair["summary"]["input_tokens"] for pair in complete]
+    outputs = [pair["summary"]["output_tokens"] for pair in complete]
+    return {
+        "count": count,
+        "average_input": sum(inputs) / count,
+        "average_output": sum(outputs) / count,
+        "average_total": sum(inputs + outputs) / count,
+    }
+
+
+def _conversation_metrics(
+    matched: Sequence[Mapping[str, object]],
+    skipped: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    grouped: dict[str, dict[str, list[Mapping[str, object]]]] = defaultdict(
+        lambda: {"attempts": [], "skipped": []}
+    )
+    for pair in matched:
+        workload = pair["workload"]
+        conversation_id = workload.get("conversation_id")
+        if workload.get("kind") == "multi_turn" and conversation_id:
+            grouped[str(conversation_id)]["attempts"].append(pair)
+    for row in skipped:
+        conversation_id = row.get("conversation_id")
+        if row.get("kind") == "multi_turn" and conversation_id:
+            grouped[str(conversation_id)]["skipped"].append(row)
+
+    items = []
+    for conversation_id in sorted(grouped):
+        group = grouped[conversation_id]
+        attempts = sorted(
+            group["attempts"],
+            key=lambda pair: pair["workload"].get("turn_index") or 0,
+        )
+        skipped_rows = sorted(
+            group["skipped"],
+            key=lambda row: row.get("turn_index") or 0,
+        )
+        complete = bool(attempts) and not skipped_rows and all(
+            _is_success(pair) for pair in attempts
+        )
+        items.append({
+            "conversation_id": conversation_id,
+            "complete": complete,
+            "turn_indices": [
+                pair["workload"].get("turn_index") for pair in attempts
+            ],
+            "skipped_turn_indices": [
+                row.get("turn_index") for row in skipped_rows
+            ],
+        })
+    return {
+        "complete_count": sum(item["complete"] for item in items),
+        "partial_count": sum(not item["complete"] for item in items),
+        "items": items,
+    }
+
+
+def analyze_join(
+    joined: Mapping[str, object],
+    pricing: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    del pricing
+    matched = list(joined["matched"])
+    successful = [pair for pair in matched if _is_success(pair)]
+    unsuccessful = [pair for pair in matched if not _is_success(pair)]
+    missing_request_id = list(joined["missing_request_id"])
+    missing_summary = list(joined["missing_summary"])
+    duplicate_summary = list(joined["duplicate_summary"])
+    skipped = list(joined["skipped"])
+    attempted = (
+        len(matched)
+        + len(missing_request_id)
+        + len(missing_summary)
+        + len(duplicate_summary)
+    )
+    failed = attempted - len(successful)
+
+    by_route = _group_pairs(successful, "route")
+    by_router_type = _group_pairs(successful, "router_type")
+
+    dominant_rows = []
+    for pair in successful:
+        summary = pair["summary"]
+        stages = {
+            stage: summary.get(field)
+            for stage, field in (
+                ("router", "router_latency_ms"),
+                ("retrieval", "retrieval_latency_ms"),
+                ("tool", "tool_latency_ms"),
+                ("model", "model_latency_ms"),
+            )
+            if isinstance(summary.get(field), (int, float))
+        }
+        total = summary.get("total_latency_ms")
+        if not stages or not isinstance(total, (int, float)) or total <= 0:
+            continue
+        stage, latency = max(stages.items(), key=lambda item: item[1])
+        dominant_rows.append({
+            "request_id": summary["request_id"],
+            "dominant_stage": stage,
+            "dominant_stage_ratio": latency / total,
+            "model_to_total_ratio": (
+                summary.get("model_latency_ms") / total
+                if isinstance(summary.get("model_latency_ms"), (int, float))
+                else None
+            ),
+        })
+
+    token_overall = _token_metrics(successful)
+    execution_counts = [
+        int(pair["summary"].get("tool_execution_count", 0))
+        for pair in successful
+    ]
+    sequence_counts = Counter(
+        tuple(pair["summary"].get("executed_tool_names") or [])
+        for pair in successful
+        if pair["summary"].get("executed_tool_names")
+    )
+    failure_layers = Counter(
+        pair["summary"].get("failure_layer")
+        for pair in unsuccessful
+        if pair["summary"].get("failure_layer") is not None
+    )
+    failure_codes = Counter(
+        pair["summary"].get("failure_code")
+        for pair in unsuccessful
+        if pair["summary"].get("failure_code") is not None
+    )
+
+    return {
+        "samples": {
+            "attempted": attempted,
+            "successful": len(successful),
+            "failed": failed,
+            "skipped": len(skipped),
+            "single_turn_successful": sum(
+                pair["workload"].get("kind") == "single_turn"
+                for pair in successful
+            ),
+            "multi_turn_successful": sum(
+                pair["workload"].get("kind") == "multi_turn"
+                for pair in successful
+            ),
+        },
+        "telemetry_join": {
+            "matched": len(matched),
+            "missing_request_id": len(missing_request_id),
+            "missing_summary": len(missing_summary),
+            "duplicate_summary": len(duplicate_summary),
+            "unrelated_summary_count": joined["unrelated_summary_count"],
+        },
+        "latency": {
+            "overall": _latency_stats(successful),
+            "by_route": {
+                route: _latency_stats(pairs)
+                for route, pairs in sorted(by_route.items())
+            },
+            "by_router_type": {
+                router_type: _latency_stats(pairs)
+                for router_type, pairs in sorted(by_router_type.items())
+            },
+        },
+        "stage_latency": {
+            "by_route": {
+                route: _stage_latency(pairs)
+                for route, pairs in sorted(by_route.items())
+            },
+            "dominant_stage_distribution": dict(sorted(Counter(
+                row["dominant_stage"] for row in dominant_rows
+            ).items())),
+            "dominant_stage_ratio": numeric_stats([
+                row["dominant_stage_ratio"] for row in dominant_rows
+            ]),
+            "request_diagnostics": dominant_rows,
+        },
+        "tokens": {
+            "coverage": {
+                "complete": token_overall["count"],
+                "eligible": len(successful),
+                "excluded": len(successful) - token_overall["count"],
+            },
+            "overall": token_overall,
+            "by_route": {
+                route: _token_metrics(pairs)
+                for route, pairs in sorted(by_route.items())
+            },
+        },
+        "tools": {
+            "overall_average_execution_count": (
+                sum(execution_counts) / len(execution_counts)
+                if execution_counts else None
+            ),
+            "average_execution_count_by_route": {
+                route: sum(
+                    int(pair["summary"].get("tool_execution_count", 0))
+                    for pair in pairs
+                ) / len(pairs)
+                for route, pairs in sorted(by_route.items())
+            },
+            "execution_count_distribution": {
+                str(count): frequency
+                for count, frequency in sorted(Counter(execution_counts).items())
+            },
+            "ordered_name_sequences": [
+                {"tool_names": list(names), "count": count}
+                for names, count in sorted(
+                    sequence_counts.items(),
+                    key=lambda item: (-item[1], item[0]),
+                )
+            ],
+        },
+        "failures": {
+            "attempted": attempted,
+            "failed": failed,
+            "failure_rate": failed / attempted if attempted else None,
+            "by_layer": dict(sorted(failure_layers.items())),
+            "by_code": dict(sorted(failure_codes.items())),
+        },
+        "conversations": _conversation_metrics(matched, skipped),
+    }

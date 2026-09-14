@@ -5,9 +5,12 @@ from datetime import datetime
 from pathlib import Path
 
 from performance.analysis import (
+    analyze_join,
     join_attempts,
     load_summaries,
     load_workload_rows,
+    nearest_rank,
+    numeric_stats,
     parse_summary_line,
 )
 
@@ -153,6 +156,209 @@ class WorkloadJoinTests(unittest.TestCase):
         self.assertEqual(len(joined["duplicate_summary"]), 1)
         self.assertEqual(len(joined["skipped"]), 1)
         self.assertEqual(joined["unrelated_summary_count"], 1)
+
+
+class AggregationTests(unittest.TestCase):
+    def test_nearest_rank_uses_one_based_ceiling(self):
+        values = [1, 2, 3, 4, 100]
+
+        self.assertEqual(nearest_rank(values, 50), 3)
+        self.assertEqual(nearest_rank(values, 95), 100)
+        self.assertIsNone(nearest_rank([], 50))
+        with self.assertRaises(ValueError):
+            nearest_rank(values, -1)
+        with self.assertRaises(ValueError):
+            nearest_rank(values, 101)
+
+    def test_numeric_stats_reports_nulls_for_no_samples(self):
+        self.assertEqual(numeric_stats([]), {
+            "count": 0,
+            "mean": None,
+            "p50": None,
+            "p95": None,
+        })
+
+    def test_aggregate_uses_successful_joined_actual_routes(self):
+        joined = self._joined_fixture()
+
+        analysis = analyze_join(joined)
+
+        self.assertEqual(analysis["samples"], {
+            "attempted": 4,
+            "successful": 3,
+            "failed": 1,
+            "skipped": 1,
+            "single_turn_successful": 1,
+            "multi_turn_successful": 2,
+        })
+        self.assertEqual(analysis["telemetry_join"]["matched"], 4)
+        self.assertEqual(analysis["latency"]["overall"]["count"], 3)
+        self.assertEqual(analysis["latency"]["overall"]["p50"], 200.0)
+        self.assertEqual(
+            set(analysis["latency"]["by_route"]),
+            {"direct", "product_search"},
+        )
+        self.assertNotIn("target-only", analysis["latency"]["by_route"])
+        self.assertEqual(
+            analysis["latency"]["by_router_type"]["deterministic"]["count"],
+            1,
+        )
+
+        product_stages = analysis["stage_latency"]["by_route"][
+            "product_search"
+        ]
+        self.assertEqual(product_stages["retrieval"]["count"], 1)
+        self.assertEqual(product_stages["tool"]["count"], 2)
+        self.assertEqual(
+            analysis["stage_latency"]["dominant_stage_distribution"],
+            {"model": 3},
+        )
+        self.assertEqual(
+            analysis["stage_latency"]["dominant_stage_ratio"]["count"],
+            3,
+        )
+        self.assertNotIn("gap", json.dumps(analysis["stage_latency"]))
+        self.assertNotIn("uninstrumented", json.dumps(analysis))
+
+        self.assertEqual(analysis["tokens"]["coverage"], {
+            "complete": 2,
+            "eligible": 3,
+            "excluded": 1,
+        })
+        self.assertEqual(analysis["tokens"]["overall"]["average_input"], 15.0)
+        self.assertEqual(analysis["tokens"]["overall"]["average_output"], 3.0)
+        self.assertEqual(analysis["tokens"]["overall"]["average_total"], 18.0)
+
+        self.assertEqual(analysis["tools"]["overall_average_execution_count"], 1.0)
+        self.assertEqual(analysis["tools"]["execution_count_distribution"], {
+            "0": 1,
+            "1": 1,
+            "2": 1,
+        })
+        self.assertEqual(analysis["tools"]["ordered_name_sequences"], [
+            {"tool_names": ["search_products"], "count": 1},
+            {
+                "tool_names": ["search_products", "search_products"],
+                "count": 1,
+            },
+        ])
+
+        self.assertEqual(analysis["failures"]["failure_rate"], 0.25)
+        self.assertEqual(analysis["failures"]["by_layer"], {"model": 1})
+        self.assertEqual(analysis["failures"]["by_code"], {
+            "provider_timeout": 1,
+        })
+
+    def test_conversation_grouping_distinguishes_complete_and_partial(self):
+        joined = self._joined_fixture()
+
+        conversations = analyze_join(joined)["conversations"]
+
+        self.assertEqual(conversations["complete_count"], 1)
+        self.assertEqual(conversations["partial_count"], 1)
+        self.assertEqual(
+            conversations["items"][0]["turn_indices"],
+            [1, 2],
+        )
+        self.assertIs(conversations["items"][0]["complete"], True)
+        self.assertIs(conversations["items"][1]["complete"], False)
+        self.assertEqual(conversations["items"][1]["skipped_turn_indices"], [3])
+
+    @staticmethod
+    def _joined_fixture():
+        def pair(
+            workload_id,
+            request_id,
+            *,
+            kind,
+            route,
+            total,
+            input_tokens,
+            output_tokens,
+            tool_count,
+            tool_names,
+            conversation_id=None,
+            turn_index=None,
+            outcome="success",
+            http_status=200,
+            failure_layer=None,
+            failure_code=None,
+            retrieval_latency=None,
+        ):
+            return {
+                "workload": {
+                    "record_type": "attempt",
+                    "workload_id": workload_id,
+                    "request_id": request_id,
+                    "kind": kind,
+                    "target_route": "target-only",
+                    "conversation_id": conversation_id,
+                    "turn_index": turn_index,
+                },
+                "summary": {
+                    "request_id": request_id,
+                    "http_status": http_status,
+                    "outcome": outcome,
+                    "route": route,
+                    "router_type": (
+                        "deterministic" if route == "direct" else "llm"
+                    ),
+                    "total_latency_ms": total,
+                    "router_latency_ms": 10.0,
+                    "retrieval_latency_ms": retrieval_latency,
+                    "tool_latency_ms": 40.0 if tool_count else None,
+                    "model_latency_ms": total * 0.6,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "tool_call_count": 99,
+                    "tool_execution_count": tool_count,
+                    "executed_tool_names": tool_names,
+                    "failure_layer": failure_layer,
+                    "failure_code": failure_code,
+                },
+            }
+
+        return {
+            "matched": [
+                pair(
+                    "single", "r1", kind="single_turn", route="direct",
+                    total=100.0, input_tokens=10, output_tokens=2,
+                    tool_count=0, tool_names=[],
+                ),
+                pair(
+                    "c1-1", "r2", kind="multi_turn",
+                    route="product_search", total=200.0, input_tokens=20,
+                    output_tokens=4, tool_count=1,
+                    tool_names=["search_products"], conversation_id="c1",
+                    turn_index=1, retrieval_latency=20.0,
+                ),
+                pair(
+                    "c1-2", "r3", kind="multi_turn",
+                    route="product_search", total=300.0, input_tokens=None,
+                    output_tokens=None, tool_count=2,
+                    tool_names=["search_products", "search_products"],
+                    conversation_id="c1", turn_index=2,
+                ),
+                pair(
+                    "c2-2", "r4", kind="multi_turn", route="knowledge",
+                    total=400.0, input_tokens=30, output_tokens=5,
+                    tool_count=0, tool_names=[], conversation_id="c2",
+                    turn_index=2, outcome="error", http_status=504,
+                    failure_layer="model", failure_code="provider_timeout",
+                ),
+            ],
+            "missing_request_id": [],
+            "missing_summary": [],
+            "duplicate_summary": [],
+            "skipped": [{
+                "record_type": "skipped",
+                "workload_id": "c2-3",
+                "kind": "multi_turn",
+                "conversation_id": "c2",
+                "turn_index": 3,
+            }],
+            "unrelated_summary_count": 0,
+        }
 
 
 if __name__ == "__main__":
