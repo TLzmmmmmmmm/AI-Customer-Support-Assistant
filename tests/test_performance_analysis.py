@@ -1,11 +1,14 @@
 import json
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from performance.analysis import (
+    PRICING_SNAPSHOT,
     analyze_join,
+    estimate_request_cost_cny,
+    is_peak,
     join_attempts,
     load_summaries,
     load_workload_rows,
@@ -264,6 +267,99 @@ class AggregationTests(unittest.TestCase):
         self.assertIs(conversations["items"][1]["complete"], False)
         self.assertEqual(conversations["items"][1]["skipped_turn_indices"], [3])
 
+    def test_peak_windows_use_shanghai_time_and_half_open_boundaries(self):
+        cases = (
+            ("2026-09-14T08:59:59+08:00", False),
+            ("2026-09-14T09:00:00+08:00", True),
+            ("2026-09-14T11:59:59+08:00", True),
+            ("2026-09-14T12:00:00+08:00", False),
+            ("2026-09-14T14:00:00+08:00", True),
+            ("2026-09-14T17:59:59+08:00", True),
+            ("2026-09-14T18:00:00+08:00", False),
+            ("2026-09-19T10:00:00+08:00", False),
+        )
+        for timestamp, expected in cases:
+            with self.subTest(timestamp=timestamp):
+                self.assertIs(is_peak(datetime.fromisoformat(timestamp)), expected)
+        self.assertIs(
+            is_peak(datetime(2026, 9, 14, 1, tzinfo=timezone.utc)),
+            True,
+        )
+        with self.assertRaises(ValueError):
+            is_peak(datetime(2026, 9, 14, 9))
+
+    def test_estimated_cost_requires_complete_provider_usage(self):
+        summary = {
+            "timestamp": datetime.fromisoformat("2026-09-14T09:00:00+08:00"),
+            "prompt_cache_hit_tokens": 800_000,
+            "prompt_cache_miss_tokens": 200_000,
+            "output_tokens": 100_000,
+        }
+
+        self.assertAlmostEqual(
+            estimate_request_cost_cny(summary),
+            0.8 * 0.10 + 0.2 * 3.00 + 0.1 * 9.00,
+        )
+        self.assertEqual(estimate_request_cost_cny({
+            **summary,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "output_tokens": 0,
+        }), 0.0)
+        for field in (
+            "prompt_cache_hit_tokens",
+            "prompt_cache_miss_tokens",
+            "output_tokens",
+        ):
+            self.assertIsNone(estimate_request_cost_cny({
+                **summary,
+                field: None,
+            }))
+        self.assertIsNone(estimate_request_cost_cny({
+            **summary,
+            "timestamp": "not-a-datetime",
+        }))
+
+    def test_cost_aggregation_is_estimated_and_separates_failed_requests(self):
+        analysis = analyze_join(self._joined_fixture())
+        cost = analysis["estimated_cost_cny"]
+
+        self.assertEqual(PRICING_SNAPSHOT["configured_model"], "deepseek-v4-flash")
+        self.assertNotIn("version", PRICING_SNAPSHOT)
+        self.assertEqual(PRICING_SNAPSHOT["off_peak"], {
+            "cache_hit_input": 0.05,
+            "cache_miss_input": 1.50,
+            "output": 4.50,
+        })
+        self.assertEqual(PRICING_SNAPSHOT["peak"], {
+            "cache_hit_input": 0.10,
+            "cache_miss_input": 3.00,
+            "output": 9.00,
+        })
+        self.assertEqual(cost["coverage"], {
+            "complete": 2,
+            "eligible": 3,
+            "excluded": 1,
+        })
+        self.assertEqual(cost["overall"]["count"], 2)
+        self.assertEqual(cost["failed_requests"]["count"], 1)
+        self.assertGreater(cost["failed_requests"]["total"], 0)
+        self.assertNotIn("actual", json.dumps(cost).lower())
+        self.assertNotIn("exact", json.dumps(cost).lower())
+        self.assertNotIn("billed", json.dumps(cost).lower())
+
+        conversations = analysis["conversations"]
+        self.assertEqual(conversations["estimated_cost_cny"]["count"], 1)
+        self.assertGreater(
+            conversations["items"][0]["estimated_cost_cny"],
+            0,
+        )
+        self.assertGreater(
+            conversations["items"][1]["partial_estimated_cost_cny"],
+            0,
+        )
+        self.assertNotIn("estimated_cost_cny", conversations["items"][1])
+
     @staticmethod
     def _joined_fixture():
         def pair(
@@ -284,6 +380,7 @@ class AggregationTests(unittest.TestCase):
             failure_layer=None,
             failure_code=None,
             retrieval_latency=None,
+            cache_complete=True,
         ):
             return {
                 "workload": {
@@ -296,6 +393,9 @@ class AggregationTests(unittest.TestCase):
                     "turn_index": turn_index,
                 },
                 "summary": {
+                    "timestamp": datetime.fromisoformat(
+                        "2026-09-14T13:00:00+08:00"
+                    ),
                     "request_id": request_id,
                     "http_status": http_status,
                     "outcome": outcome,
@@ -310,6 +410,13 @@ class AggregationTests(unittest.TestCase):
                     "model_latency_ms": total * 0.6,
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
+                    "prompt_cache_hit_tokens": (
+                        (input_tokens or 0) // 2 if cache_complete else None
+                    ),
+                    "prompt_cache_miss_tokens": (
+                        (input_tokens or 0) - (input_tokens or 0) // 2
+                        if cache_complete else None
+                    ),
                     "tool_call_count": 99,
                     "tool_execution_count": tool_count,
                     "executed_tool_names": tool_names,
@@ -323,7 +430,7 @@ class AggregationTests(unittest.TestCase):
                 pair(
                     "single", "r1", kind="single_turn", route="direct",
                     total=100.0, input_tokens=10, output_tokens=2,
-                    tool_count=0, tool_names=[],
+                    tool_count=0, tool_names=[], cache_complete=False,
                 ),
                 pair(
                     "c1-1", "r2", kind="multi_turn",
@@ -335,7 +442,7 @@ class AggregationTests(unittest.TestCase):
                 pair(
                     "c1-2", "r3", kind="multi_turn",
                     route="product_search", total=300.0, input_tokens=None,
-                    output_tokens=None, tool_count=2,
+                    output_tokens=6, tool_count=2,
                     tool_names=["search_products", "search_products"],
                     conversation_id="c1", turn_index=2,
                 ),

@@ -6,9 +6,39 @@ import json
 import math
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+
+PRICING_SNAPSHOT = {
+    "provider": "DeepSeek",
+    "configured_model": "deepseek-v4-flash",
+    "currency": "CNY",
+    "unit_tokens": 1_000_000,
+    "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+    "snapshot_date": "2026-09-14",
+    "timezone": "Asia/Shanghai",
+    "peak_windows": ["weekday 09:00-12:00", "weekday 14:00-18:00"],
+    "off_peak": {
+        "cache_hit_input": 0.05,
+        "cache_miss_input": 1.50,
+        "output": 4.50,
+    },
+    "peak": {
+        "cache_hit_input": 0.10,
+        "cache_miss_input": 3.00,
+        "output": 9.00,
+    },
+}
+
+
+def _shanghai_timezone():
+    try:
+        return ZoneInfo("Asia/Shanghai")
+    except ZoneInfoNotFoundError:
+        return timezone(timedelta(hours=8), "Asia/Shanghai")
 
 
 _REQUIRED_SUMMARY_FIELDS = frozenset({
@@ -267,6 +297,44 @@ def numeric_stats(values: Sequence[float]) -> dict[str, object]:
     }
 
 
+def is_peak(timestamp: datetime) -> bool:
+    if timestamp.tzinfo is None:
+        raise ValueError("timestamp must include a timezone")
+    local = timestamp.astimezone(_shanghai_timezone())
+    if local.weekday() >= 5:
+        return False
+    minute = local.hour * 60 + local.minute
+    return 9 * 60 <= minute < 12 * 60 or 14 * 60 <= minute < 18 * 60
+
+
+def estimate_request_cost_cny(
+    summary: Mapping[str, object],
+    pricing: Mapping[str, object] = PRICING_SNAPSHOT,
+) -> float | None:
+    timestamp = summary.get("timestamp")
+    token_fields = (
+        "prompt_cache_hit_tokens",
+        "prompt_cache_miss_tokens",
+        "output_tokens",
+    )
+    tokens = [summary.get(field) for field in token_fields]
+    if not isinstance(timestamp, datetime) or timestamp.tzinfo is None:
+        return None
+    if any(
+        not isinstance(value, int) or isinstance(value, bool) or value < 0
+        for value in tokens
+    ):
+        return None
+    period = "peak" if is_peak(timestamp) else "off_peak"
+    rates = pricing[period]
+    unit = pricing["unit_tokens"]
+    return (
+        tokens[0] * rates["cache_hit_input"]
+        + tokens[1] * rates["cache_miss_input"]
+        + tokens[2] * rates["output"]
+    ) / unit
+
+
 def _is_success(pair: Mapping[str, object]) -> bool:
     summary = pair["summary"]
     return (
@@ -344,6 +412,7 @@ def _token_metrics(
 def _conversation_metrics(
     matched: Sequence[Mapping[str, object]],
     skipped: Sequence[Mapping[str, object]],
+    pricing: Mapping[str, object],
 ) -> dict[str, object]:
     grouped: dict[str, dict[str, list[Mapping[str, object]]]] = defaultdict(
         lambda: {"attempts": [], "skipped": []}
@@ -372,7 +441,11 @@ def _conversation_metrics(
         complete = bool(attempts) and not skipped_rows and all(
             _is_success(pair) for pair in attempts
         )
-        items.append({
+        costs = [
+            estimate_request_cost_cny(pair["summary"], pricing)
+            for pair in attempts
+        ]
+        item = {
             "conversation_id": conversation_id,
             "complete": complete,
             "turn_indices": [
@@ -381,10 +454,22 @@ def _conversation_metrics(
             "skipped_turn_indices": [
                 row.get("turn_index") for row in skipped_rows
             ],
-        })
+        }
+        available_cost = sum(cost for cost in costs if cost is not None)
+        if complete and costs and all(cost is not None for cost in costs):
+            item["estimated_cost_cny"] = available_cost
+        else:
+            item["partial_estimated_cost_cny"] = available_cost
+        items.append(item)
+    complete_costs = [
+        item["estimated_cost_cny"]
+        for item in items
+        if "estimated_cost_cny" in item
+    ]
     return {
         "complete_count": sum(item["complete"] for item in items),
         "partial_count": sum(not item["complete"] for item in items),
+        "estimated_cost_cny": numeric_stats(complete_costs),
         "items": items,
     }
 
@@ -393,7 +478,7 @@ def analyze_join(
     joined: Mapping[str, object],
     pricing: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    del pricing
+    selected_pricing = pricing or PRICING_SNAPSHOT
     matched = list(joined["matched"])
     successful = [pair for pair in matched if _is_success(pair)]
     unsuccessful = [pair for pair in matched if not _is_success(pair)]
@@ -460,6 +545,26 @@ def analyze_join(
         for pair in unsuccessful
         if pair["summary"].get("failure_code") is not None
     )
+    successful_cost_rows = [
+        (pair, estimate_request_cost_cny(pair["summary"], selected_pricing))
+        for pair in successful
+    ]
+    complete_successful_cost_rows = [
+        (pair, cost)
+        for pair, cost in successful_cost_rows
+        if cost is not None
+    ]
+    cost_by_route: dict[str, list[float]] = defaultdict(list)
+    for pair, cost in complete_successful_cost_rows:
+        route = pair["summary"].get("route")
+        cost_by_route[str(route) if route is not None else "unknown"].append(cost)
+    failed_costs = [
+        cost
+        for pair in unsuccessful
+        if (cost := estimate_request_cost_cny(
+            pair["summary"], selected_pricing
+        )) is not None
+    ]
 
     return {
         "samples": {
@@ -550,5 +655,36 @@ def analyze_join(
             "by_layer": dict(sorted(failure_layers.items())),
             "by_code": dict(sorted(failure_codes.items())),
         },
-        "conversations": _conversation_metrics(matched, skipped),
+        "estimated_cost_cny": {
+            "pricing_snapshot": dict(selected_pricing),
+            "coverage": {
+                "complete": len(complete_successful_cost_rows),
+                "eligible": len(successful),
+                "excluded": len(successful) - len(complete_successful_cost_rows),
+            },
+            "overall": numeric_stats([
+                cost for _, cost in complete_successful_cost_rows
+            ]),
+            "by_route": {
+                route: numeric_stats(costs)
+                for route, costs in sorted(cost_by_route.items())
+            },
+            "requests": [
+                {
+                    "request_id": pair["summary"]["request_id"],
+                    "route": pair["summary"].get("route"),
+                    "estimated_cost_cny": cost,
+                }
+                for pair, cost in complete_successful_cost_rows
+            ],
+            "failed_requests": {
+                "count": len(failed_costs),
+                "total": sum(failed_costs),
+            },
+        },
+        "conversations": _conversation_metrics(
+            matched,
+            skipped,
+            selected_pricing,
+        ),
     }
