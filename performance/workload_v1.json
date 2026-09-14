@@ -1,0 +1,193 @@
+{
+  "schema_version": "1.0",
+  "seed": 20260914,
+  "repeat_count": 5,
+  "single_turn_cases": [
+    {
+      "case_id": "direct-greeting-1",
+      "target_route": "direct",
+      "messages": [{"role": "user", "content": "你好"}]
+    },
+    {
+      "case_id": "direct-greeting-2",
+      "target_route": "direct",
+      "messages": [{"role": "user", "content": "您好"}]
+    },
+    {
+      "case_id": "direct-thanks-1",
+      "target_route": "direct",
+      "messages": [{"role": "user", "content": "谢谢"}]
+    },
+    {
+      "case_id": "direct-goodbye-1",
+      "target_route": "direct",
+      "messages": [{"role": "user", "content": "再见"}]
+    },
+    {
+      "case_id": "knowledge-support-1",
+      "target_route": "knowledge",
+      "messages": [{"role": "user", "content": "技术支持中的项目实施阶段包含哪些主要工作？"}]
+    },
+    {
+      "case_id": "knowledge-solution-1",
+      "target_route": "knowledge",
+      "messages": [{"role": "user", "content": "酒店无线通信解决方案通常需要考虑哪些内容？"}]
+    },
+    {
+      "case_id": "knowledge-solution-2",
+      "target_route": "knowledge",
+      "messages": [{"role": "user", "content": "应急通信解决方案可以覆盖哪些典型场景？"}]
+    },
+    {
+      "case_id": "knowledge-support-2",
+      "target_route": "knowledge",
+      "messages": [{"role": "user", "content": "你们的售后服务和培训支持包括什么？"}]
+    },
+    {
+      "case_id": "exact-product-hp780",
+      "target_route": "exact_product",
+      "messages": [{"role": "user", "content": "HP780 的防护等级是什么？"}]
+    },
+    {
+      "case_id": "exact-product-hr1060",
+      "target_route": "exact_product",
+      "messages": [{"role": "user", "content": "HR1060 的电源电压是多少？"}]
+    },
+    {
+      "case_id": "exact-product-ly198",
+      "target_route": "exact_product",
+      "messages": [{"role": "user", "content": "LY198 支持哪些工作频段？"}]
+    },
+    {
+      "case_id": "exact-product-xir-p8668ex",
+      "target_route": "exact_product",
+      "messages": [{"role": "user", "content": "XiR P8668Ex 的防爆认证信息是什么？"}]
+    },
+    {
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "messages": [{"role": "user", "content": "请推荐几款适合仓库工作人员日常联络的对讲机。"}]
+    },
+    {
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "messages": [{"role": "user", "content": "酒店安保团队有哪些对讲机型号可以选择？"}]
+    },
+    {
+      "case_id": "product-search-petrochemical",
+      "target_route": "product_search",
+      "messages": [{"role": "user", "content": "石化场景应该如何选择防爆对讲机产品？"}]
+    },
+    {
+      "case_id": "product-search-mesh",
+      "target_route": "product_search",
+      "messages": [{"role": "user", "content": "请推荐适合应急现场组网的 Mesh 通信设备。"}]
+    },
+    {
+      "case_id": "contact-phone",
+      "target_route": "contact",
+      "messages": [{"role": "user", "content": "请提供公司的值班电话。"}]
+    },
+    {
+      "case_id": "contact-email",
+      "target_route": "contact",
+      "messages": [{"role": "user", "content": "公司的电子邮箱是什么？"}]
+    },
+    {
+      "case_id": "contact-channels",
+      "target_route": "contact",
+      "messages": [{"role": "user", "content": "我可以通过哪些联系方式咨询产品？"}]
+    },
+    {
+      "case_id": "contact-sales",
+      "target_route": "contact",
+      "messages": [{"role": "user", "content": "如何联系你们进行售前咨询？"}]
+    },
+    {
+      "case_id": "fallback-inventory-hp780",
+      "target_route": "fallback",
+      "messages": [{"role": "user", "content": "HP780 现在还有多少库存？"}]
+    },
+    {
+      "case_id": "fallback-inventory-ly198",
+      "target_route": "fallback",
+      "messages": [{"role": "user", "content": "LY198 今天是否有现货？"}]
+    },
+    {
+      "case_id": "fallback-ticket",
+      "target_route": "fallback",
+      "messages": [{"role": "user", "content": "请替我创建维修工单并通知技术人员。"}]
+    },
+    {
+      "case_id": "fallback-order",
+      "target_route": "fallback",
+      "messages": [{"role": "user", "content": "请替我预留两台 HP780 现货并安排发货。"}]
+    }
+  ],
+  "calibration_cases": [
+    {
+      "case_id": "calibration-direct",
+      "target_route": "direct",
+      "user_content": "感谢你的帮助"
+    },
+    {
+      "case_id": "calibration-knowledge",
+      "target_route": "knowledge",
+      "user_content": "解决方案设计服务通常包含哪些步骤？"
+    },
+    {
+      "case_id": "calibration-exact-product",
+      "target_route": "exact_product",
+      "user_content": "HP710Ex 的防护能力如何？"
+    },
+    {
+      "case_id": "calibration-product-search",
+      "target_route": "product_search",
+      "user_content": "给施工现场推荐几款通信设备。"
+    },
+    {
+      "case_id": "calibration-contact",
+      "target_route": "contact",
+      "user_content": "怎样联系公司的工作人员？"
+    },
+    {
+      "case_id": "calibration-fallback",
+      "target_route": "fallback",
+      "user_content": "请查询 HP710Ex 当前实时库存。"
+    }
+  ],
+  "conversations": [
+    {
+      "conversation_id": "conversation-product-selection",
+      "turns": [
+        {"turn_id": "need", "target_route": "product_search", "user_content": "我们需要给大型仓库的巡检人员配通信设备，有哪些选择？"},
+        {"turn_id": "refine", "target_route": "product_search", "user_content": "更关注防护等级和日常携带，请进一步推荐。"},
+        {"turn_id": "detail", "target_route": "exact_product", "user_content": "你刚才提到的第一个型号有哪些关键参数？"}
+      ]
+    },
+    {
+      "conversation_id": "conversation-solution-consultation",
+      "turns": [
+        {"turn_id": "solution", "target_route": "knowledge", "user_content": "请介绍适合地下空间的通信解决方案。"},
+        {"turn_id": "scenario", "target_route": "knowledge", "user_content": "现场还有多层结构和弱信号区域，需要考虑什么？"},
+        {"turn_id": "products", "target_route": "product_search", "user_content": "基于这个场景，有哪些设备型号可供选择？"}
+      ]
+    },
+    {
+      "conversation_id": "conversation-product-to-contact",
+      "turns": [
+        {"turn_id": "known-product", "target_route": "exact_product", "user_content": "请介绍 HP780 的主要参数。"},
+        {"turn_id": "comparison", "target_route": "exact_product", "user_content": "它和 LY198 相比有哪些区别？"},
+        {"turn_id": "contact", "target_route": "contact", "user_content": "如果要进一步确认选型，怎么联系你们？"}
+      ]
+    },
+    {
+      "conversation_id": "conversation-capability-boundary",
+      "turns": [
+        {"turn_id": "general", "target_route": "direct", "user_content": "你好，可以帮我了解通信产品吗？"},
+        {"turn_id": "boundary", "target_route": "fallback", "user_content": "你能直接读取仓库里的实时库存吗？"},
+        {"turn_id": "unsupported-action", "target_route": "fallback", "user_content": "那请直接创建采购订单并安排发货。"}
+      ]
+    }
+  ]
+}
