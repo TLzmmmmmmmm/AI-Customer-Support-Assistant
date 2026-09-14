@@ -83,6 +83,7 @@ DEPLOYMENT.md
 !/docs/week-3-day-6-agent-evaluation-final-report.md
 !/docs/week-4-day-2-metrics-cost-performance-design.md
 !/docs/week-4-day-2-performance-report.md
+!/docs/week-4-day-3-true-streaming-design.md
 
 # Week 4 Day 2 keeps request mappings and server logs local. Only the compact
 # approved analysis artifact is tracked.
