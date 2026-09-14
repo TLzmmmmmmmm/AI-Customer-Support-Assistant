@@ -230,6 +230,8 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         completion.usage = SimpleNamespace(
             prompt_tokens=11,
             completion_tokens=4,
+            prompt_cache_hit_tokens=8,
+            prompt_cache_miss_tokens=3,
         )
         self.create.side_effect = lambda **kwargs: completion
 
@@ -257,6 +259,8 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assertIn("total_latency_ms=", message)
         self.assertIn("input_tokens=11", message)
         self.assertIn("output_tokens=4", message)
+        self.assertIn("prompt_cache_hit_tokens=8", message)
+        self.assertIn("prompt_cache_miss_tokens=3", message)
         self.assertIn("failure_code=null", message)
 
     def test_scenario_only_uses_router_then_non_agentic_product_search(self):

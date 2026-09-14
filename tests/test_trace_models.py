@@ -13,6 +13,58 @@ from trace_models import (
 
 
 class RequestTraceContextTests(unittest.TestCase):
+    def test_cache_usage_is_aggregated_across_model_responses(self):
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        token = bind_request_state(state)
+        try:
+            record_model_response(SimpleNamespace(usage=SimpleNamespace(
+                prompt_tokens=10,
+                completion_tokens=2,
+                prompt_cache_hit_tokens=7,
+                prompt_cache_miss_tokens=3,
+            )))
+            record_model_response(SimpleNamespace(usage=SimpleNamespace(
+                prompt_tokens=8,
+                completion_tokens=1,
+                prompt_cache_hit_tokens=5,
+                prompt_cache_miss_tokens=3,
+            )))
+        finally:
+            reset_request_state(token)
+
+        fields = request_trace_fields(state)
+        self.assertEqual(fields["prompt_cache_hit_tokens"], 12)
+        self.assertEqual(fields["prompt_cache_miss_tokens"], 6)
+
+    def test_invalid_cache_usage_nulls_only_cache_totals(self):
+        invalid_usage = (
+            {"prompt_cache_hit_tokens": None, "prompt_cache_miss_tokens": 10},
+            {"prompt_cache_hit_tokens": True, "prompt_cache_miss_tokens": 9},
+            {"prompt_cache_hit_tokens": -1, "prompt_cache_miss_tokens": 11},
+            {"prompt_cache_hit_tokens": 4, "prompt_cache_miss_tokens": 5},
+        )
+
+        for cache_fields in invalid_usage:
+            with self.subTest(cache_fields=cache_fields):
+                state = SimpleNamespace()
+                initialize_request_trace(state)
+                token = bind_request_state(state)
+                try:
+                    record_model_response(SimpleNamespace(usage=SimpleNamespace(
+                        prompt_tokens=10,
+                        completion_tokens=2,
+                        **cache_fields,
+                    )))
+                finally:
+                    reset_request_state(token)
+
+                fields = request_trace_fields(state)
+                self.assertEqual(fields["input_tokens"], 10)
+                self.assertEqual(fields["output_tokens"], 2)
+                self.assertIsNone(fields["prompt_cache_hit_tokens"])
+                self.assertIsNone(fields["prompt_cache_miss_tokens"])
+
     def test_concurrent_request_metrics_remain_isolated(self):
         barrier = Barrier(2)
 

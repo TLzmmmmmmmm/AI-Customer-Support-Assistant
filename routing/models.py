@@ -47,6 +47,8 @@ class RouteTrace:
     model_latency_ms: float | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    prompt_cache_hit_tokens: int | None = None
+    prompt_cache_miss_tokens: int | None = None
     failure_code: str | None = None
 
 

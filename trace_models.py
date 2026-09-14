@@ -24,6 +24,8 @@ _REQUEST_TRACE_DEFAULTS: dict[str, object] = {
     "model_latency_ms": None,
     "input_tokens": None,
     "output_tokens": None,
+    "prompt_cache_hit_tokens": None,
+    "prompt_cache_miss_tokens": None,
     "failure_code": None,
 }
 
@@ -50,7 +52,10 @@ def initialize_request_trace(state: object) -> None:
         setattr(state, name, value)
     state.input_tokens = 0
     state.output_tokens = 0
+    state.prompt_cache_hit_tokens = 0
+    state.prompt_cache_miss_tokens = 0
     state.model_usage_complete = True
+    state.model_cache_usage_complete = True
 
 
 def bind_request_state(state: object) -> Token:
@@ -94,6 +99,16 @@ def record_model_response(completion: object) -> None:
         usage = getattr(completion, "usage", None)
         input_tokens = getattr(usage, "prompt_tokens", None)
         output_tokens = getattr(usage, "completion_tokens", None)
+        cache_hit_tokens = getattr(
+            usage,
+            "prompt_cache_hit_tokens",
+            None,
+        )
+        cache_miss_tokens = getattr(
+            usage,
+            "prompt_cache_miss_tokens",
+            None,
+        )
         valid = (
             isinstance(input_tokens, int)
             and not isinstance(input_tokens, bool)
@@ -104,15 +119,38 @@ def record_model_response(completion: object) -> None:
             state.model_usage_complete = False
             state.input_tokens = None
             state.output_tokens = None
+            state.model_cache_usage_complete = False
+            state.prompt_cache_hit_tokens = None
+            state.prompt_cache_miss_tokens = None
             return
         if getattr(state, "model_usage_complete", True):
             state.input_tokens += input_tokens
             state.output_tokens += output_tokens
+        cache_valid = (
+            isinstance(cache_hit_tokens, int)
+            and not isinstance(cache_hit_tokens, bool)
+            and cache_hit_tokens >= 0
+            and isinstance(cache_miss_tokens, int)
+            and not isinstance(cache_miss_tokens, bool)
+            and cache_miss_tokens >= 0
+            and cache_hit_tokens + cache_miss_tokens == input_tokens
+        )
+        if not cache_valid:
+            state.model_cache_usage_complete = False
+            state.prompt_cache_hit_tokens = None
+            state.prompt_cache_miss_tokens = None
+            return
+        if getattr(state, "model_cache_usage_complete", True):
+            state.prompt_cache_hit_tokens += cache_hit_tokens
+            state.prompt_cache_miss_tokens += cache_miss_tokens
     except Exception:
         try:
             state.model_usage_complete = False
             state.input_tokens = None
             state.output_tokens = None
+            state.model_cache_usage_complete = False
+            state.prompt_cache_hit_tokens = None
+            state.prompt_cache_miss_tokens = None
         except Exception:
             pass
 

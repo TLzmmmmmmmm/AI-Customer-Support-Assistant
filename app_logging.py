@@ -70,7 +70,9 @@ def log_request(
             "executed_tool_names=%s tool_execution_count=%s "
             "tool_execution_success=%s router_latency_ms=%s "
             "retrieval_latency_ms=%s tool_latency_ms=%s model_latency_ms=%s "
-            "input_tokens=%s output_tokens=%s failure_layer=%s "
+            "input_tokens=%s output_tokens=%s "
+            "prompt_cache_hit_tokens=%s prompt_cache_miss_tokens=%s "
+            "failure_layer=%s "
             "failure_code=%s citation_count=%s "
             "deduplicated_citation_count=%s invalid_source_count=%s "
             "citation_status=%s answer_sanitized=%s",
@@ -104,6 +106,8 @@ def log_request(
             _format_latency(telemetry["model_latency_ms"]),
             _format_optional(telemetry["input_tokens"]),
             _format_optional(telemetry["output_tokens"]),
+            _format_optional(telemetry["prompt_cache_hit_tokens"]),
+            _format_optional(telemetry["prompt_cache_miss_tokens"]),
             "-" if layer is None else layer.value,
             code or "null",
             0 if trace is None else trace.citation_count,

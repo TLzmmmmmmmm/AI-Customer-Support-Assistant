@@ -89,6 +89,31 @@ class LlmProviderMessageTests(unittest.TestCase):
 
 
 class LlmCompleteChatTests(unittest.TestCase):
+    def test_complete_chat_records_provider_cache_usage(self):
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        completion = SimpleNamespace(usage=SimpleNamespace(
+            prompt_tokens=12,
+            completion_tokens=3,
+            prompt_cache_hit_tokens=8,
+            prompt_cache_miss_tokens=4,
+        ))
+
+        telemetry_token = bind_request_state(state)
+        try:
+            with patch.object(
+                llm.client.chat.completions,
+                "create",
+                return_value=completion,
+            ):
+                llm.complete_chat(PROVIDER_MESSAGES)
+        finally:
+            reset_request_state(telemetry_token)
+
+        telemetry = request_trace_fields(state)
+        self.assertEqual(telemetry["prompt_cache_hit_tokens"], 8)
+        self.assertEqual(telemetry["prompt_cache_miss_tokens"], 4)
+
     def test_missing_usage_nulls_totals_after_prior_usage(self):
         state = SimpleNamespace()
         initialize_request_trace(state)
