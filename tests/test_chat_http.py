@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from openai import APIConnectionError, APITimeoutError
 
 import concurrency
+import app_logging
 import main
 import rate_limit
 from knowledge_pipeline.retrieval import (
@@ -224,6 +225,40 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 self.assertIn("route=product_search", logs.records[0].getMessage())
                 self.assertIn('"name":"search_products"', logs.records[0].getMessage())
 
+    def test_product_search_request_logs_request_level_observability(self):
+        completion = text_completion("受控回答")
+        completion.usage = SimpleNamespace(
+            prompt_tokens=11,
+            completion_tokens=4,
+        )
+        self.create.side_effect = lambda **kwargs: completion
+
+        with self.assertLogs("ai_customer_support", level="INFO") as logs:
+            response = self.post("推荐几款对讲机")
+
+        self.assert_ndjson(
+            response,
+            citations=(
+                ("HP780", "https://example.com/hp780/"),
+                ("润信达 LY198", "https://example.com/ly198/"),
+            ),
+        )
+        message = logs.records[0].getMessage()
+        self.assertIn("router_type=deterministic", message)
+        self.assertIn("retrieval_used=true", message)
+        self.assertIn("retrieved_count=2", message)
+        self.assertIn('executed_tool_names=["search_products"]', message)
+        self.assertIn("tool_execution_count=1", message)
+        self.assertIn("tool_execution_success=true", message)
+        self.assertRegex(message, r"router_latency_ms=\d+\.\d")
+        self.assertRegex(message, r"retrieval_latency_ms=\d+\.\d")
+        self.assertRegex(message, r"tool_latency_ms=\d+\.\d")
+        self.assertRegex(message, r"model_latency_ms=\d+\.\d")
+        self.assertIn("total_latency_ms=", message)
+        self.assertIn("input_tokens=11", message)
+        self.assertIn("output_tokens=4", message)
+        self.assertIn("failure_code=null", message)
+
     def test_scenario_only_uses_router_then_non_agentic_product_search(self):
         question = "地下停车场几十个人通信，有什么建议？"
         self.create.side_effect = [
@@ -246,6 +281,65 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assertNotIn("tools", self.create.call_args_list[1].kwargs)
         self.assertIn("route=product_search", logs.records[0].getMessage())
         self.assertIn("tool_call_count=1", logs.records[0].getMessage())
+
+    def test_llm_router_and_generation_usage_are_aggregated(self):
+        router_completion = text_completion("product_search")
+        router_completion.usage = SimpleNamespace(
+            prompt_tokens=5,
+            completion_tokens=1,
+        )
+        answer_completion = text_completion("候选产品。")
+        answer_completion.usage = SimpleNamespace(
+            prompt_tokens=13,
+            completion_tokens=3,
+        )
+        self.create.side_effect = [router_completion, answer_completion]
+
+        with self.assertLogs("ai_customer_support", level="INFO") as logs:
+            response = self.post("地下停车场几十个人通信，有什么建议？")
+
+        self.assert_ndjson(
+            response,
+            "候选产品。",
+            (
+                ("HP780", "https://example.com/hp780/"),
+                ("润信达 LY198", "https://example.com/ly198/"),
+            ),
+        )
+        message = logs.records[0].getMessage()
+        self.assertIn("router_type=llm", message)
+        self.assertIn("input_tokens=18", message)
+        self.assertIn("output_tokens=4", message)
+
+    def test_knowledge_and_tool_retrieval_counts_are_summed(self):
+        tool_turn = tool_completion(
+            "search-1",
+            "search_products",
+            '{"query":"推荐几款对讲机"}',
+        )
+        tool_turn.usage = SimpleNamespace(
+            prompt_tokens=7,
+            completion_tokens=2,
+        )
+        final_turn = text_completion("方案与候选产品。")
+        final_turn.usage = SimpleNamespace(
+            prompt_tokens=17,
+            completion_tokens=5,
+        )
+        self.create.side_effect = [tool_turn, final_turn]
+
+        with self.assertLogs("ai_customer_support", level="INFO") as logs:
+            response = self.post("介绍解决方案并推荐几款对讲机")
+
+        self.assertEqual(response.status_code, 200)
+        message = logs.records[0].getMessage()
+        self.assertIn("retrieval_used=true", message)
+        self.assertIn("retrieved_count=5", message)
+        self.assertIn("tool_call_count=1", message)
+        self.assertIn("tool_execution_count=1", message)
+        self.assertIn('executed_tool_names=["search_products"]', message)
+        self.assertIn("input_tokens=24", message)
+        self.assertIn("output_tokens=7", message)
 
     def test_mixed_knowledge_and_contact_is_agentic_after_one_retrieval(self):
         question = "介绍应急通信解决方案，另外怎么联系你们？"
@@ -299,6 +393,31 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assertEqual(self.create.call_count, 3)
         self.assertIn("route=exact_product", logs.records[0].getMessage())
 
+    def test_cached_tool_trace_does_not_increment_real_execution_count(self):
+        self.create.side_effect = [
+            tool_completion(
+                "details-1",
+                "get_product_details",
+                '{"product_id":"LY198"}',
+            ),
+            tool_completion(
+                "details-2",
+                "get_product_details",
+                '{"product_id":"LY198"}',
+            ),
+            text_completion("LY198 信息。"),
+        ]
+
+        with self.assertLogs("ai_customer_support", level="INFO") as logs:
+            response = self.post("比较 LY198 和 HP780")
+
+        self.assertEqual(response.status_code, 200)
+        message = logs.records[0].getMessage()
+        self.assertIn("tool_call_count=2", message)
+        self.assertIn("tool_execution_count=1", message)
+        self.assertIn('executed_tool_names=["get_product_details"]', message)
+        self.assertIn("tool_execution_success=true", message)
+
     def test_unknown_product_domain_error_is_observed_without_system_failure(self):
         self.create.side_effect = [
             text_completion("exact_product"),
@@ -315,7 +434,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assert_ndjson(response, "没有找到该型号，请核对后重试。")
         message = logs.records[0].getMessage()
         self.assertIn('"error_code":"PRODUCT_NOT_FOUND"', message)
+        self.assertIn("tool_execution_count=1", message)
+        self.assertIn('executed_tool_names=["get_product_details"]', message)
+        self.assertIn("tool_execution_success=false", message)
         self.assertIn("failure_layer=-", message)
+        self.assertIn("failure_code=null", message)
         self.assertEqual(self.embedding.queries, [])
 
     def test_invalid_router_output_returns_fixed_fallback_with_routing_failure(self):
@@ -353,6 +476,17 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, message)
 
+    def test_request_log_failure_does_not_change_successful_response(self):
+        with patch.object(
+            app_logging.logger,
+            "info",
+            side_effect=RuntimeError("logging unavailable"),
+        ):
+            response = self.post("你好")
+
+        self.assert_ndjson(response)
+        self.assert_slot_available()
+
     def test_router_provider_and_retrieval_failures_keep_safe_http_contract(self):
         request = httpx.Request("POST", "https://example.com/chat")
         self.create.side_effect = APITimeoutError(request=request)
@@ -360,7 +494,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             response = self.post("地下停车场通信应该怎么解决？")
         self.assertEqual(response.status_code, 504)
         self.assertEqual(response.json()["error"]["code"], "timeout")
-        self.assertIn("failure_layer=ROUTING", logs.records[0].getMessage())
+        message = logs.records[0].getMessage()
+        self.assertIn("router_type=llm", message)
+        self.assertIn("model_latency_ms=", message)
+        self.assertIn("failure_layer=ROUTING", message)
+        self.assertIn("failure_code=timeout", message)
         self.assert_slot_available()
 
         self.create.side_effect = lambda **kwargs: text_completion("unused")
@@ -371,7 +509,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "retrieval_unavailable")
         message = logs.records[0].getMessage()
         self.assertIn("route=knowledge", message)
+        self.assertIn("retrieval_used=true", message)
+        self.assertIn("retrieved_count=0", message)
+        self.assertIn("retrieval_latency_ms=", message)
         self.assertIn("failure_layer=RETRIEVAL", message)
+        self.assertIn("failure_code=retrieval_unavailable", message)
         self.assertNotIn("private embedding detail", message)
         self.assert_slot_available()
 
@@ -397,6 +539,26 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assertEqual(limited.status_code, 429)
         self.assertEqual(limited.json()["error"]["code"], "rate_limit")
         self.assert_slot_available()
+
+    def test_concurrency_rejection_logs_zero_work_and_failure_code(self):
+        self.slot.acquire()
+        try:
+            with self.assertLogs("ai_customer_support", level="INFO") as logs:
+                response = self.post("你好")
+        finally:
+            self.slot.release()
+
+        self.assertEqual(response.status_code, 503)
+        message = logs.records[0].getMessage()
+        self.assertIn("route=-", message)
+        self.assertIn("router_type=null", message)
+        self.assertIn("retrieval_used=false", message)
+        self.assertIn("retrieved_count=0", message)
+        self.assertIn("tool_execution_count=0", message)
+        self.assertIn("tool_execution_success=null", message)
+        self.assertIn("input_tokens=0", message)
+        self.assertIn("output_tokens=0", message)
+        self.assertIn("failure_code=concurrency_limit", message)
 
 
 if __name__ == "__main__":

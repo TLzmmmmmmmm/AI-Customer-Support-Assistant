@@ -270,6 +270,32 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         self.assertEqual(self.request.state.route_trace.route, Route.DIRECT)
         release.assert_called_once_with()
 
+    def test_rendering_failure_preserves_completed_route_trace(self):
+        orchestrator = FakeOrchestrator(events=[])
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot") as release,
+            patch.object(
+                chat,
+                "render_answer",
+                side_effect=RuntimeError("render failure"),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "render failure"):
+                chat.chat_stream(
+                    self.payload,
+                    self.request,
+                    None,
+                    orchestrator,
+                )
+
+        trace = self.request.state.route_trace
+        self.assertIsNotNone(trace)
+        self.assertEqual(trace.route, Route.PRODUCT_SEARCH)
+        self.assertEqual(trace.tool_call_count, 1)
+        release.assert_called_once_with()
+
     def test_busy_slot_rejects_before_deadline_or_orchestration(self):
         orchestrator = FakeOrchestrator(events=[])
         with (

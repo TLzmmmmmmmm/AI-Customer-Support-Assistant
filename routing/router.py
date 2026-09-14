@@ -5,6 +5,7 @@ from collections.abc import Sequence
 
 from agent import AgentDeadline
 from models import ChatMessage
+from trace_models import set_request_trace_field
 
 from .models import FailureLayer, Route, RouteDecision, RoutingResult
 
@@ -94,6 +95,7 @@ class HybridRouter:
         *,
         deadline: AgentDeadline,
     ) -> RoutingResult:
+        set_request_trace_field("router_type", "deterministic")
         question = messages[-1].content
         matches = self._retriever.resolve_entities(question)
         product_id = None
@@ -186,6 +188,7 @@ class HybridRouter:
                 ))
 
         deadline.ensure_active()
+        set_request_trace_field("router_type", "llm")
         completion = self._complete_chat(_provider_messages(messages))
         deadline.ensure_active()
         route = _normalize_route(completion)
@@ -193,6 +196,7 @@ class HybridRouter:
             return RoutingResult(
                 RouteDecision(route=Route.FALLBACK),
                 failure_layer=FailureLayer.ROUTING,
+                router_type="llm",
             )
 
         if route == Route.EXACT_PRODUCT and product_id is None:
@@ -201,7 +205,7 @@ class HybridRouter:
             route=route,
             agentic=agentic,
             product_id=product_id,
-        ))
+        ), router_type="llm")
 
 
 __all__ = ["HybridRouter", "ROUTER_SYSTEM_PROMPT"]

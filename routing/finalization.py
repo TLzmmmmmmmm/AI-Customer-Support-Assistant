@@ -9,7 +9,7 @@ from agent.tool_outcomes import (
     tool_trace_from_observation,
 )
 from knowledge_pipeline.retrieval.models import RetrievalResult
-from trace_models import FailureLayer
+from trace_models import FailureLayer, request_trace_fields
 
 from .deterministic import DETERMINISTIC_TOOL_ROUTES
 from .knowledge import retrieval_sources
@@ -24,6 +24,7 @@ def finalize_agentic_route(
     *,
     agent_result: AgentResult,
     retrieval_results: Sequence[RetrievalResult] = (),
+    router_type: str | None = None,
 ) -> RouteExecutionResult:
     retrieved_chunk_ids = tuple(
         result.chunk_id
@@ -33,6 +34,8 @@ def finalize_agentic_route(
         *retrieval_sources(retrieval_results),
         *agent_result.sources,
     )
+    telemetry = request_trace_fields()
+    telemetry["router_type"] = router_type or telemetry["router_type"]
     return RouteExecutionResult(
         answer=agent_result.answer,
         trace=RouteTrace(
@@ -41,6 +44,7 @@ def finalize_agentic_route(
             tool_call_count=len(agent_result.tool_calls),
             retrieved_chunk_ids=retrieved_chunk_ids,
             failure_layer=agent_result.failure_layer,
+            **telemetry,
         ),
         sources=(
             ()
@@ -58,13 +62,17 @@ def finalize_non_agentic_route(
     retrieval_results: Sequence[RetrievalResult] = (),
     tool_observation: ToolObservation | None = None,
     generation_failure: FailureLayer | None = None,
+    router_type: str | None = None,
 ) -> RouteExecutionResult:
+    telemetry = request_trace_fields()
+    telemetry["router_type"] = router_type or telemetry["router_type"]
     if route == Route.FALLBACK:
         return RouteExecutionResult(
             answer=SAFE_FALLBACK_ANSWER,
             trace=RouteTrace(
                 route=route,
                 failure_layer=routing_failure,
+                **telemetry,
             ),
         )
 
@@ -103,6 +111,7 @@ def finalize_non_agentic_route(
             tool_call_count=tool_call_count,
             retrieved_chunk_ids=retrieved_chunk_ids,
             failure_layer=failure_layer,
+            **telemetry,
         ),
         sources=() if answer == SAFE_AGENT_ANSWER else sources,
     )

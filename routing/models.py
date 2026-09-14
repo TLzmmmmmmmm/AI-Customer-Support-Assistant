@@ -35,6 +35,19 @@ class RouteTrace:
     invalid_source_count: int = 0
     citation_status: str = "none"
     answer_sanitized: bool = False
+    router_type: str | None = None
+    retrieval_used: bool = False
+    retrieved_count: int = 0
+    tool_execution_count: int = 0
+    executed_tool_names: tuple[str, ...] = ()
+    tool_execution_success: bool | None = None
+    router_latency_ms: float | None = None
+    retrieval_latency_ms: float | None = None
+    tool_latency_ms: float | None = None
+    model_latency_ms: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    failure_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +61,7 @@ class RouteExecutionResult:
 class RoutingResult:
     decision: RouteDecision
     failure_layer: FailureLayer | None = None
+    router_type: str = "deterministic"
 
 
 __all__ = [

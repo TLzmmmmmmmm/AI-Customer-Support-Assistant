@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -6,10 +8,20 @@ from starlette.exceptions import HTTPException
 from app_logging import log_request
 
 
-def _trace_fields(request: Request) -> dict[str, object]:
+def _trace_fields(
+    request: Request,
+    *,
+    failure_code: str,
+) -> dict[str, object]:
+    trace = getattr(request.state, "route_trace", None)
+    if trace is not None:
+        trace = replace(trace, failure_code=failure_code)
+        request.state.route_trace = trace
     return {
-        "trace": getattr(request.state, "route_trace", None),
+        "trace": trace,
         "failure_layer": getattr(request.state, "failure_layer", None),
+        "failure_code": failure_code,
+        "request_state": request.state,
     }
 
 
@@ -60,7 +72,7 @@ async def validation_exception_handler(
         outcome="validation_error",
         started_at=started_at,
         error=type(exc).__name__,
-        **_trace_fields(request),
+        **_trace_fields(request, failure_code="validation_error"),
     )
 
     return error_response(
@@ -116,7 +128,7 @@ async def http_exception_handler(
             if internal_error
             else None
         ),
-        **_trace_fields(request),
+        **_trace_fields(request, failure_code=code),
     )
 
     return error_response(
@@ -140,7 +152,7 @@ async def unhandled_exception_handler(
         outcome="internal_error",
         started_at=started_at,
         error=type(exc).__name__,
-        **_trace_fields(request),
+        **_trace_fields(request, failure_code="internal_error"),
     )
 
     return error_response(

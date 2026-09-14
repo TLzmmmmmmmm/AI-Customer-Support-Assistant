@@ -63,6 +63,7 @@ class RouteOrchestrator:
             return finalize_non_agentic_route(
                 decision.route,
                 routing_failure=routing.failure_layer,
+                router_type=routing.router_type,
             )
 
         retrieved = []
@@ -100,6 +101,7 @@ class RouteOrchestrator:
                 decision.route,
                 agent_result=result,
                 retrieval_results=retrieved,
+                router_type=routing.router_type,
             )
 
         observation = None
@@ -146,6 +148,7 @@ class RouteOrchestrator:
             retrieval_results=retrieved,
             tool_observation=observation,
             generation_failure=generation_failure,
+            router_type=routing.router_type,
         )
 
 __all__ = ["RouteOrchestrator", "SAFE_FALLBACK_ANSWER"]

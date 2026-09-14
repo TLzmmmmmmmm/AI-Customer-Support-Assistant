@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
@@ -43,7 +44,7 @@ from routing.finalization import (
     finalize_non_agentic_route,
 )
 from routing.knowledge import retrieval_sources, retrieve_knowledge
-from trace_models import FailureLayer
+from trace_models import FailureLayer, add_request_duration
 
 from .state import AgentState
 
@@ -71,6 +72,7 @@ def route_node(
     *,
     router: HybridRouter,
 ) -> dict[str, object]:
+    started_at = time.monotonic()
     try:
         routing = router.route(
             state["messages"],
@@ -79,9 +81,15 @@ def route_node(
     except Exception as error:
         set_failure_layer(error, FailureLayer.ROUTING)
         raise
+    finally:
+        add_request_duration(
+            "router_latency_ms",
+            (time.monotonic() - started_at) * 1000,
+        )
     return {
         "route_decision": routing.decision,
         "routing_failure": routing.failure_layer,
+        "router_type": routing.router_type,
     }
 
 
@@ -472,6 +480,7 @@ def agent_finalize_node(state: AgentState) -> dict[str, object]:
             state["route_decision"].route,
             agent_result=agent_result,
             retrieval_results=state["retrieval_hits"],
+            router_type=state.get("router_type"),
         ),
     }
 
@@ -485,6 +494,7 @@ def finalize_node(state: AgentState) -> dict[str, object]:
         retrieval_results=state["retrieval_hits"],
         tool_observation=state["tool_result"],
         generation_failure=state.get("generation_failure"),
+        router_type=state.get("router_type"),
     )
     return {"result": result}
 

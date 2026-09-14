@@ -1,6 +1,7 @@
 import json
 import unittest
 from types import MappingProxyType
+from types import SimpleNamespace
 
 from agent.models import AgentToolCall
 from support_tools import (
@@ -13,6 +14,62 @@ from support_tools import (
 
 
 class AgentExecutorTests(unittest.TestCase):
+    def test_actual_execution_metrics_exclude_invalid_calls_and_cache_reuse(self):
+        from agent.executor import ToolExecutor
+        from trace_models import (
+            bind_request_state,
+            initialize_request_trace,
+            request_trace_fields,
+            reset_request_state,
+        )
+
+        calls = []
+
+        def search_products(query):
+            calls.append(query)
+            return ProductSearchResult(products=[])
+
+        executor = ToolExecutor(MappingProxyType({
+            "search_products": search_products,
+        }))
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        telemetry_token = bind_request_state(state)
+        try:
+            executor.execute(
+                AgentToolCall("invalid", "search_products", "not-json"),
+                {},
+            )
+            cache = {}
+            executor.execute(
+                AgentToolCall(
+                    "first",
+                    "search_products",
+                    '{"query":"酒店"}',
+                ),
+                cache,
+            )
+            executor.execute(
+                AgentToolCall(
+                    "cached",
+                    "search_products",
+                    '{"query":"酒店"}',
+                ),
+                cache,
+            )
+        finally:
+            reset_request_state(telemetry_token)
+
+        telemetry = request_trace_fields(state)
+        self.assertEqual(calls, ["酒店"])
+        self.assertEqual(telemetry["tool_execution_count"], 1)
+        self.assertEqual(
+            telemetry["executed_tool_names"],
+            ("search_products",),
+        )
+        self.assertIs(telemetry["tool_execution_success"], True)
+        self.assertIsNotNone(telemetry["tool_latency_ms"])
+
     def test_success_preserves_structured_sources_across_cache_reuse(self):
         from agent.executor import ToolExecutor
         from knowledge_pipeline.models import SourceRef

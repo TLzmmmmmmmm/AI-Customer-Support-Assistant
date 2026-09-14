@@ -57,6 +57,8 @@ class ErrorHandlingPrivacyTests(unittest.TestCase):
             error="EmbeddingAPIError",
             trace=None,
             failure_layer=None,
+            failure_code="retrieval_unavailable",
+            request_state=request.state,
         )
 
     def test_http_error_logs_only_allowlisted_trace_fields(self):
@@ -97,8 +99,10 @@ class ErrorHandlingPrivacyTests(unittest.TestCase):
             outcome="provider_unavailable",
             started_at=1.0,
             error="APIConnectionError",
-            trace=trace,
+            trace=request.state.route_trace,
             failure_layer=None,
+            failure_code="provider_unavailable",
+            request_state=request.state,
         )
 
     def test_request_log_contains_bounded_trace_without_private_payloads(self):

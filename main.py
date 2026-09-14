@@ -24,6 +24,7 @@ from agent_graph import (
     build_agent_graph,
 )
 from routing import HybridRouter
+from trace_models import initialize_request_trace
 
 
 @asynccontextmanager
@@ -91,6 +92,7 @@ async def add_request_id(
     request.state.started_at = time.monotonic()
     request.state.route_trace = None
     request.state.failure_layer = None
+    initialize_request_trace(request.state)
 
     response = await call_next(request)
 

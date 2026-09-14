@@ -6,6 +6,12 @@ import httpx2 as httpx
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from services import llm
+from trace_models import (
+    bind_request_state,
+    initialize_request_trace,
+    request_trace_fields,
+    reset_request_state,
+)
 
 
 PROVIDER_MESSAGES = [
@@ -83,6 +89,32 @@ class LlmProviderMessageTests(unittest.TestCase):
 
 
 class LlmCompleteChatTests(unittest.TestCase):
+    def test_missing_usage_nulls_totals_after_prior_usage(self):
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        first = SimpleNamespace(usage=SimpleNamespace(
+            prompt_tokens=8,
+            completion_tokens=2,
+        ))
+        second = SimpleNamespace(usage=None)
+
+        telemetry_token = bind_request_state(state)
+        try:
+            with patch.object(
+                llm.client.chat.completions,
+                "create",
+                side_effect=[first, second],
+            ):
+                llm.complete_chat(PROVIDER_MESSAGES)
+                llm.complete_chat(PROVIDER_MESSAGES)
+        finally:
+            reset_request_state(telemetry_token)
+
+        telemetry = request_trace_fields(state)
+        self.assertIsNone(telemetry["input_tokens"])
+        self.assertIsNone(telemetry["output_tokens"])
+        self.assertIsNotNone(telemetry["model_latency_ms"])
+
     def test_complete_chat_sends_native_tools_without_mutating_inputs(self):
         messages = [dict(message) for message in PROVIDER_MESSAGES]
         tools = [{

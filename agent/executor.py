@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -8,6 +9,7 @@ from pydantic import ValidationError
 
 from knowledge_pipeline.models import SourceRef
 from support_tools import ProductSearchResult, ToolError, ToolErrorCode
+from trace_models import record_tool_execution
 
 from .models import AgentToolCall, TOOL_SPECS
 
@@ -129,18 +131,35 @@ class ToolExecutor:
         if tool is None:
             return _error_observation(_invalid_argument("tool_executor"))
 
+        started_at = time.monotonic()
         try:
             result = tool(**validated_arguments)
             if not isinstance(result, spec.result_model):
                 raise TypeError("unexpected tool result type")
         except ToolError as error:
+            record_tool_execution(
+                name,
+                False,
+                (time.monotonic() - started_at) * 1000,
+            )
             return _error_observation(error)
         except Exception:
+            record_tool_execution(
+                name,
+                False,
+                (time.monotonic() - started_at) * 1000,
+            )
             return _error_observation(ToolError(
                 code=ToolErrorCode.TOOL_EXECUTION_ERROR,
                 message="The tool could not complete the request.",
                 tool_name=name,
             ))
+
+        record_tool_execution(
+            name,
+            True,
+            (time.monotonic() - started_at) * 1000,
+        )
 
         content = json.dumps(
             {

@@ -24,6 +24,11 @@ from agent import AgentDeadline, AgentDeadlineExceeded, SAFE_AGENT_ANSWER
 from citation import render_answer
 from config import AGENT_TIMEOUT_SECONDS
 from routing import RouteExecutionResult, RouteTrace
+from trace_models import (
+    bind_request_state,
+    request_trace_fields,
+    reset_request_state,
+)
 
 router = APIRouter()
 
@@ -102,6 +107,7 @@ def chat_stream(
             },
         )
     
+    trace_token = bind_request_state(request.state)
     try:
         deadline = AgentDeadline.start(
             AGENT_TIMEOUT_SECONDS,
@@ -112,6 +118,7 @@ def chat_stream(
             payload.messages,
             deadline=deadline,
         )
+        request.state.route_trace = route_result.trace
         rendered = render_answer(
             route_result.answer,
             route_result.sources,
@@ -191,6 +198,8 @@ def chat_stream(
         _remember_error_trace(request, error)
         release_llm_slot()
         raise
+    finally:
+        reset_request_state(trace_token)
 
     return StreamingResponse(
         answer_events_with_slot(
@@ -219,5 +228,6 @@ def _remember_error_trace(request: Request, error: Exception) -> None:
         tool_call_count=len(tool_calls),
         retrieved_chunk_ids=retrieved_chunk_ids,
         failure_layer=failure_layer,
+        **request_trace_fields(request.state),
     )
 

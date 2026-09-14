@@ -15,6 +15,7 @@ class AgentState(TypedDict):
     last_user_message: ChatMessage
     deadline: AgentDeadline
     route_decision: NotRequired[RouteDecision]
+    router_type: NotRequired[str]
     routing_failure: NotRequired[FailureLayer | None]
     agent_messages: NotRequired[list[dict[str, object]]]
     agent_processed_calls: NotRequired[int]
