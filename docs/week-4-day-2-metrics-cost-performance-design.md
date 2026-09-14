@@ -83,6 +83,8 @@ Sources:
   `fallback`;
 - a repeat count of five for each single-turn case, producing 120 planned
   single-turn requests;
+- six independent calibration prompts, one per target route, that are not
+  reused by the measured single-turn cases;
 - four three-turn synthetic conversations, producing 12 planned multi-turn
   requests.
 
@@ -97,6 +99,12 @@ The four conversations cover:
 Target routes construct a representative workload only. They are not asserted,
 scored, or used for aggregation. All route analysis uses the actual production
 route from telemetry.
+
+The manifest loader validates only reusable structural invariants: unique IDs,
+supported routes, non-empty text, a positive repeat count, and valid non-empty
+conversations. The experiment-specific counts of 24 measured prompts, five
+repeats, six calibration prompts, and four three-turn conversations are tested
+as properties of `workload_v1.json`, not hard-coded as generic loader rules.
 
 Single-turn executions are interleaved with a fixed random seed. Conversations
 are interleaved with each other while preserving turn order inside each
@@ -118,8 +126,8 @@ assistant answers using the existing alternating history schema.
 - parse only valid `delta`, optional `citations`, and terminal `done` events for
   successful NDJSON responses;
 - keep assistant answer text in memory only for conversation history;
-- never copy prompts, answers, retrieved text, system prompts, or tool arguments into
-  raw result rows;
+- never copy prompts, answers, retrieved text, system prompts, or tool arguments
+  into raw result rows;
 - perform no runner-level retries.
 
 A single-turn failure is recorded and execution continues. If a conversation
@@ -178,18 +186,18 @@ non-null count, mean, P50, and P95. Router-type groups report count and total
 latency P50/P95. Router-type comparison is descriptive rather than causal
 because route mix may differ.
 
-Per-request `model_latency_ms / total_latency_ms` may be summarized as a
-diagnostic ratio with an explicit overlap warning. Stage metrics are never
-summed or presented as mutually exclusive percentages.
-
-The diagnostic major-stage gap is:
+For each request, `dominant_stage` is the non-null measured stage with the
+largest latency, and its diagnostic ratio is:
 
 ```text
-total_latency_ms - max(non-null major stage latencies)
+dominant_stage_ratio = max(non-null stage latency) / total_latency_ms
 ```
 
-It indicates time not represented by the largest measured stage, not an
-additive uninstrumented bucket.
+The ratio is used only to determine whether a single measured stage dominates.
+Because stage metrics can be sequential and can overlap, a low ratio means only
+that no single measured stage dominates. Stage metrics are never summed,
+presented as mutually exclusive percentages, or used to infer unexplained or
+uninstrumented latency.
 
 ## Token and tool diagnostics
 
@@ -219,20 +227,19 @@ complete. They do not enter the main successful-request token or cost averages.
 ## Pricing and cost
 
 The offline pricing snapshot uses DeepSeek's official Chinese documentation as
-of 2026-09-14, currency CNY, for the Flash model serving the configured legacy
-name `deepseek-v4-flash`:
+of 2026-09-14, currency CNY, for configured model `deepseek-v4-flash`:
 
 | Period | Cache-hit input / 1M | Cache-miss input / 1M | Output / 1M |
 | --- | ---: | ---: | ---: |
-| Off-peak | CNY 0.02 | CNY 1.00 | CNY 4.00 |
-| Peak | CNY 0.04 | CNY 2.00 | CNY 8.00 |
+| Off-peak | CNY 0.05 | CNY 1.50 | CNY 4.50 |
+| Peak | CNY 0.10 | CNY 3.00 | CNY 9.00 |
 
 Peak time is Monday-Friday, 09:00-12:00 and 14:00-18:00 Asia/Shanghai. The
 implementation treats these as half-open intervals `[09:00, 12:00)` and
 `[14:00, 18:00)`; all other times are off-peak. Each request's logger timestamp
 chooses its rate.
 
-Exact per-request estimated cost requires non-null cache-hit, cache-miss, and
+Per-request estimated cost requires non-null cache-hit, cache-miss, and
 output token totals plus a valid timestamp:
 
 ```text
@@ -241,16 +248,18 @@ hit_tokens * hit_rate / 1_000_000
 + output_tokens * output_rate / 1_000_000
 ```
 
-The report calls this an estimate, never actual billed cost. It reports cost
+The field name is `estimated_cost_cny`. The report calls this an estimate,
+never actual or exact billed cost. It reports cost
 coverage, mean/P50/P95 cost per successful request, and route-level cost. If
 the real run reveals incomplete cache telemetry, those records are excluded
-from exact cost averages and the limitation is explicit; no input split is
+from estimated cost averages and the limitation is explicit; no input split is
 inferred.
 
-Each complete synthetic conversation cost is the sum of its measured request
-costs. The report lists scenario costs, conversation count, average, and
-nearest-rank median. Interrupted conversations are listed with partial measured
-cost and excluded from complete-conversation averages.
+Each complete synthetic conversation's `estimated_cost_cny` is the sum of its
+request-level estimates. The report lists scenario estimates, conversation
+count, average, and nearest-rank median. Interrupted conversations are listed
+with `partial_estimated_cost_cny` and excluded from complete-conversation
+averages.
 
 ## Slow requests and bottleneck conclusion
 
@@ -276,10 +285,15 @@ true streaming.
 ## Execution safety
 
 The approved paid-call ceiling is CNY 5, with no recharge or resource purchase.
-Before the full run, a six-request calibration covers one case per target route.
-Its measured cache split is analyzed using the peak rates to conservatively
-project the full 132-request workload. Execution stops for renewed approval if
-the projection approaches CNY 5 or if balance/configuration errors occur.
+Before the full run, a six-request calibration uses the manifest's six
+independent calibration prompts, one per target route. These prompts never
+appear in the formal 24-prompt measured workload and therefore do not warm an
+identical measured prompt before the run. Average measured calibration cost
+multiplied by 132 and calibration tokens repriced at peak rates are labeled only
+as a `budget screening projection`. They determine whether expected spend is
+clearly below CNY 5; they are not an upper bound. Execution stops for renewed
+approval if either projection approaches CNY 5 or if balance/configuration
+errors occur.
 
 The full run is sequential and has no automatic retries. Calibration request
 IDs are not present in the full workload mapping, so their log lines cannot
@@ -311,7 +325,7 @@ Focused offline tests cover:
 - `tool_execution_count` and ordered tool sequences;
 - complete and interrupted conversation grouping;
 - peak/off-peak boundaries;
-- exact cache-hit/cache-miss/output cost;
+- estimated cache-hit/cache-miss/output cost;
 - missing and duplicate summary joins;
 - runner manifest ordering, NDJSON validation, metadata privacy, and failure
   behavior without real network calls.
@@ -324,7 +338,7 @@ After tests pass, execution proceeds in this order:
 
 1. start the local production app with a run-specific stderr log;
 2. run and analyze the six-request calibration;
-3. verify the conservative CNY 5 projection;
+3. verify the budget screening projection is clearly below CNY 5;
 4. run the full workload;
 5. join and analyze telemetry;
 6. generate and inspect both final artifacts;
@@ -341,3 +355,7 @@ After tests pass, execution proceeds in this order:
 - Aggregation uses actual routes and nearest-rank percentiles.
 - The final report ends with exactly one supported A/B/C/D recommendation.
 - No evaluation semantics or unrelated production behavior changes.
+
+The final limitations state: "Repeated test cases may increase prompt cache
+reuse; observed estimated cost reflects the measured cache behavior of this
+representative synthetic workload."
