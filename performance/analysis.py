@@ -33,6 +33,13 @@ PRICING_SNAPSHOT = {
     },
 }
 
+APPROVED_LABELS = {
+    "A": "A. True streaming is justified",
+    "B": "B. Tool/agent execution optimization is justified",
+    "C": "C. Another specific measured bottleneck should be addressed",
+    "D": "D. No material optimization is currently justified",
+}
+
 
 def _shanghai_timezone():
     try:
@@ -565,6 +572,36 @@ def analyze_join(
             pair["summary"], selected_pricing
         )) is not None
     ]
+    diagnostics_by_request = {
+        row["request_id"]: row for row in dominant_rows
+    }
+    slow_requests = []
+    for pair in sorted(
+        matched,
+        key=lambda item: item["summary"].get("total_latency_ms") or 0,
+        reverse=True,
+    )[:10]:
+        summary = pair["summary"]
+        diagnostic = diagnostics_by_request.get(summary["request_id"], {})
+        slow_requests.append({
+            "request_id": summary["request_id"],
+            "route": summary.get("route"),
+            "router_type": summary.get("router_type"),
+            "total_latency_ms": summary.get("total_latency_ms"),
+            "router_latency_ms": summary.get("router_latency_ms"),
+            "retrieval_latency_ms": summary.get("retrieval_latency_ms"),
+            "tool_latency_ms": summary.get("tool_latency_ms"),
+            "model_latency_ms": summary.get("model_latency_ms"),
+            "dominant_stage": diagnostic.get("dominant_stage"),
+            "dominant_stage_ratio": diagnostic.get("dominant_stage_ratio"),
+            "input_tokens": summary.get("input_tokens"),
+            "output_tokens": summary.get("output_tokens"),
+            "tool_execution_count": summary.get("tool_execution_count"),
+            "executed_tool_names": summary.get("executed_tool_names"),
+            "outcome": summary.get("outcome"),
+            "failure_layer": summary.get("failure_layer"),
+            "failure_code": summary.get("failure_code"),
+        })
 
     return {
         "samples": {
@@ -687,4 +724,309 @@ def analyze_join(
             skipped,
             selected_pricing,
         ),
+        "slowest_requests": slow_requests,
     }
+
+
+def _display(value: object, decimals: int = 1) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, float):
+        return f"{value:.{decimals}f}"
+    return str(value)
+
+
+def _route_with_highest(
+    groups: Mapping[str, Mapping[str, object]],
+    field: str,
+) -> str:
+    eligible = [
+        (name, metrics.get(field))
+        for name, metrics in groups.items()
+        if isinstance(metrics.get(field), (int, float))
+    ]
+    if not eligible:
+        return "No observations"
+    name, value = max(eligible, key=lambda item: item[1])
+    return f"{name} ({_display(value)})"
+
+
+def render_markdown(analysis: Mapping[str, object]) -> str:
+    recommendation = analysis.get("recommendation")
+    if not isinstance(recommendation, Mapping):
+        raise ValueError("recommendation is required")
+    category = recommendation.get("category")
+    if category not in APPROVED_LABELS:
+        raise ValueError("recommendation category is invalid")
+    rationale = recommendation.get("rationale")
+    if (
+        not isinstance(rationale, list)
+        or not rationale
+        or any(not isinstance(item, str) or not item.strip() for item in rationale)
+    ):
+        raise ValueError("recommendation rationale must be non-empty")
+    if recommendation.get("label") != APPROVED_LABELS[category]:
+        raise ValueError("recommendation label does not match category")
+
+    samples = analysis["samples"]
+    telemetry = analysis["telemetry_join"]
+    latency = analysis["latency"]
+    stages = analysis["stage_latency"]
+    tokens = analysis["tokens"]
+    tools = analysis["tools"]
+    costs = analysis["estimated_cost_cny"]
+    conversations = analysis["conversations"]
+    failures = analysis["failures"]
+    workload = analysis.get("workload", {})
+    lines = [
+        "# Week 4 Day 2 Metrics, Cost, and Performance Analysis",
+        "",
+        "## Workload methodology",
+        "",
+        (
+            "Sequential production-style HTTP workload with no runner retries. "
+            f"Manifest seed: `{workload.get('seed', 'unknown')}`; repeat count: "
+            f"`{workload.get('repeat_count', 'unknown')}`. Target routes shape "
+            "the workload only; every grouping below uses the actual production route."
+        ),
+        "",
+        "## Sample counts",
+        "",
+        "| Attempted | Successful | Failed | Skipped | Single-turn success | Multi-turn success |",
+        "| ---: | ---: | ---: | ---: | ---: | ---: |",
+        (
+            f"| {samples['attempted']} | {samples['successful']} | "
+            f"{samples['failed']} | {samples['skipped']} | "
+            f"{samples['single_turn_successful']} | "
+            f"{samples['multi_turn_successful']} |"
+        ),
+        "",
+        "## Metric definitions",
+        "",
+        (
+            "Success requires a uniquely joined production summary with HTTP 200 "
+            "and `outcome=success`. P50 and P95 use the nearest-rank definition; "
+            "each table includes its contributing sample count. Stage measurements "
+            "may overlap and are not added as percentages of total latency."
+        ),
+        "",
+        "## Telemetry coverage",
+        "",
+        "| Matched | Missing request ID | Missing summary | Duplicate summary | Unrelated summaries |",
+        "| ---: | ---: | ---: | ---: | ---: |",
+        (
+            f"| {telemetry['matched']} | {telemetry['missing_request_id']} | "
+            f"{telemetry['missing_summary']} | {telemetry['duplicate_summary']} | "
+            f"{telemetry['unrelated_summary_count']} |"
+        ),
+        "",
+        "## P50/P95 latency",
+        "",
+        "| Sample count | Mean ms | P50 ms | P95 ms |",
+        "| ---: | ---: | ---: | ---: |",
+        (
+            f"| {latency['overall']['count']} | {_display(latency['overall']['mean'])} | "
+            f"{_display(latency['overall']['p50'])} | "
+            f"{_display(latency['overall']['p95'])} |"
+        ),
+        "",
+        "## Latency by actual route",
+        "",
+        "| Route | Sample count | Mean ms | P50 ms | P95 ms |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    for route, metrics in latency["by_route"].items():
+        lines.append(
+            f"| {route} | {metrics['count']} | {_display(metrics['mean'])} | "
+            f"{_display(metrics['p50'])} | {_display(metrics['p95'])} |"
+        )
+    if not latency["by_route"]:
+        lines.append("| No observations | 0 | — | — | — |")
+
+    lines.extend((
+        "",
+        "## Stage diagnosis",
+        "",
+        (
+            "`dominant_stage_ratio` is the largest non-null measured stage divided "
+            "by positive total latency. It identifies whether one measured stage "
+            "dominates; stage timings may be sequential or overlap."
+        ),
+        "",
+        "| Route | Stage | Sample count | Mean ms | P50 ms | P95 ms |",
+        "| --- | --- | ---: | ---: | ---: | ---: |",
+    ))
+    for route, route_stages in stages["by_route"].items():
+        for stage, metrics in route_stages.items():
+            lines.append(
+                f"| {route} | {stage} | {metrics['count']} | "
+                f"{_display(metrics['mean'])} | {_display(metrics['p50'])} | "
+                f"{_display(metrics['p95'])} |"
+            )
+    ratio = stages["dominant_stage_ratio"]
+    if isinstance(ratio.get("p50"), (int, float)) and ratio["p50"] < 0.5:
+        lines.extend(("", "No single measured stage dominates at the median ratio."))
+
+    token_coverage = tokens["coverage"]
+    token_overall = tokens["overall"]
+    lines.extend((
+        "",
+        "## Tokens/request",
+        "",
+        (
+            f"Complete token sample count: {token_coverage['complete']} of "
+            f"{token_coverage['eligible']}; excluded: {token_coverage['excluded']}."
+        ),
+        "",
+        "| Average input | Average output | Average total |",
+        "| ---: | ---: | ---: |",
+        (
+            f"| {_display(token_overall['average_input'])} | "
+            f"{_display(token_overall['average_output'])} | "
+            f"{_display(token_overall['average_total'])} |"
+        ),
+        "",
+        "## Tokens by route",
+        "",
+        "| Route | Sample count | Average input | Average output | Average total |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ))
+    for route, metrics in tokens["by_route"].items():
+        lines.append(
+            f"| {route} | {metrics['count']} | {_display(metrics['average_input'])} | "
+            f"{_display(metrics['average_output'])} | "
+            f"{_display(metrics['average_total'])} |"
+        )
+
+    lines.extend((
+        "",
+        "## Tool execution",
+        "",
+        f"Average execution count: {_display(tools['overall_average_execution_count'])}.",
+        "",
+        "Execution-count distribution: "
+        + json.dumps(tools["execution_count_distribution"], ensure_ascii=False),
+        "",
+        "Ordered executed-tool sequences: "
+        + json.dumps(tools["ordered_name_sequences"], ensure_ascii=False),
+        "",
+        "## Estimated cost/request",
+        "",
+        (
+            f"Coverage: {costs['coverage']['complete']} of "
+            f"{costs['coverage']['eligible']} successful requests; excluded: "
+            f"{costs['coverage']['excluded']}. Currency: CNY."
+        ),
+        "",
+        "| Sample count | Mean CNY | P50 CNY | P95 CNY |",
+        "| ---: | ---: | ---: | ---: |",
+        (
+            f"| {costs['overall']['count']} | {_display(costs['overall']['mean'], 6)} | "
+            f"{_display(costs['overall']['p50'], 6)} | "
+            f"{_display(costs['overall']['p95'], 6)} |"
+        ),
+        "",
+        "## Estimated cost/conversation",
+        "",
+        (
+            f"Complete cost sample count: {conversations['estimated_cost_cny']['count']}; "
+            f"mean CNY: {_display(conversations['estimated_cost_cny']['mean'], 6)}; "
+            f"P50 CNY: {_display(conversations['estimated_cost_cny']['p50'], 6)}."
+        ),
+        "",
+        "## Failures",
+        "",
+        (
+            f"Failed {failures['failed']} of {failures['attempted']} attempts "
+            f"(rate {_display(failures['failure_rate'], 4)}). Layers: "
+            f"{json.dumps(failures['by_layer'], ensure_ascii=False)}. Codes: "
+            f"{json.dumps(failures['by_code'], ensure_ascii=False)}."
+        ),
+        "",
+        "## Slowest requests",
+        "",
+        "| Request ID | Route | Router type | Total ms | Model ms | Dominant stage | Ratio | Tool executions | Outcome |",
+        "| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |",
+    ))
+    for row in analysis["slowest_requests"]:
+        lines.append(
+            f"| {row['request_id']} | {_display(row['route'])} | "
+            f"{_display(row['router_type'])} | {_display(row['total_latency_ms'])} | "
+            f"{_display(row['model_latency_ms'])} | {_display(row['dominant_stage'])} | "
+            f"{_display(row['dominant_stage_ratio'], 3)} | "
+            f"{_display(row['tool_execution_count'])} | {_display(row['outcome'])} |"
+        )
+    if not analysis["slowest_requests"]:
+        lines.append("| No observations | — | — | — | — | — | — | — | — |")
+
+    slow_model_bound = sum(
+        row.get("dominant_stage") == "model"
+        for row in analysis["slowest_requests"]
+    )
+    product_repeats = sum(
+        row.get("route") == "product_search"
+        and (row.get("tool_execution_count") or 0) > 1
+        for row in analysis["slowest_requests"]
+    )
+    lines.extend((
+        "",
+        "## Bottleneck conclusion",
+        "",
+        (
+            "- Latency concentration: dominant measured stages were "
+            f"{json.dumps(stages['dominant_stage_distribution'], ensure_ascii=False)}; "
+            f"median dominant-stage ratio was {_display(ratio['p50'], 3)}."
+        ),
+        (
+            "- Slowest actual routes: highest route P50 was "
+            f"{_route_with_highest(latency['by_route'], 'p50')}; highest route P95 "
+            f"was {_route_with_highest(latency['by_route'], 'p95')}."
+        ),
+        (
+            f"- Slow-row model diagnosis: {slow_model_bound} of "
+            f"{len(analysis['slowest_requests'])} listed rows were model-dominant."
+        ),
+        (
+            "- Router-type comparison is descriptive, not causal: "
+            + json.dumps(latency["by_router_type"], ensure_ascii=False)
+            + "."
+        ),
+        (
+            "- Retrieval and tool materiality are represented by their route-level "
+            "non-null sample counts and latency percentiles in the stage table."
+        ),
+        (
+            f"- Repeated product-search execution: {product_repeats} listed slow "
+            "requests executed more than one tool."
+        ),
+        (
+            "- Highest-token route by average total tokens: "
+            f"{_route_with_highest(tokens['by_route'], 'average_total')}; "
+            "highest-cost route by mean estimated CNY: "
+            f"{_route_with_highest(costs['by_route'], 'mean')}."
+        ),
+        "",
+        "## Day 3 recommendation",
+        "",
+    ))
+    lines.extend(f"- {item}" for item in rationale)
+    lines.extend((
+        "",
+        "## Limitations",
+        "",
+        (
+            "This representative synthetic workload is not a production SLO or a "
+            "universal conversation average. Router-type comparisons may have "
+            "different route mixes. TTFT is not instrumented, so this evidence "
+            "cannot establish a true-streaming TTFT improvement."
+        ),
+        "",
+        (
+            "Repeated test cases may increase prompt cache reuse; observed estimated "
+            "cost reflects the measured cache behavior of this representative "
+            "synthetic workload."
+        ),
+        "",
+        APPROVED_LABELS[category],
+    ))
+    return "\n".join(lines) + "\n"

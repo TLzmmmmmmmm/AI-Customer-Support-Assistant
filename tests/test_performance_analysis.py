@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from performance.analysis import (
+    APPROVED_LABELS,
     PRICING_SNAPSHOT,
     analyze_join,
     estimate_request_cost_cny,
@@ -15,7 +16,9 @@ from performance.analysis import (
     nearest_rank,
     numeric_stats,
     parse_summary_line,
+    render_markdown,
 )
+from scripts.analyze_week4_day2 import main as analyze_main
 
 
 SUMMARY_LINE = (
@@ -360,6 +363,63 @@ class AggregationTests(unittest.TestCase):
         )
         self.assertNotIn("estimated_cost_cny", conversations["items"][1])
 
+    def test_report_has_required_sections_and_exact_final_label(self):
+        analysis = analyze_join(self._joined_fixture())
+        analysis["workload"] = {"seed": 20260914, "repeat_count": 5}
+        analysis["recommendation"] = {
+            "category": "D",
+            "label": APPROVED_LABELS["D"],
+            "rationale": ["Three successful requests were observed."],
+        }
+
+        report = render_markdown(analysis)
+
+        headings = [
+            "## Workload methodology",
+            "## Sample counts",
+            "## Metric definitions",
+            "## Telemetry coverage",
+            "## P50/P95 latency",
+            "## Latency by actual route",
+            "## Stage diagnosis",
+            "## Tokens/request",
+            "## Tokens by route",
+            "## Tool execution",
+            "## Estimated cost/request",
+            "## Estimated cost/conversation",
+            "## Failures",
+            "## Slowest requests",
+            "## Bottleneck conclusion",
+            "## Day 3 recommendation",
+            "## Limitations",
+        ]
+        positions = [report.index(heading) for heading in headings]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("nearest-rank", report)
+        self.assertIn("overlap", report)
+        self.assertIn("sample count", report)
+        self.assertIn(
+            "Repeated test cases may increase prompt cache reuse; observed "
+            "estimated cost reflects the measured cache behavior of this "
+            "representative synthetic workload.",
+            report,
+        )
+        self.assertNotIn("unexplained", report.lower())
+        self.assertNotIn("uninstrumented", report.lower())
+        self.assertNotIn("user_content", report)
+        self.assertNotIn("assistant_answer", report)
+        self.assertEqual(report.rstrip().splitlines()[-1], APPROVED_LABELS["D"])
+
+    def test_report_rejects_empty_rationale(self):
+        analysis = analyze_join(self._joined_fixture())
+        analysis["recommendation"] = {
+            "category": "D",
+            "label": APPROVED_LABELS["D"],
+            "rationale": [],
+        }
+        with self.assertRaises(ValueError):
+            render_markdown(analysis)
+
     @staticmethod
     def _joined_fixture():
         def pair(
@@ -466,6 +526,68 @@ class AggregationTests(unittest.TestCase):
             }],
             "unrelated_summary_count": 0,
         }
+
+
+class AnalyzerCliTests(unittest.TestCase):
+    def test_cli_writes_both_outputs_and_refuses_overwrite(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workload = root / "workload.jsonl"
+            summaries = root / "summaries.jsonl"
+            json_output = root / "analysis.json"
+            markdown_output = root / "report.md"
+            workload.write_text("\n".join((
+                json.dumps({
+                    "record_type": "run",
+                    "schema_version": "1.0",
+                    "seed": 1,
+                    "repeat_count": 1,
+                }),
+                json.dumps({
+                    "record_type": "attempt",
+                    "workload_id": "one",
+                    "kind": "single_turn",
+                    "target_route": "direct",
+                    "request_id": "req-cli",
+                    "outcome": "success",
+                }),
+            )), encoding="utf-8")
+            summaries.write_text(json.dumps({
+                "timestamp": "2026-09-14T13:00:00+08:00",
+                "request_id": "req-cli",
+                "http_status": 200,
+                "outcome": "success",
+                "route": "direct",
+                "router_type": "deterministic",
+                "total_latency_ms": 10.0,
+                "router_latency_ms": 1.0,
+                "model_latency_ms": 8.0,
+                "input_tokens": 2,
+                "output_tokens": 1,
+                "prompt_cache_hit_tokens": 1,
+                "prompt_cache_miss_tokens": 1,
+                "tool_execution_count": 0,
+                "executed_tool_names": [],
+            }), encoding="utf-8")
+            argv = [
+                "--workload-results", str(workload),
+                "--summaries", str(summaries),
+                "--json-output", str(json_output),
+                "--markdown-output", str(markdown_output),
+                "--recommendation", "D",
+                "--rationale", "One successful request was observed.",
+            ]
+
+            self.assertEqual(analyze_main(argv), 0)
+            payload = json.loads(json_output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["recommendation"]["category"], "D")
+            self.assertEqual(
+                markdown_output.read_text(encoding="utf-8").rstrip().splitlines()[-1],
+                APPROVED_LABELS["D"],
+            )
+            with self.assertRaises(FileExistsError):
+                analyze_main(argv)
+            self.assertFalse(list(root.glob("*.tmp")))
 
 
 if __name__ == "__main__":
