@@ -22,8 +22,6 @@ _REQUEST_TRACE_DEFAULTS: dict[str, object] = {
     "retrieval_latency_ms": None,
     "tool_latency_ms": None,
     "model_latency_ms": None,
-    "first_delta_latency_ms": None,
-    "buffering_saved_ms": None,
     "input_tokens": None,
     "output_tokens": None,
     "prompt_cache_hit_tokens": None,

@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator, Mapping, Sequence
-from contextvars import ContextVar, Token
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
-
-from langgraph.config import get_stream_writer
 
 from agent import (
     MAX_TOOL_CALLS,
     SAFE_AGENT_ANSWER,
-    AgentDeadline,
     AgentToolCall,
     ToolExecutor,
     ToolObservation,
@@ -33,7 +29,6 @@ from agent.tool_outcomes import (
     tool_failure_from_trace,
     tool_trace_from_observation,
 )
-from citation import IncrementalAnswerSanitizer
 from knowledge_pipeline.retrieval import Retriever
 from prompts import build_direct_messages, build_rag_messages, build_tool_messages
 from rag_context import build_retrieved_context
@@ -54,20 +49,6 @@ from trace_models import FailureLayer, add_request_duration
 from .state import AgentState
 
 
-_STREAM_FINAL_ANSWERS: ContextVar[bool] = ContextVar(
-    "stream_final_answers",
-    default=False,
-)
-
-
-def _enable_final_answer_streaming() -> Token[bool]:
-    return _STREAM_FINAL_ANSWERS.set(True)
-
-
-def _reset_final_answer_streaming(token: Token[bool]) -> None:
-    _STREAM_FINAL_ANSWERS.reset(token)
-
-
 class CompleteChat(Protocol):
     def __call__(
         self,
@@ -78,48 +59,12 @@ class CompleteChat(Protocol):
         ...
 
 
-class StreamChat(Protocol):
-    def __call__(
-        self,
-        messages: Sequence[Mapping[str, object]],
-    ) -> Iterator[str]:
-        ...
-
-
 @dataclass(frozen=True)
 class AgentGraphNodes:
     router: HybridRouter
     executor: ToolExecutor
     retriever: Retriever
     complete_chat: CompleteChat
-    stream_chat: StreamChat | None = None
-
-
-def _stream_final_answer(
-    provider_messages: Sequence[Mapping[str, object]],
-    *,
-    deadline: AgentDeadline,
-    stream_chat: StreamChat,
-) -> tuple[str, FailureLayer | None]:
-    writer = get_stream_writer()
-    sanitizer = IncrementalAnswerSanitizer()
-    raw_parts = []
-    deadline.ensure_active()
-    for raw_chunk in stream_chat(provider_messages):
-        raw_parts.append(raw_chunk)
-        for safe_chunk in sanitizer.feed(raw_chunk):
-            if safe_chunk:
-                writer(safe_chunk)
-        deadline.ensure_active()
-    tail = sanitizer.finish()
-    if tail:
-        writer(tail)
-    raw_answer = "".join(raw_parts)
-    return (
-        (raw_answer, None)
-        if raw_answer.strip()
-        else (raw_answer, FailureLayer.GENERATION)
-    )
 
 
 def route_node(
@@ -177,7 +122,6 @@ def deterministic_generate_node(
     state: AgentState,
     *,
     complete_chat: CompleteChat,
-    stream_chat: StreamChat | None = None,
 ) -> dict[str, object]:
     decision = state["route_decision"]
     observation = cast(ToolObservation, state["tool_result"])
@@ -187,18 +131,11 @@ def deterministic_generate_node(
         observation=observation.content,
     )
     try:
-        if stream_chat is None or not _STREAM_FINAL_ANSWERS.get():
-            answer, generation_failure = generate_answer(
-                provider_messages,
-                deadline=state["deadline"],
-                complete_chat=complete_chat,
-            )
-        else:
-            answer, generation_failure = _stream_final_answer(
-                provider_messages,
-                deadline=state["deadline"],
-                stream_chat=stream_chat,
-            )
+        answer, generation_failure = generate_answer(
+            provider_messages,
+            deadline=state["deadline"],
+            complete_chat=complete_chat,
+        )
     except Exception as error:
         set_failure_layer(error, FailureLayer.GENERATION)
         set_error_context(
@@ -238,7 +175,6 @@ def rag_generate_node(
     state: AgentState,
     *,
     complete_chat: CompleteChat,
-    stream_chat: StreamChat | None = None,
 ) -> dict[str, object]:
     try:
         provider_messages = build_rag_messages(
@@ -250,18 +186,11 @@ def rag_generate_node(
         set_error_context(error, route=Route.KNOWLEDGE)
         raise
     try:
-        if stream_chat is None or not _STREAM_FINAL_ANSWERS.get():
-            answer, generation_failure = generate_answer(
-                provider_messages,
-                deadline=state["deadline"],
-                complete_chat=complete_chat,
-            )
-        else:
-            answer, generation_failure = _stream_final_answer(
-                provider_messages,
-                deadline=state["deadline"],
-                stream_chat=stream_chat,
-            )
+        answer, generation_failure = generate_answer(
+            provider_messages,
+            deadline=state["deadline"],
+            complete_chat=complete_chat,
+        )
     except Exception as error:
         set_failure_layer(error, FailureLayer.GENERATION)
         set_error_context(
@@ -282,22 +211,14 @@ def direct_node(
     state: AgentState,
     *,
     complete_chat: CompleteChat,
-    stream_chat: StreamChat | None = None,
 ) -> dict[str, object]:
     provider_messages = build_direct_messages(state["messages"])
     try:
-        if stream_chat is None or not _STREAM_FINAL_ANSWERS.get():
-            answer, generation_failure = generate_answer(
-                provider_messages,
-                deadline=state["deadline"],
-                complete_chat=complete_chat,
-            )
-        else:
-            answer, generation_failure = _stream_final_answer(
-                provider_messages,
-                deadline=state["deadline"],
-                stream_chat=stream_chat,
-            )
+        answer, generation_failure = generate_answer(
+            provider_messages,
+            deadline=state["deadline"],
+            complete_chat=complete_chat,
+        )
     except Exception as error:
         set_failure_layer(error, FailureLayer.GENERATION)
         set_error_context(error, route=Route.DIRECT)
@@ -620,7 +541,6 @@ def select_agent_step_edge(
 __all__ = [
     "AgentGraphNodes",
     "CompleteChat",
-    "StreamChat",
     "agent_finalize_node",
     "agent_step_node",
     "deterministic_generate_node",

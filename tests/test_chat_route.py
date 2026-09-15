@@ -46,15 +46,12 @@ class FakeOrchestrator:
         answer="完整回答",
         error=None,
         sources=(),
-        chunks=(),
     ):
         self.events = events
         self.answer = answer
         self.error = error
         self.sources = sources
-        self.chunks = tuple(chunks)
         self.calls = []
-        self.closed = False
 
     def _result(self):
         return RouteExecutionResult(
@@ -73,20 +70,6 @@ class FakeOrchestrator:
         if self.error is not None:
             raise self.error
         return self._result()
-
-    def stream(self, messages, *, deadline):
-        self.events.append("orchestrate")
-        self.calls.append({"messages": messages, "deadline": deadline})
-        try:
-            if self.error is not None and not self.chunks:
-                raise self.error
-            yield from self.chunks
-            if self.error is not None:
-                raise self.error
-            yield self._result()
-        finally:
-            self.closed = True
-
 
 async def consume_response(response, observed_events=None) -> str:
     parts = []
@@ -111,6 +94,36 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             ChatMessage(role="assistant", content="HP780 是一款对讲机。"),
             ChatMessage(role="user", content="它的防护等级是什么？"),
         ])
+
+    def test_uses_buffered_run_boundary_without_stream_method(self):
+        events = []
+        buffered = FakeOrchestrator(events=events)
+
+        class RunOnlyOrchestrator:
+            def run(self, messages, *, deadline):
+                return buffered.run(messages, deadline=deadline)
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot"),
+            patch.object(chat, "log_request"),
+        ):
+            response = chat.chat_stream(
+                self.payload,
+                self.request,
+                None,
+                RunOnlyOrchestrator(),
+            )
+            body = asyncio.run(consume_response(response))
+
+        self.assertEqual(
+            [json.loads(line) for line in body.splitlines()],
+            [
+                {"type": "delta", "content": "完整回答"},
+                {"type": "done"},
+            ],
+        )
+        self.assertEqual(events, ["orchestrate"])
 
     def test_one_slot_covers_orchestration_and_complete_ndjson_response(self):
         events = []
@@ -165,46 +178,6 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             trace=trace,
             completed_at=10.0,
         )
-        self.assertEqual(trace.first_delta_latency_ms, 9000.0)
-        self.assertEqual(trace.buffering_saved_ms, 0.0)
-
-    def test_safe_chunks_stream_in_order_before_done(self):
-        events = []
-        orchestrator = FakeOrchestrator(
-            events=events,
-            answer="第一段第二段",
-            chunks=("第一段", "第二段"),
-        )
-
-        with (
-            patch.object(chat, "try_acquire_llm_slot", return_value=True),
-            patch.object(
-                chat,
-                "release_llm_slot",
-                side_effect=lambda: events.append("release"),
-            ) as release,
-            patch.object(
-                chat,
-                "log_request",
-                side_effect=lambda **_: events.append("summary"),
-            ),
-        ):
-            response = chat.chat_stream(
-                self.payload, self.request, None, orchestrator
-            )
-            body = asyncio.run(consume_response(response, events))
-
-        self.assertEqual(
-            [json.loads(line) for line in body.splitlines()],
-            [
-                {"type": "delta", "content": "第一段"},
-                {"type": "delta", "content": "第二段"},
-                {"type": "done"},
-            ],
-        )
-        self.assertEqual(events[-4:], ["delta", "done", "summary", "release"])
-        self.assertTrue(orchestrator.closed)
-        release.assert_called_once_with()
 
     def test_summary_occurs_only_after_done_iterator_resumes(self):
         events = []
@@ -238,93 +211,11 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             )
             asyncio.run(verify_order(response))
 
-    def test_post_delta_failures_use_existing_safe_error_taxonomy(self):
-        request = httpx.Request("POST", "https://example.com/chat")
-        cases = (
-            (EmbeddingAPIError("private"), "retrieval_unavailable"),
-            (AgentDeadlineExceeded("expired"), "timeout"),
-            (APIConnectionError(request=request), "provider_unavailable"),
-            (status_error(500), "provider_error"),
-        )
-
-        for error, expected_code in cases:
-            with self.subTest(error=type(error).__name__):
-                error.route = Route.DIRECT
-                error.failure_layer = FailureLayer.GENERATION
-                self.request.state.route_trace = None
-                orchestrator = FakeOrchestrator(
-                    events=[],
-                    answer="不应完成",
-                    chunks=("部分回答",),
-                    error=error,
-                )
-
-                with (
-                    patch.object(chat, "try_acquire_llm_slot", return_value=True),
-                    patch.object(chat, "release_llm_slot") as release,
-                    patch.object(chat, "log_request") as logged,
-                ):
-                    response = chat.chat_stream(
-                        self.payload, self.request, None, orchestrator
-                    )
-                    body = asyncio.run(consume_response(response))
-
-                body_events = [json.loads(line) for line in body.splitlines()]
-                self.assertEqual(
-                    body_events[0],
-                    {"type": "delta", "content": "部分回答"},
-                )
-                self.assertEqual(body_events[1]["type"], "error")
-                self.assertEqual(body_events[1]["code"], expected_code)
-                self.assertEqual(body_events[1]["request_id"], "request-1")
-                event_types = [event["type"] for event in body_events]
-                self.assertNotIn("done", event_types)
-                self.assertNotIn("citations", event_types)
-                self.assertEqual(logged.call_args.kwargs["http_status"], 200)
-                self.assertEqual(
-                    logged.call_args.kwargs["outcome"],
-                    expected_code,
-                )
-                self.assertEqual(
-                    logged.call_args.kwargs["failure_code"],
-                    expected_code,
-                )
-                self.assertIsNotNone(
-                    logged.call_args.kwargs["trace"].first_delta_latency_ms
-                )
-                self.assertIsNone(
-                    logged.call_args.kwargs["trace"].buffering_saved_ms
-                )
-                release.assert_called_once_with()
-
-    def test_streamed_final_invariant_mismatch_fails_closed(self):
-        orchestrator = FakeOrchestrator(
-            events=[],
-            answer="不同的最终回答",
-            chunks=("已经发送",),
-        )
-
-        with (
-            patch.object(chat, "try_acquire_llm_slot", return_value=True),
-            patch.object(chat, "release_llm_slot"),
-            patch.object(chat, "log_request") as logged,
-        ):
-            response = chat.chat_stream(
-                self.payload, self.request, None, orchestrator
-            )
-            body = asyncio.run(consume_response(response))
-
-        body_events = [json.loads(line) for line in body.splitlines()]
-        self.assertEqual([item["type"] for item in body_events], ["delta", "error"])
-        self.assertEqual(body_events[-1]["code"], "internal_error")
-        self.assertEqual(logged.call_args.kwargs["outcome"], "internal_error")
-
-    def test_disconnect_after_delta_closes_graph_and_logs_interruption(self):
+    def test_disconnect_after_delta_logs_interruption(self):
         events = []
         orchestrator = FakeOrchestrator(
             events=events,
             answer="第一段第二段",
-            chunks=("第一段", "第二段"),
         )
 
         async def consume_one_and_close(response):
@@ -342,7 +233,6 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             )
             asyncio.run(consume_one_and_close(response))
 
-        self.assertTrue(orchestrator.closed)
         release.assert_called_once_with()
         self.assertEqual(logged.call_count, 1)
         kwargs = logged.call_args.kwargs
@@ -350,14 +240,11 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         self.assertEqual(kwargs["outcome"], "stream_interrupted")
         self.assertEqual(kwargs["failure_code"], "stream_interrupted")
         self.assertIsNone(kwargs["failure_layer"])
-        self.assertIsNotNone(self.request.state.first_delta_latency_ms)
-        self.assertIsNone(self.request.state.buffering_saved_ms)
 
     def test_asgi_send_disconnect_closes_response_owner(self):
         orchestrator = FakeOrchestrator(
             events=[],
             answer="第一段第二段",
-            chunks=("第一段", "第二段"),
         )
 
         async def disconnect(response):
@@ -388,7 +275,6 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             )
             asyncio.run(disconnect(response))
 
-        self.assertTrue(orchestrator.closed)
         release.assert_called_once_with()
         self.assertEqual(logged.call_args.kwargs["outcome"], "stream_interrupted")
 
@@ -396,7 +282,6 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         orchestrator = FakeOrchestrator(
             events=[],
             answer="第一段第二段",
-            chunks=("第一段", "第二段"),
         )
 
         async def fail_on_done(response):
@@ -432,13 +317,11 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         kwargs = logged.call_args.kwargs
         self.assertEqual(kwargs["outcome"], "stream_interrupted")
         self.assertEqual(kwargs["failure_code"], "stream_interrupted")
-        self.assertIsNone(self.request.state.buffering_saved_ms)
 
-    def test_close_before_first_body_delta_releases_prefetched_stream(self):
+    def test_close_before_first_body_delta_releases_slot(self):
         orchestrator = FakeOrchestrator(
             events=[],
             answer="第一段第二段",
-            chunks=("第一段", "第二段"),
         )
 
         async def close_without_reading(response):
@@ -469,10 +352,8 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         finally:
             reset_request_state(outer_token)
 
-        self.assertTrue(orchestrator.closed)
         release.assert_called_once_with()
         self.assertEqual(logged.call_args.kwargs["outcome"], "stream_interrupted")
-        self.assertIsNone(self.request.state.first_delta_latency_ms)
 
     def test_final_delta_removes_model_urls_and_appends_only_trusted_citations(self):
         trusted = SourceRef(

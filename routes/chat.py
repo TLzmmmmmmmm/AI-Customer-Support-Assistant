@@ -37,14 +37,6 @@ class _RouteRunner(Protocol):
     ) -> RouteExecutionResult:
         ...
 
-    def stream(
-        self,
-        messages: Sequence[ChatMessage],
-        *,
-        deadline: AgentDeadline,
-    ) -> Iterator[str | RouteExecutionResult]:
-        ...
-
 
 def get_route_orchestrator(request: Request) -> _RouteRunner:
     return request.app.state.route_orchestrator
@@ -52,25 +44,6 @@ def get_route_orchestrator(request: Request) -> _RouteRunner:
 
 def encode_event(event: dict[str, object]) -> str:
     return json.dumps(event, ensure_ascii=False) + "\n"
-
-
-def _advance_with_request_state(
-    iterator: Iterator[str | RouteExecutionResult],
-    state: object,
-) -> str | RouteExecutionResult:
-    token = bind_request_state(state)
-    try:
-        return next(iterator)
-    finally:
-        reset_request_state(token)
-
-
-def _close_with_request_state(iterator: Iterator[object], state: object) -> None:
-    token = bind_request_state(state)
-    try:
-        iterator.close()
-    finally:
-        reset_request_state(token)
 
 
 def _prepare_result(
@@ -105,14 +78,6 @@ def _prepare_result(
     return rendered, trace
 
 
-def _stream_error(error: Exception) -> tuple[str, str]:
-    contract = _error_contract(error)
-    if contract is None:
-        return "internal_error", "服务暂时出现异常，请稍后再试。"
-    _, code, message = contract
-    return code, message
-
-
 def _error_contract(error: Exception) -> tuple[int, str, str] | None:
     if isinstance(error, RetrievalError):
         return (
@@ -129,7 +94,7 @@ def _error_contract(error: Exception) -> tuple[int, str, str] | None:
     return None
 
 
-def _prefetch_http_exception(error: Exception) -> HTTPException | None:
+def _http_exception(error: Exception) -> HTTPException | None:
     contract = _error_contract(error)
     if contract is None:
         return None
@@ -148,73 +113,20 @@ class _ResponseLifecycle:
     def __init__(
         self,
         *,
-        route_iterator: Iterator[str | RouteExecutionResult],
         request_id: str,
         started_at: float,
         request_state: object,
+        trace: RouteTrace,
     ) -> None:
-        self.route_iterator = route_iterator
         self.request_id = request_id
         self.started_at = started_at
         self.request_state = request_state
-        self.trace: RouteTrace | None = getattr(
-            request_state,
-            "route_trace",
-            None,
-        )
-        self.first_delta_at: float | None = None
-        self.done_yielded = False
-        self.summary_logged = False
-        self.closed = False
-        if not hasattr(request_state, "first_delta_latency_ms"):
-            request_state.first_delta_latency_ms = None
-        if not hasattr(request_state, "buffering_saved_ms"):
-            request_state.buffering_saved_ms = None
-
-    def set_trace(self, trace: RouteTrace | None) -> None:
         self.trace = trace
-        self.request_state.route_trace = trace
-
-    def mark_first_delta(self) -> None:
-        if self.first_delta_at is not None:
-            return
-        self.first_delta_at = time.monotonic()
-        latency_ms = (self.first_delta_at - self.started_at) * 1000
-        self.request_state.first_delta_latency_ms = latency_ms
-        if self.trace is not None:
-            self.set_trace(replace(
-                self.trace,
-                first_delta_latency_ms=latency_ms,
-            ))
+        self.done_yielded = False
+        self.closed = False
 
     def mark_done(self) -> None:
         self.done_yielded = True
-
-    def log_failure(self, error: Exception, *, code: str) -> None:
-        completed_at = time.monotonic()
-        failure_layer = getattr(error, "failure_layer", None)
-        self.request_state.failure_code = code
-        self.request_state.failure_layer = failure_layer
-        self.request_state.buffering_saved_ms = None
-        if self.trace is not None:
-            self.set_trace(replace(
-                self.trace,
-                failure_code=code,
-                buffering_saved_ms=None,
-            ))
-        self.summary_logged = True
-        log_request(
-            request_id=self.request_id,
-            http_status=200,
-            outcome=code,
-            started_at=self.started_at,
-            error=type(error).__name__,
-            trace=self.trace,
-            failure_layer=failure_layer,
-            failure_code=code,
-            request_state=self.request_state,
-            completed_at=completed_at,
-        )
 
     def close(self) -> None:
         if self.closed:
@@ -222,27 +134,7 @@ class _ResponseLifecycle:
         self.closed = True
         completed_at = time.monotonic()
         try:
-            try:
-                _close_with_request_state(
-                    self.route_iterator,
-                    self.request_state,
-                )
-            except Exception:
-                pass
-            if self.summary_logged:
-                return
-            self.summary_logged = True
             if self.done_yielded:
-                if self.first_delta_at is not None:
-                    buffering_saved_ms = (
-                        completed_at - self.first_delta_at
-                    ) * 1000
-                    self.request_state.buffering_saved_ms = buffering_saved_ms
-                    if self.trace is not None:
-                        self.set_trace(replace(
-                            self.trace,
-                            buffering_saved_ms=buffering_saved_ms,
-                        ))
                 log_request(
                     request_id=self.request_id,
                     http_status=200,
@@ -256,13 +148,8 @@ class _ResponseLifecycle:
             code = "stream_interrupted"
             self.request_state.failure_code = code
             self.request_state.failure_layer = None
-            self.request_state.buffering_saved_ms = None
-            if self.trace is not None:
-                self.set_trace(replace(
-                    self.trace,
-                    failure_code=code,
-                    buffering_saved_ms=None,
-                ))
+            self.trace = replace(self.trace, failure_code=code)
+            self.request_state.route_trace = self.trace
             log_request(
                 request_id=self.request_id,
                 http_status=200,
@@ -337,62 +224,21 @@ class _OwnedStreamingResponse(StreamingResponse):
 
 
 def answer_events_with_slot(
-    first_item: str | RouteExecutionResult,
-    route_iterator: Iterator[str | RouteExecutionResult],
-    prepared_result: tuple[CitationRenderResult, RouteTrace] | None,
-    request: Request,
-    language_hint: str,
+    rendered: CitationRenderResult,
     lifecycle: _ResponseLifecycle,
 ) -> Iterator[str]:
-    visible_deltas: list[str] = []
-    try:
-        if prepared_result is None:
-            current = first_item
-            while isinstance(current, str):
-                lifecycle.mark_first_delta()
-                visible_deltas.append(current)
-                yield encode_event({"type": "delta", "content": current})
-                current = _advance_with_request_state(
-                    route_iterator,
-                    request.state,
-                )
-            rendered, trace = _prepare_result(
-                current,
-                request_state=request.state,
-                language_hint=language_hint,
-            )
-            lifecycle.set_trace(trace)
-            if "".join(visible_deltas) != rendered.text:
-                raise RuntimeError("streamed answer differs from rendered answer")
-        else:
-            rendered, trace = prepared_result
-            lifecycle.set_trace(trace)
-
-        if not visible_deltas:
-            lifecycle.mark_first_delta()
-            yield encode_event({"type": "delta", "content": rendered.text})
-        if rendered.sources and rendered.citation_heading:
-            yield encode_event({
-                "type": "citations",
-                "heading": rendered.citation_heading,
-                "items": [
-                    {"title": source.title, "url": source.url}
-                    for source in rendered.sources
-                ],
-            })
-        yield encode_event({"type": "done"})
-        lifecycle.mark_done()
-    except Exception as error:
-        _remember_error_trace(request, error)
-        lifecycle.set_trace(getattr(request.state, "route_trace", None))
-        code, message = _stream_error(error)
-        lifecycle.log_failure(error, code=code)
+    yield encode_event({"type": "delta", "content": rendered.text})
+    if rendered.sources and rendered.citation_heading:
         yield encode_event({
-            "type": "error",
-            "code": code,
-            "message": message,
-            "request_id": lifecycle.request_id,
+            "type": "citations",
+            "heading": rendered.citation_heading,
+            "items": [
+                {"title": source.title, "url": source.url}
+                for source in rendered.sources
+            ],
         })
+    yield encode_event({"type": "done"})
+    lifecycle.mark_done()
 
 
 @router.post("/api/chat-stream")
@@ -413,54 +259,40 @@ def chat_stream(
             },
         )
 
-    route_iterator = None
+    token = bind_request_state(request.state)
     try:
         deadline = AgentDeadline.start(
             AGENT_TIMEOUT_SECONDS,
             clock=time.monotonic,
         )
         deadline.ensure_active()
-        route_iterator = iter(orchestrator.stream(
+        route_result = orchestrator.run(
             payload.messages,
             deadline=deadline,
-        ))
-        first_item = _advance_with_request_state(route_iterator, request.state)
-        prepared_result = (
-            _prepare_result(
-                first_item,
-                request_state=request.state,
-                language_hint=payload.messages[-1].content,
-            )
-            if isinstance(first_item, RouteExecutionResult)
-            else None
         )
-    except StopIteration as error:
-        if route_iterator is not None:
-            _close_with_request_state(route_iterator, request.state)
-        release_llm_slot()
-        raise RuntimeError("route stream ended without a result") from error
+        rendered, trace = _prepare_result(
+            route_result,
+            request_state=request.state,
+            language_hint=payload.messages[-1].content,
+        )
     except Exception as error:
         _remember_error_trace(request, error)
-        if route_iterator is not None:
-            _close_with_request_state(route_iterator, request.state)
         release_llm_slot()
-        mapped = _prefetch_http_exception(error)
+        mapped = _http_exception(error)
         if mapped is not None:
             raise mapped from error
         raise
+    finally:
+        reset_request_state(token)
 
     lifecycle = _ResponseLifecycle(
-        route_iterator=route_iterator,
         request_id=request_id,
         started_at=started_at,
         request_state=request.state,
+        trace=trace,
     )
     body_iterator = answer_events_with_slot(
-        first_item,
-        route_iterator,
-        prepared_result,
-        request,
-        payload.messages[-1].content,
+        rendered,
         lifecycle,
     )
     return _OwnedStreamingResponse(

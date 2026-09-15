@@ -76,31 +76,14 @@ class TextCompletion:
         content,
         finish_reason="stop",
         *,
-        chunks=None,
         usage=None,
     ):
         self.content = content
-        self.chunks = chunks or (content,)
         self.usage = usage
         self.choices = [SimpleNamespace(
             finish_reason=finish_reason,
             message=SimpleNamespace(content=content, tool_calls=None),
         )]
-
-    def __iter__(self):
-        for index, content in enumerate(self.chunks):
-            yield SimpleNamespace(
-                choices=[SimpleNamespace(
-                    delta=SimpleNamespace(content=content),
-                    finish_reason=(
-                        self.choices[0].finish_reason
-                        if index == len(self.chunks) - 1
-                        else None
-                    ),
-                )],
-                usage=None,
-            )
-        yield SimpleNamespace(choices=[], usage=self.usage)
 
 
 def text_completion(content, finish_reason="stop"):
@@ -273,10 +256,10 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                     response = self.post(question)
 
                 events = [json.loads(line) for line in response.text.splitlines()]
-                self.assertEqual(events[0], {
-                    "type": "delta",
-                    "content": "受控回答",
-                })
+                self.assertEqual(
+                    [event for event in events if event["type"] == "delta"],
+                    [{"type": "delta", "content": "受控回答"}],
+                )
                 if citations:
                     self.assertEqual(events[-2], {
                         "type": "citations",
@@ -287,11 +270,6 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                         ],
                     })
                 self.assertEqual(events[-1], {"type": "done"})
-                self.assertEqual("".join(
-                    event["content"]
-                    for event in events
-                    if event["type"] == "delta"
-                ), "受控回答")
                 self.assertFalse(self.create.call_args.kwargs["stream"])
                 self.assertNotIn(
                     "stream_options",
@@ -305,8 +283,6 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 self.assertIn("output_tokens=8", summary)
                 self.assertIn("prompt_cache_hit_tokens=7", summary)
                 self.assertIn("prompt_cache_miss_tokens=5", summary)
-                self.assertRegex(summary, r"first_delta_latency_ms=\d")
-                self.assertRegex(summary, r"buffering_saved_ms=\d")
                 self.assert_slot_available()
 
     def test_explicit_scenario_product_requests_are_deterministic_searches(self):

@@ -1,4 +1,3 @@
-import random
 import unittest
 
 
@@ -61,21 +60,6 @@ CASES = (
 )
 
 
-def _stream(raw: str, cut_points: tuple[int, ...]):
-    from citation import IncrementalAnswerSanitizer
-
-    sanitizer = IncrementalAnswerSanitizer()
-    emitted: list[str] = []
-    start = 0
-    snapshots: list[str] = []
-    for end in (*cut_points, len(raw)):
-        emitted.extend(sanitizer.feed(raw[start:end]))
-        snapshots.append("".join(emitted))
-        start = end
-    emitted.append(sanitizer.finish())
-    return "".join(emitted), snapshots
-
-
 class BufferedSanitizationCompatibilityTests(unittest.TestCase):
     def test_expected_outputs_are_frozen_independently(self):
         from citation import sanitize_generated_answer
@@ -83,58 +67,5 @@ class BufferedSanitizationCompatibilityTests(unittest.TestCase):
         for name, raw, expected in CASES:
             with self.subTest(name=name):
                 self.assertEqual(sanitize_generated_answer(raw), expected)
-
-
-class IncrementalSanitizationTests(unittest.TestCase):
-    def _assert_partition(self, raw: str, expected: str, cuts: tuple[int, ...]):
-        actual, snapshots = _stream(raw, cuts)
-
-        self.assertEqual(actual, expected)
-        for snapshot in snapshots:
-            self.assertTrue(
-                expected.startswith(snapshot),
-                msg=f"emitted non-prefix {snapshot!r} for {raw!r} at {cuts!r}",
-            )
-
-    def test_every_single_split_matches_buffered_contract_and_is_prefix_safe(self):
-        for name, raw, expected in CASES:
-            for cut in range(len(raw) + 1):
-                with self.subTest(name=name, cut=cut):
-                    self._assert_partition(raw, expected, (cut,))
-
-    def test_seeded_random_multi_splits_match_for_every_case(self):
-        randomizer = random.Random(20260914)
-        for name, raw, expected in CASES:
-            for partition in range(50):
-                cut_count = randomizer.randint(0, len(raw))
-                cuts = tuple(sorted(randomizer.sample(range(len(raw)), cut_count)))
-                with self.subTest(name=name, partition=partition, cuts=cuts):
-                    self._assert_partition(raw, expected, cuts)
-
-    def test_feed_returns_only_non_empty_deltas(self):
-        from citation import IncrementalAnswerSanitizer
-
-        sanitizer = IncrementalAnswerSanitizer()
-        self.assertEqual(sanitizer.feed("   https://example.com"), ())
-        self.assertEqual(sanitizer.finish(), "")
-
-    def test_fully_sanitized_answer_uses_the_existing_fallback_contract(self):
-        from citation import IncrementalAnswerSanitizer, render_answer
-
-        sanitizer = IncrementalAnswerSanitizer()
-        self.assertEqual(sanitizer.feed("References:\nhttps://example.com"), ())
-        self.assertEqual(sanitizer.finish(), "")
-
-        rendered = render_answer(
-            "References:\nhttps://example.com",
-            (),
-            fallback="Safe fallback",
-            language_hint="question",
-        )
-        self.assertEqual(rendered.text, "Safe fallback")
-        self.assertEqual(rendered.sources, ())
-        self.assertTrue(rendered.used_fallback)
-
-
 if __name__ == "__main__":
     unittest.main()

@@ -5,12 +5,11 @@ from .core import (
     collect_sources,
     render_answer,
 )
-from .sanitization import IncrementalAnswerSanitizer, sanitize_generated_answer
+from .sanitization import sanitize_generated_answer
 
 __all__ = [
     "CitationCollection",
     "CitationRenderResult",
-    "IncrementalAnswerSanitizer",
     "citation_heading",
     "collect_sources",
     "render_answer",

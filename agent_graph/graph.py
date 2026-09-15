@@ -34,11 +34,7 @@ def build_agent_graph(nodes: AgentGraphNodes):
     )
     graph.add_node(
         "rag_generate",
-        partial(
-            rag_generate_node,
-            complete_chat=nodes.complete_chat,
-            stream_chat=nodes.stream_chat,
-        ),
+        partial(rag_generate_node, complete_chat=nodes.complete_chat),
     )
     graph.add_node(
         "agent_step",
@@ -58,16 +54,11 @@ def build_agent_graph(nodes: AgentGraphNodes):
         partial(
             deterministic_generate_node,
             complete_chat=nodes.complete_chat,
-            stream_chat=nodes.stream_chat,
         ),
     )
     graph.add_node(
         "direct",
-        partial(
-            direct_node,
-            complete_chat=nodes.complete_chat,
-            stream_chat=nodes.stream_chat,
-        ),
+        partial(direct_node, complete_chat=nodes.complete_chat),
     )
     graph.add_node("fallback", fallback_node)
     graph.add_node("finalize", finalize_node)
