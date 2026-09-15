@@ -71,21 +71,30 @@ class ControlledEmbedding:
 
 
 class TextCompletion:
-    def __init__(self, content, finish_reason="stop"):
+    def __init__(
+        self,
+        content,
+        finish_reason="stop",
+        *,
+        chunks=None,
+        usage=None,
+    ):
         self.content = content
-        self.usage = None
+        self.chunks = chunks or (content,)
+        self.usage = usage
         self.choices = [SimpleNamespace(
             finish_reason=finish_reason,
             message=SimpleNamespace(content=content, tool_calls=None),
         )]
 
     def __iter__(self):
-        yield SimpleNamespace(
-            choices=[SimpleNamespace(
-                delta=SimpleNamespace(content=self.content),
-            )],
-            usage=None,
-        )
+        for content in self.chunks:
+            yield SimpleNamespace(
+                choices=[SimpleNamespace(
+                    delta=SimpleNamespace(content=content),
+                )],
+                usage=None,
+            )
         yield SimpleNamespace(choices=[], usage=self.usage)
 
 
@@ -219,6 +228,79 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 if tool:
                     self.assertIn(f'"name":"{tool}"', message)
                 self.assertIn(f"citation_count={len(citations)}", message)
+                self.assert_slot_available()
+
+    def test_streaming_smoke_covers_all_eligible_routes_with_complete_telemetry(self):
+        usage = SimpleNamespace(
+            prompt_tokens=12,
+            completion_tokens=8,
+            prompt_cache_hit_tokens=7,
+            prompt_cache_miss_tokens=5,
+        )
+        cases = (
+            ("你好", "direct", ()),
+            (
+                "你们有哪些解决方案？",
+                "knowledge",
+                (
+                    ("酒店通信", "https://example.com/hotel/"),
+                    ("HP780", "https://example.com/hp780/"),
+                    ("润信达 LY198", "https://example.com/ly198/"),
+                ),
+            ),
+            (
+                "推荐几款对讲机",
+                "product_search",
+                (
+                    ("HP780", "https://example.com/hp780/"),
+                    ("润信达 LY198", "https://example.com/ly198/"),
+                ),
+            ),
+        )
+
+        for question, route, citations in cases:
+            with self.subTest(route=route):
+                self.create.side_effect = lambda **kwargs: TextCompletion(
+                    "受控回答",
+                    chunks=("受控", "回答"),
+                    usage=usage,
+                )
+                with self.assertLogs("ai_customer_support", level="INFO") as logs:
+                    response = self.post(question)
+
+                events = [json.loads(line) for line in response.text.splitlines()]
+                self.assertEqual(
+                    events[:2],
+                    [
+                        {"type": "delta", "content": "受控"},
+                        {"type": "delta", "content": "回答"},
+                    ],
+                )
+                if citations:
+                    self.assertEqual(events[-2], {
+                        "type": "citations",
+                        "heading": "参考资料：",
+                        "items": [
+                            {"title": title, "url": url}
+                            for title, url in citations
+                        ],
+                    })
+                self.assertEqual(events[-1], {"type": "done"})
+                self.assertEqual("".join(
+                    event["content"]
+                    for event in events
+                    if event["type"] == "delta"
+                ), "受控回答")
+
+                self.assertEqual(len(logs.records), 1)
+                summary = logs.records[0].getMessage()
+                self.assertIn(f"route={route}", summary)
+                self.assertIn("input_tokens=12", summary)
+                self.assertIn("output_tokens=8", summary)
+                self.assertIn("prompt_cache_hit_tokens=7", summary)
+                self.assertIn("prompt_cache_miss_tokens=5", summary)
+                self.assertRegex(summary, r"first_delta_latency_ms=\d")
+                self.assertRegex(summary, r"buffering_saved_ms=\d")
                 self.assert_slot_available()
 
     def test_explicit_scenario_product_requests_are_deterministic_searches(self):
