@@ -70,11 +70,27 @@ class ControlledEmbedding:
         return EmbeddingBatch(vectors=([1.0, 0.0],), input_tokens=1)
 
 
+class TextCompletion:
+    def __init__(self, content, finish_reason="stop"):
+        self.content = content
+        self.usage = None
+        self.choices = [SimpleNamespace(
+            finish_reason=finish_reason,
+            message=SimpleNamespace(content=content, tool_calls=None),
+        )]
+
+    def __iter__(self):
+        yield SimpleNamespace(
+            choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=self.content),
+            )],
+            usage=None,
+        )
+        yield SimpleNamespace(choices=[], usage=self.usage)
+
+
 def text_completion(content, finish_reason="stop"):
-    return SimpleNamespace(choices=[SimpleNamespace(
-        finish_reason=finish_reason,
-        message=SimpleNamespace(content=content, tool_calls=None),
-    )])
+    return TextCompletion(content, finish_reason)
 
 
 def tool_completion(call_id, name, arguments):
