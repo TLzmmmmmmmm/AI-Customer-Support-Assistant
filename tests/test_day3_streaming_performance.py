@@ -12,6 +12,7 @@ from performance.day3_streaming import (
     day2_budget_screening_projection,
     load_day3_manifest,
     parse_success_ndjson,
+    render_day3_markdown,
 )
 from scripts import run_week4_day3_streaming as runner
 
@@ -247,6 +248,10 @@ class Day3GateTests(unittest.TestCase):
         analysis = analyze_day3_phases(baseline, after)
 
         self.assertTrue(analysis["gates"]["success_36_of_36"])
+        self.assertEqual(
+            analysis["gates"]["success_by_phase"],
+            {"baseline_18_of_18": True, "after_18_of_18": True},
+        )
         self.assertEqual(analysis["gates"]["route_counts"], {
             "baseline": {"product_search": 6, "knowledge": 6, "direct": 6},
             "after": {"product_search": 6, "knowledge": 6, "direct": 6},
@@ -258,8 +263,42 @@ class Day3GateTests(unittest.TestCase):
             analysis["gates"]["total_latency_p50_within_15_percent"],
             {"product_search": True, "knowledge": True, "direct": True},
         )
+        self.assertTrue(
+            analysis["gates"][
+                "all_routes_total_latency_p50_within_15_percent"
+            ]
+        )
         self.assertTrue(analysis["gates"]["all_pass"])
         self.assertEqual(analysis["conclusion"], "A")
+
+    def test_analysis_and_report_include_route_failures_tokens_latency_and_cost(self):
+        baseline, after = passing_pairs()
+        after[-1] = pair(
+            "after",
+            "product_search",
+            5,
+            success=False,
+            total=1150.0,
+            ttft=1000.0,
+        )
+
+        analysis = analyze_day3_phases(baseline, after)
+        route = analysis["by_phase_route"]["after"]["product_search"]
+        report = render_day3_markdown(analysis)
+
+        self.assertEqual(route["observed"], 6)
+        self.assertEqual(route["successful"], 5)
+        self.assertEqual(route["failed"], 1)
+        self.assertEqual(route["model_latency_ms"]["count"], 5)
+        self.assertEqual(route["output_tokens"]["count"], 5)
+        self.assertEqual(route["estimated_cost_cny"]["count"], 6)
+        self.assertIn("18/18 baseline success", report)
+        self.assertIn("18/18 after success", report)
+        self.assertIn("All routes total-latency P50 <=15% regression", report)
+        self.assertIn("Model P50/P95 ms", report)
+        self.assertIn("Output tokens P50/P95", report)
+        self.assertIn("Estimated cost CNY", report)
+        self.assertIn("| after | product_search | 5 | 1 |", report)
 
     def test_one_failed_request_prevents_36_of_36_and_conclusion_a(self):
         baseline, after = passing_pairs()

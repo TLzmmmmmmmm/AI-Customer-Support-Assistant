@@ -1,0 +1,885 @@
+{
+  "schema_version": "1.0",
+  "samples": {
+    "baseline": 18,
+    "after": 18,
+    "total": 36,
+    "successful": {
+      "baseline": 18,
+      "after": 18
+    }
+  },
+  "by_phase_route": {
+    "baseline": {
+      "product_search": {
+        "observed": 6,
+        "successful": 6,
+        "failed": 0,
+        "first_delta_latency_ms": {
+          "count": 6,
+          "mean": 1927.1666666666667,
+          "p50": 1844.0,
+          "p95": 2360.0
+        },
+        "buffering_saved_ms": {
+          "count": 6,
+          "mean": 5.166666666666667,
+          "p50": 0.0,
+          "p95": 16.0
+        },
+        "total_latency_ms": {
+          "count": 6,
+          "mean": 1932.3333333333333,
+          "p50": 1844.0,
+          "p95": 2375.0
+        },
+        "model_latency_ms": {
+          "count": 6,
+          "mean": 1752.3333333333333,
+          "p50": 1703.0,
+          "p95": 2172.0
+        },
+        "output_tokens": {
+          "count": 6,
+          "mean": 232.0,
+          "p50": 173.0,
+          "p95": 434.0
+        },
+        "estimated_cost_cny": {
+          "count": 6,
+          "mean": 0.00242876,
+          "p50": 0.0019068800000000001,
+          "p95": 0.00409464,
+          "total": 0.01457256
+        }
+      },
+      "knowledge": {
+        "observed": 6,
+        "successful": 6,
+        "failed": 0,
+        "first_delta_latency_ms": {
+          "count": 6,
+          "mean": 2252.3333333333335,
+          "p50": 2187.0,
+          "p95": 3922.0
+        },
+        "buffering_saved_ms": {
+          "count": 6,
+          "mean": 5.333333333333333,
+          "p50": 0.0,
+          "p95": 16.0
+        },
+        "total_latency_ms": {
+          "count": 6,
+          "mean": 2257.6666666666665,
+          "p50": 2187.0,
+          "p95": 3922.0
+        },
+        "model_latency_ms": {
+          "count": 6,
+          "mean": 1640.3333333333333,
+          "p50": 1593.0,
+          "p95": 2359.0
+        },
+        "output_tokens": {
+          "count": 6,
+          "mean": 171.16666666666666,
+          "p50": 59.0,
+          "p95": 326.0
+        },
+        "estimated_cost_cny": {
+          "count": 6,
+          "mean": 0.0018580933333333333,
+          "p50": 0.00094952,
+          "p95": 0.003108,
+          "total": 0.01114856
+        }
+      },
+      "direct": {
+        "observed": 6,
+        "successful": 6,
+        "failed": 0,
+        "first_delta_latency_ms": {
+          "count": 6,
+          "mean": 929.5,
+          "p50": 984.0,
+          "p95": 1250.0
+        },
+        "buffering_saved_ms": {
+          "count": 6,
+          "mean": 0.0,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "total_latency_ms": {
+          "count": 6,
+          "mean": 929.5,
+          "p50": 984.0,
+          "p95": 1250.0
+        },
+        "model_latency_ms": {
+          "count": 6,
+          "mean": 927.0,
+          "p50": 984.0,
+          "p95": 1250.0
+        },
+        "output_tokens": {
+          "count": 6,
+          "mean": 25.333333333333332,
+          "p50": 16.0,
+          "p95": 39.0
+        },
+        "estimated_cost_cny": {
+          "count": 6,
+          "mean": 0.0005320666666666666,
+          "p50": 0.00045739999999999995,
+          "p95": 0.0006414,
+          "total": 0.0031923999999999998
+        }
+      }
+    },
+    "after": {
+      "product_search": {
+        "observed": 6,
+        "successful": 6,
+        "failed": 0,
+        "first_delta_latency_ms": {
+          "count": 6,
+          "mean": 1151.0,
+          "p50": 1063.0,
+          "p95": 1484.0
+        },
+        "buffering_saved_ms": {
+          "count": 6,
+          "mean": 987.1666666666666,
+          "p50": 672.0,
+          "p95": 1750.0
+        },
+        "total_latency_ms": {
+          "count": 6,
+          "mean": 2138.1666666666665,
+          "p50": 2156.0,
+          "p95": 3031.0
+        },
+        "model_latency_ms": {
+          "count": 6,
+          "mean": 1922.1666666666667,
+          "p50": 1797.0,
+          "p95": 2891.0
+        },
+        "output_tokens": {
+          "count": 6,
+          "mean": 231.33333333333334,
+          "p50": 94.0,
+          "p95": 498.0
+        },
+        "estimated_cost_cny": {
+          "count": 6,
+          "mean": 0.002423426666666667,
+          "p50": 0.0012748800000000002,
+          "p95": 0.00460664,
+          "total": 0.014540560000000001
+        }
+      },
+      "knowledge": {
+        "observed": 6,
+        "successful": 6,
+        "failed": 0,
+        "first_delta_latency_ms": {
+          "count": 6,
+          "mean": 1364.5,
+          "p50": 1062.0,
+          "p95": 3047.0
+        },
+        "buffering_saved_ms": {
+          "count": 6,
+          "mean": 695.5,
+          "p50": 391.0,
+          "p95": 1641.0
+        },
+        "total_latency_ms": {
+          "count": 6,
+          "mean": 2060.0,
+          "p50": 1469.0,
+          "p95": 3328.0
+        },
+        "model_latency_ms": {
+          "count": 6,
+          "mean": 1497.6666666666667,
+          "p50": 1219.0,
+          "p95": 2375.0
+        },
+        "output_tokens": {
+          "count": 6,
+          "mean": 147.66666666666666,
+          "p50": 70.0,
+          "p95": 363.0
+        },
+        "estimated_cost_cny": {
+          "count": 6,
+          "mean": 0.0016700933333333333,
+          "p50": 0.00103752,
+          "p95": 0.003404,
+          "total": 0.01002056
+        }
+      },
+      "direct": {
+        "observed": 6,
+        "successful": 6,
+        "failed": 0,
+        "first_delta_latency_ms": {
+          "count": 6,
+          "mean": 929.5,
+          "p50": 781.0,
+          "p95": 1828.0
+        },
+        "buffering_saved_ms": {
+          "count": 6,
+          "mean": 417.0,
+          "p50": 219.0,
+          "p95": 1375.0
+        },
+        "total_latency_ms": {
+          "count": 6,
+          "mean": 1346.5,
+          "p50": 1016.0,
+          "p95": 3203.0
+        },
+        "model_latency_ms": {
+          "count": 6,
+          "mean": 1338.8333333333333,
+          "p50": 1000.0,
+          "p95": 3203.0
+        },
+        "output_tokens": {
+          "count": 6,
+          "mean": 24.166666666666668,
+          "p50": 21.0,
+          "p95": 37.0
+        },
+        "estimated_cost_cny": {
+          "count": 6,
+          "mean": 0.0005227333333333333,
+          "p50": 0.0004974,
+          "p95": 0.0006254,
+          "total": 0.0031363999999999997
+        }
+      }
+    }
+  },
+  "gates": {
+    "success_by_phase": {
+      "baseline_18_of_18": true,
+      "after_18_of_18": true
+    },
+    "success_36_of_36": true,
+    "route_counts": {
+      "baseline": {
+        "product_search": 6,
+        "knowledge": 6,
+        "direct": 6
+      },
+      "after": {
+        "product_search": 6,
+        "knowledge": 6,
+        "direct": 6
+      }
+    },
+    "route_counts_pass": true,
+    "terminal_and_finalization": true,
+    "ttft": {
+      "product_search": {
+        "baseline_p50_ms": 1844.0,
+        "after_p50_ms": 1063.0,
+        "absolute_reduction_ms": 781.0,
+        "relative_reduction": 0.4235357917570499,
+        "pass": true
+      },
+      "knowledge": {
+        "baseline_p50_ms": 2187.0,
+        "after_p50_ms": 1062.0,
+        "absolute_reduction_ms": 1125.0,
+        "relative_reduction": 0.51440329218107,
+        "pass": true
+      }
+    },
+    "total_latency_p50_within_15_percent": {
+      "product_search": false,
+      "knowledge": true,
+      "direct": true
+    },
+    "all_routes_total_latency_p50_within_15_percent": false,
+    "all_pass": false
+  },
+  "estimated_cost_cny": {
+    "coverage": 36,
+    "total": 0.05661104,
+    "by_phase_route": {
+      "baseline": {
+        "product_search": 0.01457256,
+        "knowledge": 0.01114856,
+        "direct": 0.0031923999999999998
+      },
+      "after": {
+        "product_search": 0.014540560000000001,
+        "knowledge": 0.01002056,
+        "direct": 0.0031363999999999997
+      }
+    }
+  },
+  "requests": [
+    {
+      "request_id": "33444f0205434a7cb07f7ffb4fdaf09a",
+      "phase": "baseline",
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 3922.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 3922.0,
+      "model_latency_ms": 1266.0,
+      "output_tokens": 23,
+      "estimated_cost_cny": 0.00066152
+    },
+    {
+      "request_id": "b8bf8414bd9d4a809518ef5135301ffa",
+      "phase": "baseline",
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1750.0,
+      "buffering_saved_ms": 16.0,
+      "total_latency_ms": 1766.0,
+      "model_latency_ms": 1593.0,
+      "output_tokens": 59,
+      "estimated_cost_cny": 0.00094952
+    },
+    {
+      "request_id": "6d17d079871840feb964551a96c26f30",
+      "phase": "baseline",
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1078.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 1078.0,
+      "model_latency_ms": 1078.0,
+      "output_tokens": 38,
+      "estimated_cost_cny": 0.0006334
+    },
+    {
+      "request_id": "f61d9b0a6a114e0daf71fe4fab178819",
+      "phase": "baseline",
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 2360.0,
+      "buffering_saved_ms": 15.0,
+      "total_latency_ms": 2375.0,
+      "model_latency_ms": 2172.0,
+      "output_tokens": 434,
+      "estimated_cost_cny": 0.00409464
+    },
+    {
+      "request_id": "fbfbb69098bb47029e3562ffaf37c97b",
+      "phase": "baseline",
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1250.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 1250.0,
+      "model_latency_ms": 1250.0,
+      "output_tokens": 37,
+      "estimated_cost_cny": 0.0006254
+    },
+    {
+      "request_id": "db24c9bc1cca494f830aadc99bf154cf",
+      "phase": "baseline",
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 2187.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 2187.0,
+      "model_latency_ms": 1984.0,
+      "output_tokens": 284,
+      "estimated_cost_cny": 0.002772
+    },
+    {
+      "request_id": "1f6ebc00b492489394da5a8d21776858",
+      "phase": "baseline",
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1844.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 1844.0,
+      "model_latency_ms": 1703.0,
+      "output_tokens": 173,
+      "estimated_cost_cny": 0.0019068800000000001
+    },
+    {
+      "request_id": "c95fa100082e4e2484fe32ab388a34e0",
+      "phase": "baseline",
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 672.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 672.0,
+      "model_latency_ms": 672.0,
+      "output_tokens": 7,
+      "estimated_cost_cny": 0.0003854
+    },
+    {
+      "request_id": "f4fbc5d73421487fab45bb62a2f1a966",
+      "phase": "baseline",
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 843.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 843.0,
+      "model_latency_ms": 687.0,
+      "output_tokens": 23,
+      "estimated_cost_cny": 0.00066152
+    },
+    {
+      "request_id": "d78436c93d3d4a69871bcffeecb44067",
+      "phase": "baseline",
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1000.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 1000.0,
+      "model_latency_ms": 1000.0,
+      "output_tokens": 15,
+      "estimated_cost_cny": 0.0004494
+    },
+    {
+      "request_id": "99bffa2c95bc4eaeabfce13b66397c31",
+      "phase": "baseline",
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 593.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 593.0,
+      "model_latency_ms": 578.0,
+      "output_tokens": 16,
+      "estimated_cost_cny": 0.00045739999999999995
+    },
+    {
+      "request_id": "a290228a69344ad78e71925132dbfd25",
+      "phase": "baseline",
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1547.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 1547.0,
+      "model_latency_ms": 1390.0,
+      "output_tokens": 138,
+      "estimated_cost_cny": 0.00162688
+    },
+    {
+      "request_id": "893f60bb26a34732a90f6080c8f23f44",
+      "phase": "baseline",
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 984.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 984.0,
+      "model_latency_ms": 984.0,
+      "output_tokens": 39,
+      "estimated_cost_cny": 0.0006414
+    },
+    {
+      "request_id": "284c97d3013443d28f00c3b0cc02ab5c",
+      "phase": "baseline",
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 2031.0,
+      "buffering_saved_ms": 16.0,
+      "total_latency_ms": 2047.0,
+      "model_latency_ms": 1859.0,
+      "output_tokens": 137,
+      "estimated_cost_cny": 0.00161888
+    },
+    {
+      "request_id": "e118b971886e4bf18a6ac8b0880cdde1",
+      "phase": "baseline",
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 2516.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 2516.0,
+      "model_latency_ms": 2359.0,
+      "output_tokens": 326,
+      "estimated_cost_cny": 0.003108
+    },
+    {
+      "request_id": "401cf1315f824994a2beb74f6e56042c",
+      "phase": "baseline",
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 2296.0,
+      "buffering_saved_ms": 16.0,
+      "total_latency_ms": 2312.0,
+      "model_latency_ms": 1953.0,
+      "output_tokens": 312,
+      "estimated_cost_cny": 0.002996
+    },
+    {
+      "request_id": "ffa582f2c266488f9d588a56a00b69f4",
+      "phase": "baseline",
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 2031.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 2031.0,
+      "model_latency_ms": 1859.0,
+      "output_tokens": 324,
+      "estimated_cost_cny": 0.00321464
+    },
+    {
+      "request_id": "57b955f6bcd0409a9a29c906b7e003a3",
+      "phase": "baseline",
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1750.0,
+      "buffering_saved_ms": 0.0,
+      "total_latency_ms": 1750.0,
+      "model_latency_ms": 1531.0,
+      "output_tokens": 186,
+      "estimated_cost_cny": 0.00211064
+    },
+    {
+      "request_id": "099fdff1f823471f9fbd872326261cb6",
+      "phase": "after",
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 3047.0,
+      "buffering_saved_ms": 281.0,
+      "total_latency_ms": 3328.0,
+      "model_latency_ms": 1063.0,
+      "output_tokens": 53,
+      "estimated_cost_cny": 0.00090152
+    },
+    {
+      "request_id": "bd0f2fdbab184daeb8a820a5d13467e6",
+      "phase": "after",
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1062.0,
+      "buffering_saved_ms": 391.0,
+      "total_latency_ms": 1453.0,
+      "model_latency_ms": 1219.0,
+      "output_tokens": 59,
+      "estimated_cost_cny": 0.00094952
+    },
+    {
+      "request_id": "945c0c14e9124167843f5658e36dde38",
+      "phase": "after",
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 906.0,
+      "buffering_saved_ms": 235.0,
+      "total_latency_ms": 1141.0,
+      "model_latency_ms": 1141.0,
+      "output_tokens": 37,
+      "estimated_cost_cny": 0.0006254
+    },
+    {
+      "request_id": "dae6c27017a0477a82dac3a3d93515ee",
+      "phase": "after",
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1469.0,
+      "buffering_saved_ms": 1406.0,
+      "total_latency_ms": 2875.0,
+      "model_latency_ms": 2609.0,
+      "output_tokens": 416,
+      "estimated_cost_cny": 0.00395064
+    },
+    {
+      "request_id": "a4a2601614a143b984fa7a90efd0aae0",
+      "phase": "after",
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 750.0,
+      "buffering_saved_ms": 282.0,
+      "total_latency_ms": 1032.0,
+      "model_latency_ms": 1032.0,
+      "output_tokens": 33,
+      "estimated_cost_cny": 0.0005934
+    },
+    {
+      "request_id": "6495fc9ccff14a1ca3db8be5c93628e5",
+      "phase": "after",
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1094.0,
+      "buffering_saved_ms": 1641.0,
+      "total_latency_ms": 2735.0,
+      "model_latency_ms": 2375.0,
+      "output_tokens": 363,
+      "estimated_cost_cny": 0.003404
+    },
+    {
+      "request_id": "b5af465ace6b4ddaaf5e6d4070167f34",
+      "phase": "after",
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 781.0,
+      "buffering_saved_ms": 579.0,
+      "total_latency_ms": 1360.0,
+      "model_latency_ms": 1141.0,
+      "output_tokens": 94,
+      "estimated_cost_cny": 0.0012748800000000002
+    },
+    {
+      "request_id": "aebbdef4897b4733801627a9b06ba04f",
+      "phase": "after",
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 515.0,
+      "buffering_saved_ms": 172.0,
+      "total_latency_ms": 687.0,
+      "model_latency_ms": 672.0,
+      "output_tokens": 21,
+      "estimated_cost_cny": 0.0004974
+    },
+    {
+      "request_id": "894067d54a374202b5233782442ecc1e",
+      "phase": "after",
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 953.0,
+      "buffering_saved_ms": 329.0,
+      "total_latency_ms": 1282.0,
+      "model_latency_ms": 1063.0,
+      "output_tokens": 70,
+      "estimated_cost_cny": 0.00103752
+    },
+    {
+      "request_id": "8f1e0211448349d2998691ef46622e75",
+      "phase": "after",
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1828.0,
+      "buffering_saved_ms": 1375.0,
+      "total_latency_ms": 3203.0,
+      "model_latency_ms": 3203.0,
+      "output_tokens": 16,
+      "estimated_cost_cny": 0.00045739999999999995
+    },
+    {
+      "request_id": "06db2a27048f4b45b128ecbd58cb2fdf",
+      "phase": "after",
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 781.0,
+      "buffering_saved_ms": 219.0,
+      "total_latency_ms": 1000.0,
+      "model_latency_ms": 985.0,
+      "output_tokens": 16,
+      "estimated_cost_cny": 0.00045739999999999995
+    },
+    {
+      "request_id": "6549a70cc53d4f4f99e1ce04b2389338",
+      "phase": "after",
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 828.0,
+      "buffering_saved_ms": 344.0,
+      "total_latency_ms": 1172.0,
+      "model_latency_ms": 1032.0,
+      "output_tokens": 72,
+      "estimated_cost_cny": 0.0010988800000000002
+    },
+    {
+      "request_id": "c859a8f9ab544d2a9b8321003918f68c",
+      "phase": "after",
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "route": "direct",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 797.0,
+      "buffering_saved_ms": 219.0,
+      "total_latency_ms": 1016.0,
+      "model_latency_ms": 1000.0,
+      "output_tokens": 22,
+      "estimated_cost_cny": 0.0005053999999999999
+    },
+    {
+      "request_id": "4306111d903641c3b7441b1b0f2b7427",
+      "phase": "after",
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1484.0,
+      "buffering_saved_ms": 672.0,
+      "total_latency_ms": 2156.0,
+      "model_latency_ms": 1797.0,
+      "output_tokens": 77,
+      "estimated_cost_cny": 0.00113888
+    },
+    {
+      "request_id": "a8be8ea5ea2b49818196e177953bac63",
+      "phase": "after",
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1281.0,
+      "buffering_saved_ms": 812.0,
+      "total_latency_ms": 2093.0,
+      "model_latency_ms": 1953.0,
+      "output_tokens": 189,
+      "estimated_cost_cny": 0.002012
+    },
+    {
+      "request_id": "a4551b226dad4209871a893c4364551f",
+      "phase": "after",
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "route": "knowledge",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 750.0,
+      "buffering_saved_ms": 719.0,
+      "total_latency_ms": 1469.0,
+      "model_latency_ms": 1313.0,
+      "output_tokens": 152,
+      "estimated_cost_cny": 0.001716
+    },
+    {
+      "request_id": "4d22f01b417c487293683fbbcf0e49e2",
+      "phase": "after",
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1281.0,
+      "buffering_saved_ms": 1750.0,
+      "total_latency_ms": 3031.0,
+      "model_latency_ms": 2891.0,
+      "output_tokens": 498,
+      "estimated_cost_cny": 0.00460664
+    },
+    {
+      "request_id": "d6e0c474217e428ea05910c5feccafeb",
+      "phase": "after",
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "route": "product_search",
+      "success": true,
+      "terminal_done": true,
+      "first_delta_latency_ms": 1063.0,
+      "buffering_saved_ms": 1172.0,
+      "total_latency_ms": 2235.0,
+      "model_latency_ms": 2063.0,
+      "output_tokens": 231,
+      "estimated_cost_cny": 0.00247064
+    }
+  ],
+  "conclusion": "B",
+  "telemetry_join": {
+    "baseline": {
+      "attempts": 18,
+      "matched": 18,
+      "unrelated_summary_count": 0
+    },
+    "after": {
+      "attempts": 18,
+      "matched": 18,
+      "unrelated_summary_count": 0
+    }
+  }
+}

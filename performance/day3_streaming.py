@@ -173,12 +173,25 @@ def _route_metrics(
 ) -> dict[str, dict[str, object]]:
     metrics = {}
     for route in DAY3_ROUTES:
+        observed_pairs = [
+            pair for pair in pairs
+            if pair["summary"].get("route") == route
+        ]
         route_pairs = [
             pair for pair in pairs
             if pair["summary"].get("route") == route and _is_success(pair)
         ]
+        costs = [
+            cost
+            for pair in observed_pairs
+            if (cost := estimate_request_cost_cny(pair["summary"])) is not None
+        ]
+        cost_stats = numeric_stats(costs)
+        cost_stats["total"] = sum(costs)
         metrics[route] = {
+            "observed": len(observed_pairs),
             "successful": len(route_pairs),
+            "failed": len(observed_pairs) - len(route_pairs),
             "first_delta_latency_ms": _numeric_summary(
                 route_pairs, "first_delta_latency_ms"
             ),
@@ -192,6 +205,7 @@ def _route_metrics(
                 route_pairs, "model_latency_ms"
             ),
             "output_tokens": _numeric_summary(route_pairs, "output_tokens"),
+            "estimated_cost_cny": cost_stats,
         }
     return metrics
 
@@ -235,6 +249,16 @@ def analyze_day3_phases(
         and len(after_pairs) == DAY3_PHASE_REQUESTS
         and successful == {"baseline": 18, "after": 18}
     )
+    success_by_phase = {
+        "baseline_18_of_18": (
+            len(baseline_pairs) == DAY3_PHASE_REQUESTS
+            and successful["baseline"] == DAY3_PHASE_REQUESTS
+        ),
+        "after_18_of_18": (
+            len(after_pairs) == DAY3_PHASE_REQUESTS
+            and successful["after"] == DAY3_PHASE_REQUESTS
+        ),
+    }
     route_counts_pass = all(
         route_counts[phase][route] == 6
         for phase in phase_pairs
@@ -278,6 +302,7 @@ def analyze_day3_phases(
             and after is not None
             and after <= before * 1.15
         )
+    all_routes_total_gate = all(total_gate.values())
 
     all_pairs = [*baseline_pairs, *after_pairs]
     request_costs = []
@@ -309,7 +334,7 @@ def analyze_day3_phases(
         and route_counts_pass
         and terminal_gate
         and all(item["pass"] for item in ttft.values())
-        and all(total_gate.values())
+        and all_routes_total_gate
     )
     return {
         "schema_version": "1.0",
@@ -321,17 +346,28 @@ def analyze_day3_phases(
         },
         "by_phase_route": metrics,
         "gates": {
+            "success_by_phase": success_by_phase,
             "success_36_of_36": success_gate,
             "route_counts": route_counts,
             "route_counts_pass": route_counts_pass,
             "terminal_and_finalization": terminal_gate,
             "ttft": ttft,
             "total_latency_p50_within_15_percent": total_gate,
+            "all_routes_total_latency_p50_within_15_percent": (
+                all_routes_total_gate
+            ),
             "all_pass": all_pass,
         },
         "estimated_cost_cny": {
             "coverage": len(request_costs),
             "total": sum(request_costs),
+            "by_phase_route": {
+                phase: {
+                    route: metrics[phase][route]["estimated_cost_cny"]["total"]
+                    for route in DAY3_ROUTES
+                }
+                for phase in ("baseline", "after")
+            },
         },
         "requests": request_rows,
         "conclusion": "A" if all_pass else "B",
@@ -346,13 +382,20 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
         "",
         "## Result",
         "",
-        f"Conclusion: **{analysis['conclusion']}**.",
+        (
+            "Conclusion: **A**. Every required safety and performance gate passed."
+            if analysis["conclusion"] == "A"
+            else "Conclusion: **B**. Streaming semantics are safe, but at least one performance gate failed."
+        ),
         "",
         "## Explicit gates",
         "",
+        f"- 18/18 baseline success: `{gates['success_by_phase']['baseline_18_of_18']}`",
+        f"- 18/18 after success: `{gates['success_by_phase']['after_18_of_18']}`",
         f"- 36/36 success: `{gates['success_36_of_36']}`",
         f"- Exact route counts: `{gates['route_counts_pass']}`",
-        f"- Terminal/finalization invariant: `{gates['terminal_and_finalization']}`",
+        "- Every measured success ended with `done` after the final render "
+        f"invariant: `{gates['terminal_and_finalization']}`",
     ]
     for route in ("product_search", "knowledge"):
         item = gates["ttft"][route]
@@ -365,12 +408,16 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
             f"- {route} total-latency P50 <=15% regression: "
             f"`{gates['total_latency_p50_within_15_percent'][route]}`"
         )
+    lines.append(
+        "- All routes total-latency P50 <=15% regression: "
+        f"`{gates['all_routes_total_latency_p50_within_15_percent']}`"
+    )
     lines.extend((
         "",
         "## Route metrics",
         "",
-        "| Phase | Route | Success | TTFT P50/P95 ms | Buffering saved P50/P95 ms | Total P50/P95 ms |",
-        "| --- | --- | ---: | ---: | ---: | ---: |",
+        "| Phase | Route | Success | Failure | TTFT P50/P95 ms | Buffering saved P50/P95 ms | Total P50/P95 ms | Model P50/P95 ms | Output tokens P50/P95 | Estimated cost CNY |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ))
     for phase in ("baseline", "after"):
         for route in DAY3_ROUTES:
@@ -378,11 +425,18 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
             first = item["first_delta_latency_ms"]
             saved = item["buffering_saved_ms"]
             total = item["total_latency_ms"]
+            model = item["model_latency_ms"]
+            output = item["output_tokens"]
+            cost = item["estimated_cost_cny"]
             lines.append(
                 f"| {phase} | {route} | {item['successful']} | "
+                f"{item['failed']} | "
                 f"{first['p50']} / {first['p95']} | "
                 f"{saved['p50']} / {saved['p95']} | "
-                f"{total['p50']} / {total['p95']} |"
+                f"{total['p50']} / {total['p95']} | "
+                f"{model['p50']} / {model['p95']} | "
+                f"{output['p50']} / {output['p95']} | "
+                f"{cost['total']:.6f} |"
             )
     lines.extend((
         "",
