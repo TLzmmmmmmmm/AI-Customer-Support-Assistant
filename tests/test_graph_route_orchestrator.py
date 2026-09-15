@@ -18,7 +18,65 @@ class RecordingCompiledGraph:
         return self.final_state
 
 
+class StreamingCompiledGraph(RecordingCompiledGraph):
+    def __init__(self, events):
+        super().__init__(None)
+        self.events = events
+        self.stream_kwargs = None
+
+    def stream(self, state, **kwargs):
+        self.states.append(state)
+        self.stream_kwargs = kwargs
+        yield from self.events
+
+
 class GraphRouteOrchestratorTests(unittest.TestCase):
+    def test_stream_yields_only_custom_strings_then_the_final_result(self):
+        result = RouteExecutionResult(
+            answer="第一段第二段",
+            trace=RouteTrace(route=Route.DIRECT),
+        )
+        graph = StreamingCompiledGraph([
+            ("values", {"answer": None}),
+            ("custom", "第一段"),
+            ("values", {"answer": "第一段"}),
+            ("custom", "第二段"),
+            ("values", {"answer": "第一段第二段", "result": result}),
+        ])
+        orchestrator = GraphRouteOrchestrator(graph)
+        messages = [ChatMessage(role="user", content="你好")]
+        deadline = AgentDeadline(expires_at=10.0, clock=lambda: 0.0)
+
+        items = list(orchestrator.stream(messages, deadline=deadline))
+
+        self.assertEqual(items[:-1], ["第一段", "第二段"])
+        self.assertIs(items[-1], result)
+        self.assertEqual(
+            graph.stream_kwargs["stream_mode"],
+            ["custom", "values"],
+        )
+
+    def test_stream_fails_closed_without_a_final_result(self):
+        graph = StreamingCompiledGraph([("values", {"answer": "完成"})])
+        orchestrator = GraphRouteOrchestrator(graph)
+        messages = [ChatMessage(role="user", content="你好")]
+        deadline = AgentDeadline(expires_at=10.0, clock=lambda: 0.0)
+
+        with self.assertRaises(RuntimeError):
+            list(orchestrator.stream(messages, deadline=deadline))
+
+    def test_stream_rejects_invalid_custom_payloads(self):
+        messages = [ChatMessage(role="user", content="你好")]
+        deadline = AgentDeadline(expires_at=10.0, clock=lambda: 0.0)
+        invalid_payloads = ("", None, 1, {"answer": "leak"})
+
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                graph = StreamingCompiledGraph([("custom", payload)])
+                orchestrator = GraphRouteOrchestrator(graph)
+                with self.assertRaises((TypeError, ValueError)):
+                    list(orchestrator.stream(messages, deadline=deadline))
+
     def test_run_builds_exact_request_state_and_returns_graph_result(self):
         result = RouteExecutionResult(
             answer="完成",

@@ -347,9 +347,9 @@ class IncrementalAnswerSanitizer:
         if self._finished:
             raise RuntimeError("incremental sanitizer is already finished")
         self._root.feed(raw_chunk)
-        deltas = tuple(delta for delta in self._deltas if delta)
+        delta = "".join(self._deltas)
         self._deltas.clear()
-        return deltas
+        return (delta,) if delta else ()
 
     def finish(self) -> str:
         if self._finished:
