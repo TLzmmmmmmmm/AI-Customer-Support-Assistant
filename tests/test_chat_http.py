@@ -88,10 +88,15 @@ class TextCompletion:
         )]
 
     def __iter__(self):
-        for content in self.chunks:
+        for index, content in enumerate(self.chunks):
             yield SimpleNamespace(
                 choices=[SimpleNamespace(
                     delta=SimpleNamespace(content=content),
+                    finish_reason=(
+                        self.choices[0].finish_reason
+                        if index == len(self.chunks) - 1
+                        else None
+                    ),
                 )],
                 usage=None,
             )
@@ -230,7 +235,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 self.assertIn(f"citation_count={len(citations)}", message)
                 self.assert_slot_available()
 
-    def test_streaming_smoke_covers_all_eligible_routes_with_complete_telemetry(self):
+    def test_production_defaults_eligible_routes_to_buffered_generation(self):
         usage = SimpleNamespace(
             prompt_tokens=12,
             completion_tokens=8,
@@ -262,20 +267,16 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             with self.subTest(route=route):
                 self.create.side_effect = lambda **kwargs: TextCompletion(
                     "受控回答",
-                    chunks=("受控", "回答"),
                     usage=usage,
                 )
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
                     response = self.post(question)
 
                 events = [json.loads(line) for line in response.text.splitlines()]
-                self.assertEqual(
-                    events[:2],
-                    [
-                        {"type": "delta", "content": "受控"},
-                        {"type": "delta", "content": "回答"},
-                    ],
-                )
+                self.assertEqual(events[0], {
+                    "type": "delta",
+                    "content": "受控回答",
+                })
                 if citations:
                     self.assertEqual(events[-2], {
                         "type": "citations",
@@ -291,6 +292,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                     for event in events
                     if event["type"] == "delta"
                 ), "受控回答")
+                self.assertFalse(self.create.call_args.kwargs["stream"])
+                self.assertNotIn(
+                    "stream_options",
+                    self.create.call_args.kwargs,
+                )
 
                 self.assertEqual(len(logs.records), 1)
                 summary = logs.records[0].getMessage()

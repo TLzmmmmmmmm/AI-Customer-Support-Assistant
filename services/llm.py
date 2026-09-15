@@ -157,6 +157,7 @@ def stream_chat(
         while True:
             has_yielded_content = False
             final_usage = None
+            finish_reason = None
 
             try:
                 stream = client.chat.completions.create(
@@ -185,18 +186,14 @@ def stream_chat(
                         has_yielded_content = True
                         yield content
 
-                    if getattr(choice, "finish_reason", None) in {
-                        "length",
-                        "content_filter",
-                    }:
-                        record_model_usage(final_usage)
-                        if has_yielded_content:
-                            raise IncompleteModelStreamError(
-                                "provider stream ended without a complete answer"
-                            )
-                        return
+                    if getattr(choice, "finish_reason", None) is not None:
+                        finish_reason = choice.finish_reason
 
                 record_model_usage(final_usage)
+                if finish_reason != "stop" and has_yielded_content:
+                    raise IncompleteModelStreamError(
+                        "provider stream ended without a complete answer"
+                    )
                 return
 
             except APITimeoutError:

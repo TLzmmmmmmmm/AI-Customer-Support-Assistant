@@ -4,6 +4,8 @@
 
 Conclusion: **B**. Streaming semantics are safe, but at least one performance gate failed.
 
+Production deployment: **buffered**; the experimental streaming implementation remains covered but is not injected.
+
 ## Explicit gates
 
 - 18/18 baseline success: `True`

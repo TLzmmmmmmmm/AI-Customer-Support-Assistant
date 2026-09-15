@@ -90,7 +90,7 @@ class ApplicationRoutingLifespanTests(unittest.TestCase):
         self.assertIs(nodes.retriever, retriever)
         self.assertIs(nodes.executor._registry, registry)
         self.assertIs(nodes.complete_chat, main.complete_chat)
-        self.assertIs(nodes.stream_chat, main.stream_chat)
+        self.assertIsNone(nodes.stream_chat)
         self.assertFalse(hasattr(main.app.state, "route_orchestrator"))
 
 

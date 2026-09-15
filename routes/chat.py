@@ -380,8 +380,8 @@ def answer_events_with_slot(
                     for source in rendered.sources
                 ],
             })
-        lifecycle.mark_done()
         yield encode_event({"type": "done"})
+        lifecycle.mark_done()
     except Exception as error:
         _remember_error_trace(request, error)
         lifecycle.set_trace(getattr(request.state, "route_trace", None))

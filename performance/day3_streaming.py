@@ -388,6 +388,13 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
             else "Conclusion: **B**. Streaming semantics are safe, but at least one performance gate failed."
         ),
         "",
+        (
+            "Production deployment: **true streaming enabled**."
+            if analysis["conclusion"] == "A"
+            else "Production deployment: **buffered**; the experimental "
+            "streaming implementation remains covered but is not injected."
+        ),
+        "",
         "## Explicit gates",
         "",
         f"- 18/18 baseline success: `{gates['success_by_phase']['baseline_18_of_18']}`",

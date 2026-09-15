@@ -299,6 +299,7 @@ class Day3GateTests(unittest.TestCase):
         self.assertIn("Output tokens P50/P95", report)
         self.assertIn("Estimated cost CNY", report)
         self.assertIn("| after | product_search | 5 | 1 |", report)
+        self.assertIn("Production deployment: **buffered**", report)
 
     def test_one_failed_request_prevents_36_of_36_and_conclusion_a(self):
         baseline, after = passing_pairs()

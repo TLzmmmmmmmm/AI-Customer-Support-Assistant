@@ -84,6 +84,7 @@ class LlmProviderMessageTests(unittest.TestCase):
             )], usage=None),
             SimpleNamespace(choices=[SimpleNamespace(
                 delta=SimpleNamespace(content="第二段"),
+                finish_reason="stop",
             )], usage=None),
             SimpleNamespace(choices=[], usage=usage),
         ]
@@ -171,6 +172,12 @@ class LlmProviderMessageTests(unittest.TestCase):
         sleep.assert_not_called()
 
     def test_stream_chat_rejects_incomplete_finish_after_content(self):
+        usage = SimpleNamespace(
+            prompt_tokens=12,
+            completion_tokens=3,
+            prompt_cache_hit_tokens=8,
+            prompt_cache_miss_tokens=4,
+        )
         stream = [
             SimpleNamespace(choices=[SimpleNamespace(
                 delta=SimpleNamespace(content="部分回答"),
@@ -180,16 +187,46 @@ class LlmProviderMessageTests(unittest.TestCase):
                 delta=SimpleNamespace(content=None),
                 finish_reason="length",
             )], usage=None),
+            SimpleNamespace(choices=[], usage=usage),
         ]
-        with patch.object(
-            llm.client.chat.completions,
-            "create",
-            return_value=stream,
-        ):
-            content = llm.stream_chat(PROVIDER_MESSAGES)
-            self.assertEqual(next(content), "部分回答")
-            with self.assertRaises(llm.IncompleteModelStreamError):
-                next(content)
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        telemetry_token = bind_request_state(state)
+        try:
+            with patch.object(
+                llm.client.chat.completions,
+                "create",
+                return_value=stream,
+            ):
+                content = llm.stream_chat(PROVIDER_MESSAGES)
+                self.assertEqual(next(content), "部分回答")
+                with self.assertRaises(llm.IncompleteModelStreamError):
+                    next(content)
+        finally:
+            reset_request_state(telemetry_token)
+
+        telemetry = request_trace_fields(state)
+        self.assertEqual(telemetry["input_tokens"], 12)
+        self.assertEqual(telemetry["output_tokens"], 3)
+        self.assertEqual(telemetry["prompt_cache_hit_tokens"], 8)
+        self.assertEqual(telemetry["prompt_cache_miss_tokens"], 4)
+
+    def test_stream_chat_rejects_missing_or_unexpected_finish_reason(self):
+        for finish_reason in (None, "tool_calls"):
+            with self.subTest(finish_reason=finish_reason):
+                chunks = [SimpleNamespace(choices=[SimpleNamespace(
+                    delta=SimpleNamespace(content="不完整回答"),
+                    finish_reason=finish_reason,
+                )], usage=None)]
+                with patch.object(
+                    llm.client.chat.completions,
+                    "create",
+                    return_value=chunks,
+                ):
+                    content = llm.stream_chat(PROVIDER_MESSAGES)
+                    self.assertEqual(next(content), "不完整回答")
+                    with self.assertRaises(llm.IncompleteModelStreamError):
+                        next(content)
 
     def test_stream_chat_leaves_empty_incomplete_response_for_safe_fallback(self):
         stream = [SimpleNamespace(choices=[SimpleNamespace(

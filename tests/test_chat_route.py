@@ -392,6 +392,48 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
         release.assert_called_once_with()
         self.assertEqual(logged.call_args.kwargs["outcome"], "stream_interrupted")
 
+    def test_asgi_send_failure_on_done_is_logged_as_interrupted(self):
+        orchestrator = FakeOrchestrator(
+            events=[],
+            answer="第一段第二段",
+            chunks=("第一段", "第二段"),
+        )
+
+        async def fail_on_done(response):
+            async def receive():
+                return {"type": "http.disconnect"}
+
+            async def send(message):
+                if message["type"] != "http.response.body":
+                    return
+                body = message.get("body", b"").decode("utf-8")
+                if body and json.loads(body).get("type") == "done":
+                    raise OSError("client disconnected while sending done")
+
+            with self.assertRaises(ClientDisconnect):
+                await response(
+                    {"type": "http", "asgi": {"spec_version": "2.4"}},
+                    receive,
+                    send,
+                )
+
+        with (
+            patch.object(chat, "try_acquire_llm_slot", return_value=True),
+            patch.object(chat, "release_llm_slot") as release,
+            patch.object(chat, "log_request") as logged,
+        ):
+            response = chat.chat_stream(
+                self.payload, self.request, None, orchestrator
+            )
+            asyncio.run(fail_on_done(response))
+
+        release.assert_called_once_with()
+        self.assertEqual(logged.call_count, 1)
+        kwargs = logged.call_args.kwargs
+        self.assertEqual(kwargs["outcome"], "stream_interrupted")
+        self.assertEqual(kwargs["failure_code"], "stream_interrupted")
+        self.assertIsNone(self.request.state.buffering_saved_ms)
+
     def test_close_before_first_body_delta_releases_prefetched_stream(self):
         orchestrator = FakeOrchestrator(
             events=[],
