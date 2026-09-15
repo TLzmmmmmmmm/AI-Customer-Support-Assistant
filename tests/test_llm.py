@@ -170,6 +170,39 @@ class LlmProviderMessageTests(unittest.TestCase):
         self.assertEqual(create.call_count, 1)
         sleep.assert_not_called()
 
+    def test_stream_chat_rejects_incomplete_finish_after_content(self):
+        stream = [
+            SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content="部分回答"),
+                finish_reason=None,
+            )], usage=None),
+            SimpleNamespace(choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=None),
+                finish_reason="length",
+            )], usage=None),
+        ]
+        with patch.object(
+            llm.client.chat.completions,
+            "create",
+            return_value=stream,
+        ):
+            content = llm.stream_chat(PROVIDER_MESSAGES)
+            self.assertEqual(next(content), "部分回答")
+            with self.assertRaises(llm.IncompleteModelStreamError):
+                next(content)
+
+    def test_stream_chat_leaves_empty_incomplete_response_for_safe_fallback(self):
+        stream = [SimpleNamespace(choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=None),
+            finish_reason="content_filter",
+        )], usage=None)]
+        with patch.object(
+            llm.client.chat.completions,
+            "create",
+            return_value=stream,
+        ):
+            self.assertEqual(list(llm.stream_chat(PROVIDER_MESSAGES)), [])
+
     def test_stream_chat_timeout_is_never_retried(self):
         error = APITimeoutError(
             request=httpx.Request("POST", "https://example.com/chat"),

@@ -74,7 +74,7 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
         return retriever
 
     def observe_create(**kwargs):
-        # Capture exactly what is sent; no max_tokens, usage options or judge.
+        # Capture exactly what is sent; no max_tokens or judge calls.
         active["provider_requests"].append(deepcopy(kwargs))
         active["provider_input_characters"] += sum(
             len(message.get("content", ""))
@@ -91,6 +91,55 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
             active["llm_total_latency_seconds"] = total
             active["provider_errors"].append(type(error).__name__)
             raise
+
+        if kwargs.get("stream") is True:
+            prior = active["llm_total_latency_seconds"] or 0.0
+
+            def observe_stream():
+                try:
+                    for chunk in completion:
+                        active["provider_model"] = (
+                            getattr(chunk, "model", None)
+                            or active["provider_model"]
+                        )
+                        for choice in getattr(chunk, "choices", ()):
+                            content = getattr(
+                                getattr(choice, "delta", None),
+                                "content",
+                                None,
+                            )
+                            if isinstance(content, str):
+                                if active["llm_ttft_seconds"] is None:
+                                    active["llm_ttft_seconds"] = round(
+                                        prior + time.monotonic() - generation_started,
+                                        6,
+                                    )
+                                active["provider_partial_answer"] += content
+                            finish_reason = getattr(
+                                choice,
+                                "finish_reason",
+                                None,
+                            )
+                            if finish_reason:
+                                active["finish_reasons"].append(finish_reason)
+                        yield chunk
+                except Exception as error:
+                    active["provider_errors"].append(type(error).__name__)
+                    raise
+                finally:
+                    total = round(
+                        prior + time.monotonic() - generation_started,
+                        6,
+                    )
+                    active["generation_latency_seconds"] = total
+                    active["llm_total_latency_seconds"] = total
+                    ttft = active["llm_ttft_seconds"]
+                    active["llm_streaming_latency_seconds"] = round(
+                        total - (ttft if ttft is not None else total),
+                        6,
+                    )
+
+            return observe_stream()
 
         elapsed = round(time.monotonic() - generation_started, 6)
         total = round((active["llm_total_latency_seconds"] or 0.0) + elapsed, 6)

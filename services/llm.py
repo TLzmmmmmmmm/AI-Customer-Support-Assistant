@@ -31,6 +31,10 @@ client = OpenAI(
     max_retries=DEEPSEEK_MAX_RETRIES,
 )
 
+
+class IncompleteModelStreamError(RuntimeError):
+    pass
+
 def is_retryable_status(error: APIStatusError) -> bool:
     return error.status_code == 429 or error.status_code >= 500
 
@@ -174,11 +178,23 @@ def stream_chat(
                     if not chunk.choices:
                         continue
 
-                    content = chunk.choices[0].delta.content
+                    choice = chunk.choices[0]
+                    content = choice.delta.content
 
                     if content:
                         has_yielded_content = True
                         yield content
+
+                    if getattr(choice, "finish_reason", None) in {
+                        "length",
+                        "content_filter",
+                    }:
+                        record_model_usage(final_usage)
+                        if has_yielded_content:
+                            raise IncompleteModelStreamError(
+                                "provider stream ended without a complete answer"
+                            )
+                        return
 
                 record_model_usage(final_usage)
                 return

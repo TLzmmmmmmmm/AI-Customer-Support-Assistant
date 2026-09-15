@@ -265,6 +265,28 @@ def _nodes(
 
 
 class AgentGraphTests(unittest.TestCase):
+    def test_buffered_run_ignores_stream_provider_for_eligible_routes(self):
+        def forbidden_stream(messages):
+            raise AssertionError("buffered run must not use stream provider")
+
+        for route in (Route.PRODUCT_SEARCH, Route.KNOWLEDGE, Route.DIRECT):
+            with self.subTest(route=route):
+                complete = RecordingCompletion([_completion("buffered answer")])
+                graph = build_agent_graph(_nodes(
+                    [],
+                    decision=RouteDecision(route),
+                    complete_chat=complete,
+                    stream_chat=forbidden_stream,
+                ))
+
+                result = GraphRouteOrchestrator(graph).run(
+                    [ChatMessage(role="user", content="测试问题")],
+                    deadline=RecordingDeadline(),
+                )
+
+                self.assertEqual(result.answer, "buffered answer")
+                self.assertEqual(len(complete.calls), 1)
+
     def test_streams_only_non_agentic_final_answer_content(self):
         class RecordingStreamChat:
             def __init__(self):

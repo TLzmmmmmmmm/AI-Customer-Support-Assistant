@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterator, Mapping, Sequence
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
 
@@ -51,6 +52,20 @@ from routing.knowledge import retrieval_sources, retrieve_knowledge
 from trace_models import FailureLayer, add_request_duration
 
 from .state import AgentState
+
+
+_STREAM_FINAL_ANSWERS: ContextVar[bool] = ContextVar(
+    "stream_final_answers",
+    default=False,
+)
+
+
+def _enable_final_answer_streaming() -> Token[bool]:
+    return _STREAM_FINAL_ANSWERS.set(True)
+
+
+def _reset_final_answer_streaming(token: Token[bool]) -> None:
+    _STREAM_FINAL_ANSWERS.reset(token)
 
 
 class CompleteChat(Protocol):
@@ -172,7 +187,7 @@ def deterministic_generate_node(
         observation=observation.content,
     )
     try:
-        if stream_chat is None:
+        if stream_chat is None or not _STREAM_FINAL_ANSWERS.get():
             answer, generation_failure = generate_answer(
                 provider_messages,
                 deadline=state["deadline"],
@@ -235,7 +250,7 @@ def rag_generate_node(
         set_error_context(error, route=Route.KNOWLEDGE)
         raise
     try:
-        if stream_chat is None:
+        if stream_chat is None or not _STREAM_FINAL_ANSWERS.get():
             answer, generation_failure = generate_answer(
                 provider_messages,
                 deadline=state["deadline"],
@@ -271,7 +286,7 @@ def direct_node(
 ) -> dict[str, object]:
     provider_messages = build_direct_messages(state["messages"])
     try:
-        if stream_chat is None:
+        if stream_chat is None or not _STREAM_FINAL_ANSWERS.get():
             answer, generation_failure = generate_answer(
                 provider_messages,
                 deadline=state["deadline"],
