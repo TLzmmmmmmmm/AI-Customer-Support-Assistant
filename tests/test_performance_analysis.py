@@ -32,6 +32,7 @@ SUMMARY_LINE = (
     "retrieval_latency_ms=20.0 tool_latency_ms=null "
     "model_latency_ms=1100.0 input_tokens=100 output_tokens=20 "
     "prompt_cache_hit_tokens=80 prompt_cache_miss_tokens=20 "
+    "first_delta_latency_ms=325.4 buffering_saved_ms=874.6 "
     "failure_layer=- failure_code=null citation_count=1 "
     "deduplicated_citation_count=0 invalid_source_count=0 "
     "citation_status=rendered answer_sanitized=False"
@@ -50,9 +51,22 @@ class SummaryParsingTests(unittest.TestCase):
         self.assertIsNone(summary["tool_execution_success"])
         self.assertIsNone(summary["tool_latency_ms"])
         self.assertIsNone(summary["failure_layer"])
+        self.assertEqual(summary["first_delta_latency_ms"], 325.4)
+        self.assertEqual(summary["buffering_saved_ms"], 874.6)
         self.assertIs(summary["answer_sanitized"], False)
         self.assertIsInstance(summary["timestamp"], datetime)
         self.assertIsNotNone(summary["timestamp"].tzinfo)
+
+    def test_parses_null_streaming_latency_fields(self):
+        summary = parse_summary_line(
+            SUMMARY_LINE.replace(
+                "first_delta_latency_ms=325.4 buffering_saved_ms=874.6",
+                "first_delta_latency_ms=null buffering_saved_ms=null",
+            )
+        )
+
+        self.assertIsNone(summary["first_delta_latency_ms"])
+        self.assertIsNone(summary["buffering_saved_ms"])
 
     def test_ignores_unrelated_server_log_lines(self):
         self.assertIsNone(parse_summary_line(

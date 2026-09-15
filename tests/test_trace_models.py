@@ -13,6 +13,20 @@ from trace_models import (
 
 
 class RequestTraceContextTests(unittest.TestCase):
+    def test_streaming_latency_fields_default_to_null(self):
+        from routing import Route, RouteTrace
+
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+
+        fields = request_trace_fields(state)
+        trace = RouteTrace(route=Route.DIRECT)
+
+        self.assertIsNone(fields["first_delta_latency_ms"])
+        self.assertIsNone(fields["buffering_saved_ms"])
+        self.assertIsNone(trace.first_delta_latency_ms)
+        self.assertIsNone(trace.buffering_saved_ms)
+
     def test_cache_usage_is_aggregated_across_model_responses(self):
         state = SimpleNamespace()
         initialize_request_trace(state)

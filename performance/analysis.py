@@ -74,6 +74,8 @@ _FLOAT_FIELDS = frozenset({
     "retrieval_latency_ms",
     "tool_latency_ms",
     "model_latency_ms",
+    "first_delta_latency_ms",
+    "buffering_saved_ms",
 })
 _JSON_FIELDS = frozenset({
     "tool_calls",

@@ -60,19 +60,21 @@ def answer_events_with_slot(
     request_id: str,
     started_at: float,
     trace: RouteTrace,
+    request_state: object,
 ) -> Iterator[str]:
+    first_delta_at: float | None = None
+    done_yielded = False
     try:
+        first_delta_at = time.monotonic()
+        trace = replace(
+            trace,
+            first_delta_latency_ms=(first_delta_at - started_at) * 1000,
+        )
+        request_state.route_trace = trace
         yield encode_event({
             "type": "delta",
             "content": answer,
         })
-        log_request(
-            request_id=request_id,
-            http_status=200,
-            outcome="success",
-            started_at=started_at,
-            trace=trace,
-        )
         if sources and citation_heading:
             yield encode_event({
                 "type": "citations",
@@ -82,11 +84,29 @@ def answer_events_with_slot(
                     for source in sources
                 ],
             })
+        done_yielded = True
         yield encode_event({
             "type": "done",
         })
     finally:
-        release_llm_slot()
+        try:
+            if done_yielded and first_delta_at is not None:
+                completed_at = time.monotonic()
+                trace = replace(
+                    trace,
+                    buffering_saved_ms=(completed_at - first_delta_at) * 1000,
+                )
+                request_state.route_trace = trace
+                log_request(
+                    request_id=request_id,
+                    http_status=200,
+                    outcome="success",
+                    started_at=started_at,
+                    trace=trace,
+                    completed_at=completed_at,
+                )
+        finally:
+            release_llm_slot()
 
 @router.post("/api/chat-stream")
 def chat_stream(
@@ -209,6 +229,7 @@ def chat_stream(
             request_id,
             started_at,
             trace,
+            request.state,
         ),
         media_type="application/x-ndjson",
     )

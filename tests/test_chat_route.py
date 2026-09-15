@@ -54,10 +54,13 @@ class FakeOrchestrator:
         )
 
 
-async def consume_response(response) -> str:
+async def consume_response(response, observed_events=None) -> str:
     parts = []
     async for part in response.body_iterator:
-        parts.append(part.decode("utf-8") if isinstance(part, bytes) else part)
+        text = part.decode("utf-8") if isinstance(part, bytes) else part
+        parts.append(text)
+        if observed_events is not None:
+            observed_events.append(json.loads(text)["type"])
     return "".join(parts)
 
 
@@ -83,18 +86,18 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             events.append("acquire")
             return True
 
-        def clock():
-            events.append("clock")
-            return 10.0
-
         def release():
             events.append("release")
 
         with (
             patch.object(chat, "try_acquire_llm_slot", side_effect=acquire),
             patch.object(chat, "release_llm_slot", side_effect=release),
-            patch.object(chat.time, "monotonic", side_effect=clock),
-            patch.object(chat, "log_request") as logged,
+            patch.object(chat.time, "monotonic", return_value=10.0),
+            patch.object(
+                chat,
+                "log_request",
+                side_effect=lambda **_: events.append("summary"),
+            ) as logged,
         ):
             response = chat.chat_stream(
                 self.payload,
@@ -104,11 +107,12 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             )
             self.assertEqual(
                 events,
-                ["acquire", "clock", "clock", "orchestrate"],
+                ["acquire", "orchestrate"],
             )
-            body = asyncio.run(consume_response(response))
+            body = asyncio.run(consume_response(response, events))
 
         self.assertEqual(events.count("release"), 1)
+        self.assertEqual(events[-4:], ["delta", "done", "summary", "release"])
         self.assertEqual(orchestrator.calls[0]["messages"], self.payload.messages)
         self.assertEqual(
             [json.loads(line) for line in body.splitlines()],
@@ -125,7 +129,10 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             outcome="success",
             started_at=1.0,
             trace=trace,
+            completed_at=10.0,
         )
+        self.assertEqual(trace.first_delta_latency_ms, 9000.0)
+        self.assertEqual(trace.buffering_saved_ms, 0.0)
 
     def test_final_delta_removes_model_urls_and_appends_only_trusted_citations(self):
         trusted = SourceRef(

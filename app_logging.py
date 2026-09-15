@@ -34,9 +34,11 @@ def log_request(
     failure_layer: FailureLayer | None = None,
     failure_code: str | None = None,
     request_state: object | None = None,
+    completed_at: float | None = None,
 ) -> None:
     try:
-        total_latency_ms = (time.monotonic() - started_at) * 1000
+        finished_at = time.monotonic() if completed_at is None else completed_at
+        total_latency_ms = (finished_at - started_at) * 1000
         telemetry = request_trace_fields(request_state)
         if trace is not None:
             telemetry = {
@@ -72,6 +74,7 @@ def log_request(
             "retrieval_latency_ms=%s tool_latency_ms=%s model_latency_ms=%s "
             "input_tokens=%s output_tokens=%s "
             "prompt_cache_hit_tokens=%s prompt_cache_miss_tokens=%s "
+            "first_delta_latency_ms=%s buffering_saved_ms=%s "
             "failure_layer=%s "
             "failure_code=%s citation_count=%s "
             "deduplicated_citation_count=%s invalid_source_count=%s "
@@ -108,6 +111,8 @@ def log_request(
             _format_optional(telemetry["output_tokens"]),
             _format_optional(telemetry["prompt_cache_hit_tokens"]),
             _format_optional(telemetry["prompt_cache_miss_tokens"]),
+            _format_latency(telemetry["first_delta_latency_ms"]),
+            _format_latency(telemetry["buffering_saved_ms"]),
             "-" if layer is None else layer.value,
             code or "null",
             0 if trace is None else trace.citation_count,
