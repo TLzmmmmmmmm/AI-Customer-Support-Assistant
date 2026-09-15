@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "seed": 20260914,
+  "repeat_count": 3,
+  "interval_seconds": 6.5,
+  "cases": [
+    {
+      "case_id": "direct-greeting",
+      "target_route": "direct",
+      "messages": [{"role": "user", "content": "你好"}]
+    },
+    {
+      "case_id": "direct-thanks",
+      "target_route": "direct",
+      "messages": [{"role": "user", "content": "谢谢"}]
+    },
+    {
+      "case_id": "knowledge-support",
+      "target_route": "knowledge",
+      "messages": [{"role": "user", "content": "技术支持中的项目实施阶段包含哪些主要工作？"}]
+    },
+    {
+      "case_id": "knowledge-hotel",
+      "target_route": "knowledge",
+      "messages": [{"role": "user", "content": "酒店无线通信解决方案通常需要考虑哪些内容？"}]
+    },
+    {
+      "case_id": "product-search-warehouse",
+      "target_route": "product_search",
+      "messages": [{"role": "user", "content": "请推荐几款适合仓库工作人员日常联络的对讲机。"}]
+    },
+    {
+      "case_id": "product-search-hotel",
+      "target_route": "product_search",
+      "messages": [{"role": "user", "content": "酒店安保团队有哪些对讲机型号可以选择？"}]
+    }
+  ]
+}
