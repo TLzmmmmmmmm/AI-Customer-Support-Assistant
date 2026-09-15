@@ -7,12 +7,71 @@ from trace_models import (
     bind_request_state,
     initialize_request_trace,
     record_model_response,
+    record_model_usage,
     request_trace_fields,
     reset_request_state,
 )
 
 
 class RequestTraceContextTests(unittest.TestCase):
+    def test_shared_usage_accumulator_matches_completion_accumulation(self):
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        token = bind_request_state(state)
+        try:
+            record_model_usage(SimpleNamespace(
+                prompt_tokens=10,
+                completion_tokens=2,
+                prompt_cache_hit_tokens=7,
+                prompt_cache_miss_tokens=3,
+            ))
+            record_model_usage(SimpleNamespace(
+                prompt_tokens=8,
+                completion_tokens=1,
+                prompt_cache_hit_tokens=5,
+                prompt_cache_miss_tokens=3,
+            ))
+        finally:
+            reset_request_state(token)
+
+        fields = request_trace_fields(state)
+        self.assertEqual(fields["input_tokens"], 18)
+        self.assertEqual(fields["output_tokens"], 3)
+        self.assertEqual(fields["prompt_cache_hit_tokens"], 12)
+        self.assertEqual(fields["prompt_cache_miss_tokens"], 6)
+
+    def test_invalid_usage_permanently_nulls_totals(self):
+        state = SimpleNamespace()
+        initialize_request_trace(state)
+        valid = SimpleNamespace(
+            prompt_tokens=10,
+            completion_tokens=2,
+            prompt_cache_hit_tokens=7,
+            prompt_cache_miss_tokens=3,
+        )
+        token = bind_request_state(state)
+        try:
+            record_model_usage(valid)
+            record_model_usage(None)
+            record_model_usage(valid)
+        finally:
+            reset_request_state(token)
+
+        fields = request_trace_fields(state)
+        self.assertIsNone(fields["input_tokens"])
+        self.assertIsNone(fields["output_tokens"])
+        self.assertIsNone(fields["prompt_cache_hit_tokens"])
+        self.assertIsNone(fields["prompt_cache_miss_tokens"])
+
+    def test_record_model_response_delegates_its_usage(self):
+        from unittest.mock import patch
+
+        usage = object()
+        with patch("trace_models.record_model_usage") as record:
+            record_model_response(SimpleNamespace(usage=usage))
+
+        record.assert_called_once_with(usage)
+
     def test_streaming_latency_fields_default_to_null(self):
         from routing import Route, RouteTrace
 

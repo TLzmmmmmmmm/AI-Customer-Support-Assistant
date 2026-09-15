@@ -17,7 +17,11 @@ from config import (
     LLM_APP_MAX_RETRIES,
     LLM_RETRY_DELAY_SECONDS,
 )
-from trace_models import add_request_duration, record_model_response
+from trace_models import (
+    add_request_duration,
+    record_model_response,
+    record_model_usage,
+)
 
 
 client = OpenAI(
@@ -140,51 +144,64 @@ def iter_chat_content(stream) -> Iterator[str]:
 def stream_chat(
     messages: Sequence[Mapping[str, str]],
 ) -> Iterator[str]:
+    started_at = time.monotonic()
     provider_messages = _copy_messages(messages)
 
     attempt = 0
 
-    while True:
-        has_yielded_content = False
+    try:
+        while True:
+            has_yielded_content = False
+            final_usage = None
 
-        try:
-            stream = client.chat.completions.create(
-                model=DEEPSEEK_MODEL,
-                messages=provider_messages,
-                stream=True,
-                extra_body={
-                    "thinking": {
-                        "type": "disabled",
-                    }
-                },
-            )
+            try:
+                stream = client.chat.completions.create(
+                    model=DEEPSEEK_MODEL,
+                    messages=provider_messages,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                    extra_body={
+                        "thinking": {
+                            "type": "disabled",
+                        }
+                    },
+                )
 
-            for chunk in stream:
-                if not chunk.choices:
-                    continue
+                for chunk in stream:
+                    usage = getattr(chunk, "usage", None)
+                    if usage is not None:
+                        final_usage = usage
+                    if not chunk.choices:
+                        continue
 
-                content = chunk.choices[0].delta.content
+                    content = chunk.choices[0].delta.content
 
-                if content:
-                    has_yielded_content = True
-                    yield content
+                    if content:
+                        has_yielded_content = True
+                        yield content
 
-            return
+                record_model_usage(final_usage)
+                return
 
-        except APITimeoutError:
-            raise
-
-        except APIConnectionError:
-            if has_yielded_content or attempt >= LLM_APP_MAX_RETRIES:
+            except APITimeoutError:
                 raise
 
-        except APIStatusError as error:
-            if (
-                has_yielded_content
-                or not is_retryable_status(error)
-                or attempt >= LLM_APP_MAX_RETRIES
-            ):
-                raise
+            except APIConnectionError:
+                if has_yielded_content or attempt >= LLM_APP_MAX_RETRIES:
+                    raise
 
-        attempt += 1
-        time.sleep(LLM_RETRY_DELAY_SECONDS)
+            except APIStatusError as error:
+                if (
+                    has_yielded_content
+                    or not is_retryable_status(error)
+                    or attempt >= LLM_APP_MAX_RETRIES
+                ):
+                    raise
+
+            attempt += 1
+            time.sleep(LLM_RETRY_DELAY_SECONDS)
+    finally:
+        add_request_duration(
+            "model_latency_ms",
+            (time.monotonic() - started_at) * 1000,
+        )

@@ -93,12 +93,11 @@ def add_request_duration(name: str, elapsed_ms: float) -> None:
         pass
 
 
-def record_model_response(completion: object) -> None:
+def record_model_usage(usage: object | None) -> None:
     state = _current_request_state.get()
     if state is None:
         return
     try:
-        usage = getattr(completion, "usage", None)
         input_tokens = getattr(usage, "prompt_tokens", None)
         output_tokens = getattr(usage, "completion_tokens", None)
         cache_hit_tokens = getattr(
@@ -155,6 +154,14 @@ def record_model_response(completion: object) -> None:
             state.prompt_cache_miss_tokens = None
         except Exception:
             pass
+
+
+def record_model_response(completion: object) -> None:
+    try:
+        usage = getattr(completion, "usage", None)
+    except Exception:
+        usage = None
+    record_model_usage(usage)
 
 
 def record_retrieval(count: int | None, elapsed_ms: float) -> None:
@@ -217,6 +224,7 @@ __all__ = [
     "bind_request_state",
     "initialize_request_trace",
     "record_model_response",
+    "record_model_usage",
     "record_retrieval",
     "record_tool_execution",
     "request_trace_fields",
