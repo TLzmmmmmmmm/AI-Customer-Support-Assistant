@@ -8,27 +8,7 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import ValidationError
 
 from knowledge_pipeline.models import SourceRef
-
-
-_REFERENCE_HEADING = re.compile(
-    r"^[ \t]*(?:#{1,6}[ \t]*)?"
-    r"(?:参考资料|引用|来源|references?|citations?|sources?)"
-    r"[ \t]*[:：]?[ \t]*$",
-    re.IGNORECASE | re.MULTILINE,
-)
-_MARKDOWN_LINK = re.compile(
-    r"\[([^\]\r\n]+)\]\(\s*(?:https?://|www\.)[^)\r\n]+\s*\)",
-    re.IGNORECASE,
-)
-_ANGLE_URL = re.compile(
-    r"<(?:https?://|www\.)[^<>\s]+>",
-    re.IGNORECASE,
-)
-_PLAIN_URL = re.compile(
-    r"(?:https?://|www\.)"
-    r"[^\s<>\[\]()\"'，。！？；：]+",
-    re.IGNORECASE,
-)
+from citation.sanitization import sanitize_generated_answer
 
 
 @dataclass(frozen=True)
@@ -89,15 +69,6 @@ def collect_sources(sources: Iterable[object]) -> CitationCollection:
         invalid_source_count=invalid_count,
         deduplicated_count=duplicate_count,
     )
-
-
-def sanitize_generated_answer(answer: str) -> str:
-    heading = _REFERENCE_HEADING.search(answer)
-    without_references = answer if heading is None else answer[:heading.start()]
-    cleaned = _MARKDOWN_LINK.sub(r"\1", without_references)
-    cleaned = _ANGLE_URL.sub("", cleaned)
-    cleaned = _PLAIN_URL.sub("", cleaned)
-    return cleaned.strip()
 
 
 def _answer_language(text: str) -> str | None:
