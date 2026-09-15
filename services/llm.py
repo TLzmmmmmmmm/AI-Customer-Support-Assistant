@@ -41,6 +41,7 @@ def complete_chat(
     messages: Sequence[Mapping[str, object]],
     *,
     tools: Sequence[Mapping[str, object]] | None = None,
+    max_tokens: int | None = None,
 ):
     started_at = time.monotonic()
     provider_messages = _copy_messages(messages)
@@ -62,6 +63,8 @@ def complete_chat(
                 }
                 if provider_tools is not None:
                     request["tools"] = provider_tools
+                if max_tokens is not None:
+                    request["max_tokens"] = max_tokens
                 completion = client.chat.completions.create(**request)
                 record_model_response(completion)
                 return completion

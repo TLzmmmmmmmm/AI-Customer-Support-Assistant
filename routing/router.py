@@ -10,9 +10,11 @@ from trace_models import set_request_trace_field
 from .models import FailureLayer, Route, RouteDecision, RoutingResult
 
 
+ROUTER_MAX_TOKENS = 16
+
 ROUTER_SYSTEM_PROMPT = """
 Classify the user's request by the primary execution capability required.
-Return exactly one token from this list and nothing else:
+Return exactly one label from this list and nothing else:
 product_search, exact_product, contact, knowledge, direct, fallback.
 
 Meanings:
@@ -189,7 +191,10 @@ class HybridRouter:
 
         deadline.ensure_active()
         set_request_trace_field("router_type", "llm")
-        completion = self._complete_chat(_provider_messages(messages))
+        completion = self._complete_chat(
+            _provider_messages(messages),
+            max_tokens=ROUTER_MAX_TOKENS,
+        )
         deadline.ensure_active()
         route = _normalize_route(completion)
         if route is None:
@@ -208,4 +213,4 @@ class HybridRouter:
         ), router_type="llm")
 
 
-__all__ = ["HybridRouter", "ROUTER_SYSTEM_PROMPT"]
+__all__ = ["HybridRouter", "ROUTER_MAX_TOKENS", "ROUTER_SYSTEM_PROMPT"]

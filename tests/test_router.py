@@ -98,8 +98,12 @@ class RecordingCompletion:
         self.responses = deque(responses)
         self.calls = []
 
-    def __call__(self, messages, *, tools=None):
-        self.calls.append({"messages": messages, "tools": tools})
+    def __call__(self, messages, *, tools=None, max_tokens=None):
+        self.calls.append({
+            "messages": messages,
+            "tools": tools,
+            "max_tokens": max_tokens,
+        })
         response = self.responses.popleft()
         if isinstance(response, Exception):
             raise response
@@ -122,6 +126,28 @@ def messages(question, history=()):
 
 
 class HybridRouterTests(unittest.TestCase):
+    def test_llm_classifier_uses_exact_label_prompt_and_token_guardrail(self):
+        from routing import HybridRouter, Route
+        from routing.router import ROUTER_MAX_TOKENS, ROUTER_SYSTEM_PROMPT
+
+        complete = RecordingCompletion([completion("knowledge")])
+        result = HybridRouter(
+            retriever=RecordingRetriever(),
+            complete_chat=complete,
+        ).route(
+            messages("地下停车场通信应该怎么解决？"),
+            deadline=RecordingDeadline(),
+        )
+
+        self.assertEqual(result.decision.route, Route.KNOWLEDGE)
+        self.assertEqual(ROUTER_MAX_TOKENS, 16)
+        self.assertIn(
+            "Return exactly one label from this list and nothing else:",
+            ROUTER_SYSTEM_PROMPT,
+        )
+        self.assertNotIn("Return exactly one token", ROUTER_SYSTEM_PROMPT)
+        self.assertEqual(complete.calls[0]["max_tokens"], 16)
+
     def test_single_explicit_product_routes_to_details_without_fact_keyword(self):
         from routing import HybridRouter, Route
 

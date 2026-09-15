@@ -89,6 +89,26 @@ class LlmProviderMessageTests(unittest.TestCase):
 
 
 class LlmCompleteChatTests(unittest.TestCase):
+    def test_complete_chat_forwards_non_null_max_tokens(self):
+        with patch.object(
+            llm.client.chat.completions,
+            "create",
+            return_value=SimpleNamespace(usage=None),
+        ) as create:
+            llm.complete_chat(PROVIDER_MESSAGES, max_tokens=16)
+
+        self.assertEqual(create.call_args.kwargs["max_tokens"], 16)
+
+    def test_complete_chat_omits_null_max_tokens(self):
+        with patch.object(
+            llm.client.chat.completions,
+            "create",
+            return_value=SimpleNamespace(usage=None),
+        ) as create:
+            llm.complete_chat(PROVIDER_MESSAGES)
+
+        self.assertNotIn("max_tokens", create.call_args.kwargs)
+
     def test_complete_chat_records_provider_cache_usage(self):
         state = SimpleNamespace()
         initialize_request_trace(state)
