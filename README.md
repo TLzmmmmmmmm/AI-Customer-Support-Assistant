@@ -46,46 +46,10 @@ A production AI customer-support system built for **Shengborun Communications**,
 
 ![Shengborun AI customer-support assistant integrated into the public website](docs/assets/ai-assistant-website.webp)
 
-### Exact Product Lookup
-
-<p align="center">
-  <img
-    src="docs/assets/chat-ly198-detail.png"
-    width="440"
-    alt="Shengborun AI assistant answering an exact LY198 product specification query with a company citation"
-  />
-</p>
-
 **Query:** `对讲机 LY198 的技术参数是什么？`  
 *What are the technical specifications of the LY198 radio?*
 
 The assistant resolves `LY198` as an exact product entity, returns the documented specifications, and cites the corresponding company product page.
-
----
-
-## Why This Project Exists
-
-The first version connected an LLM to a FastAPI backend and constrained it from inventing unsupported company information.
-
-That system was safe but **knowledge-limited**: it had no authoritative company knowledge source. In a 20-case baseline evaluation, it correctly answered only 2 cases because all 17 answerable company-knowledge questions had to fall back rather than guess.
-
-Instead of weakening the grounding rules, I added the missing capability: structured access to company knowledge.
-
-The system then evolved incrementally:
-
-```mermaid
-flowchart LR
-    A[LLM + Prompt]
-    B[RAG]
-    C[RAG + Deterministic Tools]
-    D[Hybrid Router + LangGraph]
-    E[Telemetry + Performance + Security]
-
-    A -->|Add authoritative knowledge| B
-    B -->|Separate exact lookup from similarity| C
-    C -->|Avoid unnecessary agent reasoning| D
-    D -->|Measure system behavior| E
-```
 
 ---
 

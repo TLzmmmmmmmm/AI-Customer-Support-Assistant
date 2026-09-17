@@ -1,1 +1,0 @@
-A site-wide AI customer-support widget, floating on desktop and expanding to a near-full-screen experience on mobile.
