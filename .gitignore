@@ -67,27 +67,10 @@ DEPLOYMENT.md
 !/eval/results/v1.1-holdout-summary.json
 !/eval/results/v1.1-release-candidate-summary.json
 
-# Documentation: track only current schemas, architecture, operator workflow,
-# and one core acceptance report per completed phase. Local planning material,
-# including docs/superpowers, remains ignored.
-/docs/*
-!/docs/chunk-schema-v1.md
-!/docs/knowledge-schema-v1.md
-!/docs/retrieval-schema-v1.md
-!/docs/retrieval-architecture-v1.md
-!/docs/rag-evaluation-v1.md
-!/docs/day-5-alpha-acceptance.md
-!/docs/day-6-step-7-v0-v1-comparison.md
-!/docs/day-7-step-3-knowledge-update-workflow.md
-!/docs/day-7-step-6-release-candidate-smoke.md
-!/docs/week-3-day-6-agent-evaluation-final-report.md
-!/docs/week-4-day-2-metrics-cost-performance-design.md
-!/docs/week-4-day-2-performance-report.md
-!/docs/week-4-day-3-true-streaming-design.md
-!/docs/week-4-day-3-streaming-closeout.md
-!/docs/security/
-/docs/security/*
-!/docs/security/week4-security-boundary-audit.md
+# Documentation is tracked by default. Keep internal planning material and
+# evidence-audit working files local.
+/docs/superpowers/
+/docs/project-evidence-audit-*.md
 
 # Week 4 Day 2 keeps request mappings and server logs local. Only the compact
 # approved analysis artifact is tracked.
