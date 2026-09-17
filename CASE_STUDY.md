@@ -70,7 +70,7 @@ At the same time, company-specific answers could not rely on unsupported model k
 
 ---
 
-# 2. Baseline: Safe but Knowledge-Limited
+# 2. Baseline: Conservative but Knowledge-Limited
 
 The initial architecture intentionally contained no RAG pipeline, vector index, tools, or agent framework.
 
@@ -180,15 +180,7 @@ The current production path does not use:
 - query rewriting,
 - or reranking.
 
-Historical retrieval evaluation produced:
-
-| Dataset | Retrieval-Eligible Queries | Hit@1 | Hit@5 |
-|---|---:|---:|---:|
-| Dev | 23 | 22/23 | **23/23** |
-| Frozen | 18 | 16/18 | **18/18** |
-| Holdout10 | 9 | 8/9 | **9/9** |
-
-These are historical evaluation results, not production accuracy or an online SLO.
+Historical evaluation achieved Hit@5 on all retrieval-eligible Dev, Frozen, and Holdout10 queries; detailed results appear in Section 7. These are historical evaluation results, not production accuracy or an online SLO.
 
 ---
 
@@ -352,11 +344,13 @@ A separate **manual Dev answer-quality review** scored:
 
 - **47/48**
 
+Twenty-three cases received full credit, while one received partial credit for an unsupported inference.
+
 This metric was intentionally kept separate from routing and tool-action accuracy: a system can choose the correct action and still produce an imperfect user-facing answer.
 
 ---
 
-# 8. Production Measurement
+# 8. Controlled Production-Path Measurement
 
 Once the core behavior was stable, I added request-level telemetry covering:
 
