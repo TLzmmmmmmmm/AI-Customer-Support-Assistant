@@ -10,6 +10,22 @@ A production AI customer-support system built for **Shengborun Communications**,
 
 ---
 
+## Results at a Glance
+
+| Area | Result |
+|---|---|
+| **Agent Evaluation** | **24/24 route decisions** and **24/24 expected tool actions** on the final Dev evaluation |
+| **Representative Workload** | **132/132 requests completed successfully** |
+| **Latency** | **P50 1.00 s · P95 3.156 s** in a controlled representative workload |
+| **Backend Verification** | **669/669 tests passed** |
+| **Frontend Verification** | **28/28 unit tests passed** |
+| **Security Evaluation** | **32 internal adversarial runs** across 12 attack families, with **0 reviewed boundary breaches** |
+| **Streaming Experiment** | Product-search TTFT improved **42.4%**, but total latency regressed **16.9%**, so the optimization was not shipped |
+
+> Performance results come from controlled representative production-path workloads, not organic customer traffic or production SLOs.
+
+---
+
 ## Role & Ownership
 
 | | |
@@ -44,22 +60,6 @@ A production AI customer-support system built for **Shengborun Communications**,
 *What are the technical specifications of the LY198 radio?*
 
 The assistant resolves `LY198` as an exact product entity, returns the documented specifications, and cites the corresponding company product page.
-
----
-
-## Results at a Glance
-
-| Area | Result |
-|---|---|
-| **Agent Evaluation** | **24/24 route decisions** and **24/24 expected tool actions** on the final Dev evaluation |
-| **Representative Workload** | **132/132 requests completed successfully** |
-| **Latency** | **P50 1.00 s · P95 3.156 s** in a controlled representative workload |
-| **Backend Verification** | **669/669 tests passed** |
-| **Frontend Verification** | **28/28 unit tests passed** |
-| **Security Evaluation** | **32 internal adversarial runs** across 12 attack families, with **0 reviewed boundary breaches** |
-| **Streaming Experiment** | Product-search TTFT improved **42.4%**, but total latency regressed **16.9%**, so the optimization was not shipped |
-
-> Performance results come from controlled representative production-path workloads, not organic customer traffic or production SLOs.
 
 ---
 
@@ -157,20 +157,6 @@ High-confidence requests are routed deterministically. Ambiguous requests may us
 
 ## RAG & Knowledge Pipeline
 
-Website content is normalized into stable business entities before embedding:
-
-```text
-Website Sources
-      ↓
-Normalized Documents
-      ↓
-Structural Chunks
-      ↓
-Embeddings
-      ↓
-Local Vector Index
-```
-
 Current audited snapshot:
 
 - **62 normalized documents**
@@ -201,16 +187,6 @@ get_product_details(product_id)
 get_contact_info()
 ```
 
-For known products:
-
-```text
-LY198
-  ↓
-ExactEntityResolver
-  ↓
-get_product_details()
-```
-
 Exact product lookup bypasses semantic retrieval.
 
 The agent is limited to **3 tool calls per request**. Malformed, unauthorized, or over-budget tool calls fail safely.
@@ -219,13 +195,7 @@ The agent is limited to **3 tool calls per request**. Malformed, unauthorized, o
 
 ## Controlled Production-Path Measurement
 
-A controlled **132-request representative production-style workload** completed:
-
-- **132 successful**
-- **0 failed**
-- **0 skipped**
-- telemetry coverage: **132/132**
-- token-usage coverage: **132/132**
+A controlled representative production-style workload completed **132/132 requests successfully with complete request-level telemetry and token-usage coverage**.
 
 Latency:
 
@@ -302,6 +272,22 @@ This was an internal engineering assessment, not a penetration test or security 
 
 ---
 
+## Run Locally
+
+Requires Python 3.12 and a `.env` file containing `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, and `DASHSCOPE_WORKSPACE_ID`.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
+python scripts/build_embeddings.py --execute  # paid embedding API call
+python -m uvicorn main:app --reload
+```
+
+The API is then available at `http://127.0.0.1:8000`; verify it with `GET /health`.
+
+---
+
 ## Tech Stack
 
 **Frontend:** Astro · TypeScript  
@@ -314,7 +300,6 @@ This was an internal engineering assessment, not a penetration test or security 
 
 ## Repositories & Documentation
 
-- **AI Backend:** [AI-Customer-Support-Assistant](https://github.com/TLzmmmmmmmm/AI-Customer-Support-Assistant)
 - **Corporate Website:** [Shengborun](https://github.com/TLzmmmmmmmm/Shengborun)
 - **Live Website:** [shengborun.com](https://www.shengborun.com/)
 - **Engineering Deep Dive:** [CASE_STUDY.md](./CASE_STUDY.md)
