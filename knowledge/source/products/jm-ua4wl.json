@@ -1,19 +1,19 @@
 {
-  "id": "jm-ua4wl",
-  "name": "JM-UA4WL",
-  "slug": "jm-ua4wl",
-  "category_id": "mesh-network",
-  "key_features": [
+  "id": "mesh-f",
+  "name": "润信达 Mesh-F",
+  "slug": "mesh-f",
+  "categoryId": "mesh-network",
+  "keyFeatures": [
     "机载自组网"
   ],
-  "product_features": "JM-UA4WL是一款安装在飞行器上跟地面设备完成自组网的机载设备，用于特定组网场景。",
-  "technical_parameters": [
+  "productFeatures": "Mesh-F是一款安装在飞行器上跟地面设备完成自组网的机载设备，用于特定组网场景。",
+  "technicalParameters": [
     {
       "group": "系统参数",
       "items": [
         {
           "name": "型号",
-          "value": "JM-UA4WL"
+          "value": "Mesh-F"
         },
         {
           "name": "中心频率",
@@ -112,12 +112,12 @@
       ]
     }
   ],
-  "source_path": "/mesh-network/jm-ua4wl/",
+  "source_path": "/mesh-network/mesh-f/",
   "published": true,
   "provenance": [
     {
       "kind": "website_file",
-      "reference": "src/content/products/mesh-network/jm-ua4wl.json"
+      "reference": "src/content/products/mesh-network/mesh-f.json"
     }
   ]
 }

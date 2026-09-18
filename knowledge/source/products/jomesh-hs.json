@@ -1,20 +1,20 @@
 {
-  "id": "jomesh-hs",
-  "name": "久华信 JoMesh-HS",
-  "slug": "jomesh-hs",
-  "category_id": "mesh-network",
-  "key_features": [
+  "id": "mesh-h",
+  "name": "润信达 Mesh-H",
+  "slug": "mesh-h",
+  "categoryId": "mesh-network",
+  "keyFeatures": [
     "频率定制",
     "无线图传"
   ],
-  "product_features": "JoMesh-HS是一款集语音、数据、视频以及智能业务为一体的全新宽带自组网终端。基于国产智能终端平台，灵活方便，支持多种移动应用。",
-  "technical_parameters": [
+  "productFeatures": "Mesh-H是一款集语音、数据、视频以及智能业务为一体的全新宽带自组网终端。基于国产智能终端平台，灵活方便，支持多种移动应用。",
+  "technicalParameters": [
     {
       "group": "系统参数",
       "items": [
         {
           "name": "型号",
-          "value": "JoMesh-HS"
+          "value": "Mesh-H"
         },
         {
           "name": "中心频率",
@@ -125,12 +125,12 @@
       ]
     }
   ],
-  "source_path": "/mesh-network/jomesh-hs/",
+  "source_path": "/mesh-network/mesh-h/",
   "published": true,
   "provenance": [
     {
       "kind": "website_file",
-      "reference": "src/content/products/mesh-network/jomesh-hs.json"
+      "reference": "src/content/products/mesh-network/mesh-h.json"
     }
   ]
 }

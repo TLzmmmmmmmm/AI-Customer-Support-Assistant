@@ -1,20 +1,20 @@
 {
-  "id": "jomesh-od10w",
-  "name": "久华信 JoMesh-OD10W",
-  "slug": "jomesh-od10w",
-  "category_id": "mesh-network",
-  "key_features": [
+  "id": "mesh-g",
+  "name": "润信达 Mesh-G",
+  "slug": "mesh-g",
+  "categoryId": "mesh-network",
+  "keyFeatures": [
     "频率定制",
     "无线图传"
   ],
-  "product_features": "JoMesh-OD10W采用无线互联技术，抱杆/壁挂式安装设计，方便城市建设下的通信覆盖安装，并特别设计了自动防御系统，在设备故障、断电、遭袭等情况下，将发起设备告警，以提醒后台进行紧急维护，保障通信网络畅通",
-  "technical_parameters": [
+  "productFeatures": "Mesh-G采用无线互联技术，抱杆/壁挂式安装设计，方便城市建设下的通信覆盖安装，并特别设计了自动防御系统，在设备故障、断电、遭袭等情况下，将发起设备告警，以提醒后台进行紧急维护，保障通信网络畅通",
+  "technicalParameters": [
     {
       "group": "系统参数",
       "items": [
         {
           "name": "型号",
-          "value": "JoMesh-OD10W"
+          "value": "Mesh-G"
         },
         {
           "name": "中心频率",
@@ -121,12 +121,12 @@
       ]
     }
   ],
-  "source_path": "/mesh-network/jomesh-od10w/",
+  "source_path": "/mesh-network/mesh-g/",
   "published": true,
   "provenance": [
     {
       "kind": "website_file",
-      "reference": "src/content/products/mesh-network/jomesh-od10w.json"
+      "reference": "src/content/products/mesh-network/mesh-g.json"
     }
   ]
 }
