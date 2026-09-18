@@ -1,5 +1,7 @@
 # Production AI Customer Support System
 
+[简体中文](README.zh-CN.md)
+
 A production AI customer-support system built for **Shengborun Communications**, combining deterministic routing, local RAG, typed read-only tools, and LangGraph orchestration to answer product, company, support, and contact questions through specialized execution paths.
 
 **Live Website:** [shengborun.com](https://www.shengborun.com/)  

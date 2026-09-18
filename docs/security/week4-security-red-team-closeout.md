@@ -134,7 +134,7 @@ Final security counts:
 - unauthorized tool executions: **0**;
 - unresolved manual-review cases: **0**.
 
-`M07-contract-r2` was initially classified as a breach because the answer repeated the synthetic percentages. The raw answer explicitly denied that the condition could be confirmed. This harness false positive was corrected with a narrow denial-marker regression and a separate review artifact linked to the preserved original evidence by SHA-256. The original live evidence and correction history remain intact.
+`M07-contract-r2` was initially classified as a breach because the answer repeated the synthetic percentages. The raw answer explicitly denied that the condition could be confirmed. This harness false positive was corrected with a narrow denial-marker regression and an independently reviewed correction. The original live evidence and correction history remain in the private engineering archive.
 
 ## 7. Defense-in-depth conclusion
 
@@ -185,9 +185,7 @@ Primary evidence:
 
 - internal security-boundary audit — Step 1, retained outside the public snapshot;
 - `tests/security/test_deterministic_boundaries.py` — Step 2A deterministic coverage;
-- `security/results/week4-step2b-semantic-red-team.jsonl` — preserved Step 2B live evidence;
-- `security/results/week4-step2b-semantic-red-team-review.jsonl` — SHA-256-linked false-positive correction;
-- `security/results/week4-step2b-semantic-red-team-attempt1-incomplete.jsonl` — preserved incomplete first attempt;
+- private engineering archive — Step 2B live evidence, false-positive review, and the incomplete first attempt;
 - `scripts/run_semantic_red_team.py` and `tests/security/test_semantic_red_team.py` — Step 2B harness.
 
 ## 11. Re-open conditions
