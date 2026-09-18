@@ -2,12 +2,12 @@
   "id": "mesh-f",
   "name": "润信达 Mesh-F",
   "slug": "mesh-f",
-  "categoryId": "mesh-network",
-  "keyFeatures": [
+  "category_id": "mesh-network",
+  "key_features": [
     "机载自组网"
   ],
-  "productFeatures": "Mesh-F是一款安装在飞行器上跟地面设备完成自组网的机载设备，用于特定组网场景。",
-  "technicalParameters": [
+  "product_features": "Mesh-F是一款安装在飞行器上跟地面设备完成自组网的机载设备，用于特定组网场景。",
+  "technical_parameters": [
     {
       "group": "系统参数",
       "items": [
@@ -121,4 +121,3 @@
     }
   ]
 }
-

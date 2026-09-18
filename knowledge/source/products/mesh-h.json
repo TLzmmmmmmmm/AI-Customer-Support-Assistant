@@ -1,40 +1,36 @@
 {
-  "id": "mesh-g",
-  "name": "润信达 Mesh-G",
-  "slug": "mesh-g",
-  "categoryId": "mesh-network",
-  "keyFeatures": [
+  "id": "mesh-h",
+  "name": "润信达 Mesh-H",
+  "slug": "mesh-h",
+  "category_id": "mesh-network",
+  "key_features": [
     "频率定制",
     "无线图传"
   ],
-  "productFeatures": "Mesh-G采用无线互联技术，抱杆/壁挂式安装设计，方便城市建设下的通信覆盖安装，并特别设计了自动防御系统，在设备故障、断电、遭袭等情况下，将发起设备告警，以提醒后台进行紧急维护，保障通信网络畅通",
-  "technicalParameters": [
+  "product_features": "Mesh-H是一款集语音、数据、视频以及智能业务为一体的全新宽带自组网终端。基于国产智能终端平台，灵活方便，支持多种移动应用。",
+  "technical_parameters": [
     {
       "group": "系统参数",
       "items": [
         {
           "name": "型号",
-          "value": "Mesh-G"
+          "value": "Mesh-H"
         },
         {
           "name": "中心频率",
-          "value": "500MHz~650MHz（U段），1~1.5GHz（L段）"
+          "value": "520～650MHz（U段）；1.2～1.5GHz（L段）"
         },
         {
           "name": "载波带宽",
-          "value": "2.5/5/10/20MHz"
+          "value": "2.5/5/10MHz"
         },
         {
           "name": "传输体制",
           "value": "COFDM"
         },
         {
-          "name": "传输模式",
-          "value": "2T2R分集/MIMO（可选）"
-        },
-        {
-          "name": "传输速率（无线环境）",
-          "value": "分集：峰值速率≥50Mbps；2*2MIMO：峰值速率≥90Mbps"
+          "name": "传输速率",
+          "value": "28Mbps@10MHz；47Mbps@20MHz（带宽扩展）"
         },
         {
           "name": "图像质量",
@@ -46,7 +42,7 @@
         },
         {
           "name": "发射功率",
-          "value": "2*10W，双通道"
+          "value": "0.5W，1T2R"
         },
         {
           "name": "冷启动时间",
@@ -58,11 +54,15 @@
         },
         {
           "name": "单跳时延",
-          "value": "≤10ms"
+          "value": "≤7ms"
         },
         {
           "name": "链路自适应",
-          "value": "可根据信道传输质量自动调整载波调制方式，调整范围QPSK/16QAM/64QAM/256QAM"
+          "value": "可根据信道传输质量自动调整载波调制方式，调整范围：QPSK/16QAM/64QAM/256QAM"
+        },
+        {
+          "name": "加密方式",
+          "value": "DES/AES128/AES256/SM4"
         }
       ]
     },
@@ -71,23 +71,27 @@
       "items": [
         {
           "name": "天线接口",
-          "value": "N型*2"
+          "value": "SMA×2"
         },
         {
-          "name": "WIFI、定位接口",
-          "value": "防水航插：SMA-K"
+          "name": "WiFi、定位",
+          "value": "支持"
+        },
+        {
+          "name": "视频输入接口",
+          "value": "IP视频输入/外置HDMI视频编码模块"
         },
         {
           "name": "业务接口",
-          "value": "以太网（航插）：WY20J4Z"
+          "value": "以太网（航插）"
         },
         {
-          "name": "供电",
-          "value": "AC220V/DC+48V(交流/直流供电，二选一)"
+          "name": "设备供电",
+          "value": "锂电池，续航时间6小时"
         },
         {
-          "name": "电源接口",
-          "value": "AC220V防水航插：WY20J3Z(交流供电接口)；DC+48V防水航插：WY20J2Z(直流供电接口)"
+          "name": "充电方式",
+          "value": "座充"
         }
       ]
     },
@@ -96,15 +100,15 @@
       "items": [
         {
           "name": "设备尺寸",
-          "value": "321*248*138mm"
+          "value": "155×65×32mm（包含锂电池，不含天线和背夹）"
         },
         {
           "name": "设备重量",
-          "value": "≤7.5kg"
+          "value": "430g（包含锂电池，不含天线和背夹）"
         },
         {
-          "name": "设备功耗",
-          "value": "≤200W"
+          "name": "屏幕",
+          "value": "1.8寸，TFT LCD（320*240）"
         },
         {
           "name": "工作温度",
@@ -121,13 +125,12 @@
       ]
     }
   ],
-  "source_path": "/mesh-network/mesh-g/",
+  "source_path": "/mesh-network/mesh-h/",
   "published": true,
   "provenance": [
     {
       "kind": "website_file",
-      "reference": "src/content/products/mesh-network/mesh-g.json"
+      "reference": "src/content/products/mesh-network/mesh-h.json"
     }
   ]
 }
-

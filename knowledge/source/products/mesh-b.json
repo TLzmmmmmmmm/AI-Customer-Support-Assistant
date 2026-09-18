@@ -2,13 +2,13 @@
   "id": "mesh-b",
   "name": "润信达 Mesh-B",
   "slug": "mesh-b",
-  "categoryId": "mesh-network",
-  "keyFeatures": [
+  "category_id": "mesh-network",
+  "key_features": [
     "频率定制",
     "无线图传"
   ],
-  "productFeatures": "Mesh-B便携台是新一代宽带无线自组网便携式产品，具备集成度高、小巧便携、接口丰富等特点，采用先进算法，抗干扰能力强。",
-  "technicalParameters": [
+  "product_features": "Mesh-B便携台是新一代宽带无线自组网便携式产品，具备集成度高、小巧便携、接口丰富等特点，采用先进算法，抗干扰能力强。",
+  "technical_parameters": [
     {
       "group": "系统参数",
       "items": [
@@ -163,4 +163,3 @@
     }
   ]
 }
-
