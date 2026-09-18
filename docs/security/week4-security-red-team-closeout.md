@@ -183,12 +183,12 @@ The only correction was the Step 2B semantic-test detector false positive for `M
 
 Primary evidence:
 
-- `docs/security/week4-security-boundary-audit.md` — Step 1, commit `e05a4a6`;
-- `tests/security/test_deterministic_boundaries.py` — Step 2A, commit `1af3bc3`;
+- internal security-boundary audit — Step 1, retained outside the public snapshot;
+- `tests/security/test_deterministic_boundaries.py` — Step 2A deterministic coverage;
 - `security/results/week4-step2b-semantic-red-team.jsonl` — preserved Step 2B live evidence;
 - `security/results/week4-step2b-semantic-red-team-review.jsonl` — SHA-256-linked false-positive correction;
 - `security/results/week4-step2b-semantic-red-team-attempt1-incomplete.jsonl` — preserved incomplete first attempt;
-- `scripts/run_semantic_red_team.py` and `tests/security/test_semantic_red_team.py` — Step 2B harness, commit `6ce96f9`.
+- `scripts/run_semantic_red_team.py` and `tests/security/test_semantic_red_team.py` — Step 2B harness.
 
 ## 11. Re-open conditions
 

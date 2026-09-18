@@ -57,7 +57,7 @@ V0三个已证实错误断言为004“并非公司产品”、006“网站没有
 | 019 | 1 / N/A / 1 / 2 | 2 / 2 / 2 / 2 | V1同时保留200公里以上参考值和未知保证边界 |
 | 020 | 2 / N/A / 2 / 2 | 2 / 2 / 2 / 2 | 均不冒充执行操作；V1联系方式来自实际context |
 
-完整逐题理由分别见[V0复评分](../eval/results/baseline-v0-day6-review.json)与[V1评分](../eval/results/generation-frozen-20260904T101056Z-04e12253-review.json)。018–020的3个样本不足以证明所有未知/越权场景都可靠；此前dev-027的注入失败仍然存在。
+完整逐题理由中的 V0 部分见[V0复评分](../eval/results/baseline-v0-day6-review.json)；V1 原始评分记录仅保留在内部工程档案中，本报告保留其汇总结果。018–020的3个样本不足以证明所有未知/越权场景都可靠；此前dev-027的注入失败仍然存在。
 
 ## 4. V1检索：18道有gold题全部召回
 
@@ -123,9 +123,9 @@ V1的prompts.py文件SHA-256为`b62feb8f53c71b1eef7a411bdd2b6d6e30c9d36437f610ec
 
 ## 7. 文件、验证与停止点
 
-- 原始 V1 运行曾包含20份回答、actual provider messages、Top-K provenance及运行元数据；该大型 JSONL 已从当前工作树清理，可通过 Git 历史和 SHA-256 `32910b6d47daf7bf997ce0904c148fc896ebcceb9abcefa6bd25991b2cd43b8b` 审计。
+- 原始 V1 运行曾包含20份回答、actual provider messages、Top-K provenance及运行元数据；该大型 JSONL 未包含在公开快照中，仅保留在内部工程 Git 历史，可通过 SHA-256 `32910b6d47daf7bf997ce0904c148fc896ebcceb9abcefa6bd25991b2cd43b8b` 核验。
 - [V0新复评](../eval/results/baseline-v0-day6-review.json)：独立20条评分，不改历史原件。
-- [V1新评分](../eval/results/generation-frozen-20260904T101056Z-04e12253-review.json)：20条理由、统计和同次检索指标。V1 review_status=complete；V0复评分未包含在本次指定确认范围，仍为pending_review。
+- V1新评分：20条理由、统计和同次检索指标保留在内部工程档案中。V1 review_status=complete；V0复评分未包含在本次指定确认范围，仍为pending_review。
 - 评测入口仅新增`--split frozen`，默认仍dev，holdout无入口，混合split拒绝。新增4项测试，完整244项unittest通过；测试只隔离外部provider，真实评测没有替换retriever或模型。
 - 原始V0两文件、Day 6封存输入、知识向量、Step 5原始运行保持hash一致；生产代码/prompt与本次运行记录一致。
 - 独立只读代码审查因服务额度限制未完成，不宣称审查通过。已完成主执行者复核和自动化测试；V1语义评分已由用户审阅确认，V0复评分仍待确认。
@@ -135,8 +135,7 @@ V1的prompts.py文件SHA-256为`b62feb8f53c71b1eef7a411bdd2b6d6e30c9d36437f610ec
 复现入口（默认仅预检；追加`--execute`会再次付费并产生新运行，审核原结果时不应重跑）：
 
 ```powershell
-$env:PYTHONPATH=(Resolve-Path '.venv/Lib/site-packages').Path
-& 'C:/Users/Lenovo/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe' scripts/evaluate_rag_generation.py --split frozen
+python scripts/evaluate_rag_generation.py --split frozen
 ```
 
 本节记录Step 7；Step 8现已完成，见最终报告。所有修复继续留到Day 7。

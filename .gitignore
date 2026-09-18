@@ -67,10 +67,8 @@ DEPLOYMENT.md
 !/eval/results/v1.1-holdout-summary.json
 !/eval/results/v1.1-release-candidate-summary.json
 
-# Documentation is tracked by default. Keep internal planning material and
-# evidence-audit working files local.
-/docs/superpowers/
-/docs/project-evidence-audit-*.md
+# Documentation is tracked by default. Keep internal reference material local.
+/docs/internal/
 
 # Week 4 Day 2 keeps request mappings and server logs local. Only the compact
 # approved analysis artifact is tracked.

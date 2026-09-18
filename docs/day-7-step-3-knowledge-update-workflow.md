@@ -85,12 +85,12 @@ staging directory without changing the live snapshot.
 
 ```powershell
 # Plan only: no API request.
-.\.venv\Scripts\python.exe scripts\build_knowledge.py
+python scripts\build_knowledge.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Run only after owner approval of any reported embedding cost.
 # Changed chunks may call DashScope; unchanged vectors are reused.
-.\.venv\Scripts\python.exe scripts\build_knowledge.py --execute
+python scripts\build_knowledge.py --execute
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
 
@@ -114,10 +114,10 @@ checkout without restarting the service:
 set -euo pipefail
 
 # Plan only. Record and obtain approval for non-zero paid work.
-.venv/bin/python scripts/build_knowledge.py
+python scripts/build_knowledge.py
 
 # Run only after owner approval.
-.venv/bin/python scripts/build_knowledge.py --execute
+python scripts/build_knowledge.py --execute
 ```
 
 Only after every command succeeds may the separately authorized deployment
