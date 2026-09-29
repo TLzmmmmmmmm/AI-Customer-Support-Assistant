@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
+from citation import source_id
 from knowledge_pipeline.models import SourceRef
 from support_tools import ProductSearchResult, ToolError, ToolErrorCode
 from trace_models import record_tool_execution
@@ -161,10 +162,20 @@ class ToolExecutor:
             (time.monotonic() - started_at) * 1000,
         )
 
+        payload = result.model_dump(mode="json")
+        source_groups = (
+            payload["products"]
+            if isinstance(result, ProductSearchResult)
+            else [payload]
+        )
+        for group in source_groups:
+            for source in group["sources"]:
+                source["source_id"] = source_id(source["url"])
+
         content = json.dumps(
             {
                 "ok": True,
-                "result": result.model_dump(mode="json"),
+                "result": payload,
             },
             ensure_ascii=False,
             separators=(",", ":"),

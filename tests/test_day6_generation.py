@@ -76,7 +76,7 @@ class GenerationTests(unittest.TestCase):
             row["answer"],
             "无法确认价格。",
         )
-        self.assertEqual(row["event_types"], ["delta", "citations", "done"])
+        self.assertEqual(row["event_types"], ["delta", "done"])
         self.assertEqual(row["http_status"], 200)
         self.assertEqual(provider.queries, [case.question])
         self.assertTrue(row["clean_hits"])

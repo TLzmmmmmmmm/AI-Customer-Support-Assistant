@@ -364,7 +364,7 @@ class ChatRouteOrchestrationTests(unittest.TestCase):
             events=[],
             answer=(
                 "LY198 功率信息。详情见 "
-                "[产品页](https://fake.example/ly198)。\n\n"
+                "[产品页](https://fake.example/ly198)。【C_151e27afe4b407ca】\n\n"
                 "参考资料：\nFake：https://fake.example/source"
             ),
             sources=(trusted,),

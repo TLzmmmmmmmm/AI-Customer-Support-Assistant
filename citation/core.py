@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -9,6 +10,9 @@ from pydantic import ValidationError
 
 from knowledge_pipeline.models import SourceRef
 from citation.sanitization import sanitize_generated_answer
+
+
+_SOURCE_MARKER = re.compile(r"【(C_[0-9a-f]{16})】")
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,11 @@ def _normalized_url_identity(url: str) -> str:
         parsed.query,
         parsed.fragment,
     ))
+
+
+def source_id(url: str) -> str:
+    identity = _normalized_url_identity(url)
+    return "C_" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
 
 
 def collect_sources(sources: Iterable[object]) -> CitationCollection:
@@ -106,7 +115,9 @@ def render_answer(
     language_hint: str,
 ) -> CitationRenderResult:
     stripped = answer.strip()
-    cleaned = sanitize_generated_answer(answer)
+    sanitized_answer = sanitize_generated_answer(answer)
+    cited_ids = set(_SOURCE_MARKER.findall(sanitized_answer))
+    cleaned = _SOURCE_MARKER.sub("", sanitized_answer).strip()
     sanitized = cleaned != stripped
     if not cleaned:
         return CitationRenderResult(
@@ -119,16 +130,23 @@ def render_answer(
             used_fallback=True,
         )
 
+    if cleaned == fallback:
+        cited_ids.clear()
+
     collection = collect_sources(sources)
+    cited_sources = tuple(
+        source for source in collection.sources
+        if source_id(source.url) in cited_ids
+    )
     heading = None
-    if collection.sources:
+    if cited_sources:
         heading = citation_heading(
             language_text=cleaned,
             language_hint=language_hint,
         )
     return CitationRenderResult(
         text=cleaned,
-        sources=collection.sources,
+        sources=cited_sources,
         citation_heading=heading,
         invalid_source_count=collection.invalid_source_count,
         deduplicated_count=collection.deduplicated_count,

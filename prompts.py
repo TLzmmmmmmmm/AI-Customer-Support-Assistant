@@ -82,6 +82,8 @@ CITATION_GENERATION_POLICY = """
 Do not output URLs in the answer.
 Do not write a references or citation section.
 Do not invent or rewrite source titles.
+When a factual sentence uses a supplied source, append its exact source_id between 【 and 】 immediately after the sentence.
+Never mark a source that did not support the sentence.
 The backend adds trusted references after generation.
 """.strip()
 
@@ -196,7 +198,7 @@ def build_tool_messages(
 
 def build_rag_messages(
     messages: Sequence[ChatMessage],
-    retrieved_context: Sequence[Mapping[str, str]],
+    retrieved_context: Sequence[Mapping[str, object]],
 ) -> list[dict[str, str]]:
     payload = {
         "retrieved_context": [dict(item) for item in retrieved_context],

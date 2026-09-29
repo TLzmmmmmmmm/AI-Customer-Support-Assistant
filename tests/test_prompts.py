@@ -116,7 +116,7 @@ class RagPromptBuilderTests(unittest.TestCase):
                     messages[0]["content"],
                 )
 
-    def test_citation_and_plain_text_policies_are_unchanged(self):
+    def test_citation_marker_and_plain_text_policies(self):
         self.assertEqual(
             prompts.CITATION_GENERATION_POLICY,
             """## Citation output boundary
@@ -124,6 +124,8 @@ class RagPromptBuilderTests(unittest.TestCase):
 Do not output URLs in the answer.
 Do not write a references or citation section.
 Do not invent or rewrite source titles.
+When a factual sentence uses a supplied source, append its exact source_id between 【 and 】 immediately after the sentence.
+Never mark a source that did not support the sentence.
 The backend adds trusted references after generation.""",
         )
         self.assertEqual(

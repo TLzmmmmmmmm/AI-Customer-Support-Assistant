@@ -104,6 +104,37 @@ class AgentExecutorTests(unittest.TestCase):
         self.assertEqual(first.sources, (source,))
         self.assertEqual(reused.sources, (source,))
         self.assertTrue(reused.reused)
+        self.assertEqual(
+            json.loads(first.content)["result"]["products"][0]["sources"],
+            [{
+                "title": "LY198 产品详情",
+                "url": "https://example.com/products/ly198/",
+                "source_id": "C_d239f1cf96057838",
+            }],
+        )
+
+    def test_contact_observation_exposes_source_id_without_changing_source_model(self):
+        from agent.executor import ToolExecutor
+        from knowledge_pipeline.models import SourceRef
+
+        source = SourceRef(title="联系我们", url="https://example.com/source/")
+        executor = ToolExecutor(MappingProxyType({
+            "get_contact_info": lambda: ContactInfoResult(
+                company_name="测试公司",
+                duty_phone="4000000000",
+                email="support@example.com",
+                sources=[source],
+            ),
+        }))
+
+        observation = executor.execute_named("get_contact_info", {}, {})
+
+        self.assertEqual(observation.sources, (source,))
+        self.assertEqual(json.loads(observation.content)["result"]["sources"], [{
+            "title": "联系我们",
+            "url": "https://example.com/source/",
+            "source_id": "C_9e0667d4f1f44f2b",
+        }])
 
     def test_failed_observation_has_no_sources(self):
         from agent.executor import ToolExecutor

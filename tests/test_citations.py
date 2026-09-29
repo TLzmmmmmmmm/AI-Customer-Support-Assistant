@@ -133,6 +133,54 @@ class CitationHeadingTests(unittest.TestCase):
 
 
 class CitationRenderingTests(unittest.TestCase):
+    def test_only_sources_marked_in_answer_are_rendered(self):
+        from citation import render_answer
+
+        sources = [
+            SourceRef(title="A", url="https://example.com/a"),
+            SourceRef(title="B", url="https://example.com/b"),
+        ]
+        result = render_answer(
+            "答案依据 A。【C_2dce0a4c50441bfc】",
+            sources,
+            fallback="Safe fallback",
+            language_hint="问题",
+        )
+
+        self.assertEqual(result.text, "答案依据 A。")
+        self.assertEqual(result.sources, (sources[0],))
+        self.assertEqual(result.citation_heading, "参考资料：")
+
+    def test_missing_or_unknown_markers_do_not_create_citations(self):
+        from citation import render_answer
+
+        source = SourceRef(title="A", url="https://example.com/a")
+        for answer in ("普通回答。", "普通回答。【C_0000000000000000】"):
+            with self.subTest(answer=answer):
+                result = render_answer(
+                    answer,
+                    (source,),
+                    fallback="安全回答",
+                    language_hint="问题",
+                )
+                self.assertEqual(result.text, "普通回答。")
+                self.assertEqual(result.sources, ())
+                self.assertIsNone(result.citation_heading)
+
+    def test_marker_in_removed_reference_section_does_not_count(self):
+        from citation import render_answer
+
+        source = SourceRef(title="A", url="https://example.com/a")
+        result = render_answer(
+            "普通回答。\n\n参考资料：\nA【C_2dce0a4c50441bfc】",
+            (source,),
+            fallback="安全回答",
+            language_hint="问题",
+        )
+
+        self.assertEqual(result.text, "普通回答。")
+        self.assertEqual(result.sources, ())
+
     def test_all_invalid_sources_keep_answer_without_empty_reference_section(self):
         from citation import render_answer
 
@@ -160,7 +208,7 @@ class CitationRenderingTests(unittest.TestCase):
         )
 
         result = render_answer(
-            "Read https://trusted.example/product",
+            "Read https://trusted.example/product 【C_80d0128d0cc23d21】",
             (source,),
             fallback="Safe fallback",
             language_hint="question",
@@ -180,7 +228,7 @@ class CitationRenderingTests(unittest.TestCase):
         )
 
         result = render_answer(
-            "详情见 https://fake.example/ly198",
+            "详情见 https://fake.example/ly198 【C_e5684a6ab49f7b08】",
             [trusted],
             fallback="安全回答",
             language_hint="LY198 功率是多少？",
@@ -208,6 +256,21 @@ class CitationRenderingTests(unittest.TestCase):
         self.assertIsNone(result.citation_heading)
         self.assertTrue(result.answer_sanitized)
         self.assertTrue(result.used_fallback)
+
+    def test_fallback_text_with_marker_has_no_citation(self):
+        from citation import render_answer
+
+        source = SourceRef(title="A", url="https://example.com/a")
+        result = render_answer(
+            "Safe fallback【C_2dce0a4c50441bfc】",
+            (source,),
+            fallback="Safe fallback",
+            language_hint="question",
+        )
+
+        self.assertEqual(result.text, "Safe fallback")
+        self.assertEqual(result.sources, ())
+        self.assertIsNone(result.citation_heading)
 
 
 if __name__ == "__main__":

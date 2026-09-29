@@ -4,6 +4,7 @@ from .core import (
     citation_heading,
     collect_sources,
     render_answer,
+    source_id,
 )
 from .sanitization import sanitize_generated_answer
 
@@ -13,5 +14,6 @@ __all__ = [
     "citation_heading",
     "collect_sources",
     "render_answer",
+    "source_id",
     "sanitize_generated_answer",
 ]

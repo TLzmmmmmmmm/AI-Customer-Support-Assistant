@@ -38,7 +38,7 @@ def retrieval_result(
 class RagContextBuilderTests(unittest.TestCase):
     def _builder(
         self,
-    ) -> Callable[[Sequence[RetrievalResult]], list[dict[str, str]]]:
+    ) -> Callable[[Sequence[RetrievalResult]], list[dict[str, object]]]:
         try:
             module = importlib.import_module("rag_context")
         except ModuleNotFoundError:
@@ -47,7 +47,7 @@ class RagContextBuilderTests(unittest.TestCase):
         self.assertIsNotNone(builder)
         return builder
 
-    def test_preserves_all_five_results_in_order_with_only_llm_fields(self):
+    def test_preserves_all_five_results_with_trusted_source_ids(self):
         results = [
             retrieval_result(1, "产品概述", "# 产品一\n\n完整概述文本。"),
             retrieval_result(2, "技术参数", "# 产品二\n\n功率：5W。"),
@@ -64,26 +64,31 @@ class RagContextBuilderTests(unittest.TestCase):
                 "type": "product",
                 "section": "产品概述",
                 "text": "# 产品一\n\n完整概述文本。",
+                "source_ids": ["C_ad255f82bbce2cdf"],
             },
             {
                 "type": "product",
                 "section": "技术参数",
                 "text": "# 产品二\n\n功率：5W。",
+                "source_ids": ["C_490f3f610a623da3"],
             },
             {
                 "type": "product",
                 "section": "产品功能",
                 "text": "# 产品三\n\n支持完整功能说明。",
+                "source_ids": ["C_8ffe619d5f1014e1"],
             },
             {
                 "type": "product",
                 "section": "应用场景",
                 "text": "# 产品四\n\n适用于应急通信。",
+                "source_ids": ["C_5b0abbc697c92e46"],
             },
             {
                 "type": "product",
                 "section": "注意事项",
                 "text": "# 产品五\n\n不得截断的最后一条完整文本。",
+                "source_ids": ["C_ad4af77cfe2520ce"],
             },
         ]
 
@@ -93,7 +98,7 @@ class RagContextBuilderTests(unittest.TestCase):
         self.assertEqual(first, expected)
         self.assertEqual(second, expected)
         for item in first:
-            self.assertEqual(set(item), {"type", "section", "text"})
+            self.assertEqual(set(item), {"type", "section", "text", "source_ids"})
 
     def test_empty_results_produce_empty_context(self):
         self.assertEqual(self._builder()([]), [])

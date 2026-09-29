@@ -15,6 +15,7 @@ import concurrency
 import app_logging
 import main
 import rate_limit
+from citation import source_id
 from knowledge_pipeline.retrieval import (
     ExactEntityResolver,
     NumpyExactVectorIndex,
@@ -203,6 +204,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             with self.subTest(question=question):
                 self.embedding.queries.clear()
                 self.create.reset_mock()
+                self.create.side_effect = lambda **kwargs: text_completion(
+                    "受控回答" + "".join(
+                        f"【{source_id(url)}】" for _, url in citations
+                    )
+                )
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
                     response = self.post(question)
                 answer = SAFE_FALLBACK_ANSWER if route == "fallback" else "受控回答"
@@ -249,7 +255,9 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         for question, route, citations in cases:
             with self.subTest(route=route):
                 self.create.side_effect = lambda **kwargs: TextCompletion(
-                    "受控回答",
+                    "受控回答" + "".join(
+                        f"【{source_id(url)}】" for _, url in citations
+                    ),
                     usage=usage,
                 )
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
@@ -295,10 +303,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 self.create.reset_mock()
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
                     response = self.post(question)
-                self.assert_ndjson(response, citations=(
-                    ("HP780", "https://example.com/hp780/"),
-                    ("润信达 LY198", "https://example.com/ly198/"),
-                ))
+                self.assert_ndjson(response)
                 self.assertEqual(self.embedding.queries, [question])
                 self.assertEqual(self.create.call_count, 1)
                 self.assertNotIn("tools", self.create.call_args.kwargs)
@@ -318,13 +323,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         with self.assertLogs("ai_customer_support", level="INFO") as logs:
             response = self.post("推荐几款对讲机")
 
-        self.assert_ndjson(
-            response,
-            citations=(
-                ("HP780", "https://example.com/hp780/"),
-                ("润信达 LY198", "https://example.com/ly198/"),
-            ),
-        )
+        self.assert_ndjson(response)
         message = logs.records[0].getMessage()
         self.assertIn("router_type=deterministic", message)
         self.assertIn("retrieval_used=true", message)
@@ -355,10 +354,6 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assert_ndjson(
             response,
             "候选产品，请联系专业技术人员确认选型。",
-            (
-                ("HP780", "https://example.com/hp780/"),
-                ("润信达 LY198", "https://example.com/ly198/"),
-            ),
         )
         self.assertEqual(self.embedding.queries, [question])
         self.assertEqual(self.create.call_count, 2)
@@ -385,10 +380,6 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.assert_ndjson(
             response,
             "候选产品。",
-            (
-                ("HP780", "https://example.com/hp780/"),
-                ("润信达 LY198", "https://example.com/ly198/"),
-            ),
         )
         message = logs.records[0].getMessage()
         self.assertIn("router_type=llm", message)
@@ -429,7 +420,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         question = "介绍应急通信解决方案，另外怎么联系你们？"
         self.create.side_effect = [
             tool_completion("contact-1", "get_contact_info", "{}"),
-            text_completion("方案说明和联系渠道。"),
+            text_completion(
+                "方案说明和联系渠道。"
+                f"【{source_id('https://example.com/hotel/')}】"
+                f"【{source_id('https://www.shengborun.com/about/#contact')}】"
+            ),
         ]
         with self.assertLogs("ai_customer_support", level="INFO") as logs:
             response = self.post(question)
@@ -439,8 +434,6 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             "方案说明和联系渠道。",
             (
                 ("酒店通信", "https://example.com/hotel/"),
-                ("HP780", "https://example.com/hp780/"),
-                ("润信达 LY198", "https://example.com/ly198/"),
                 ("联系我们", "https://www.shengborun.com/about/#contact"),
             ),
         )
@@ -459,7 +452,10 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 "get_product_details",
                 '{"product_id":"hp780"}',
             ),
-            text_completion("第二款 HP780 的防护等级是 IP68。"),
+            text_completion(
+                "第二款 HP780 的防护等级是 IP68。"
+                f"【{source_id('https://www.shengborun.com/two-way-radio/hp780/')}】"
+            ),
         ]
         history = (
             {"role": "user", "content": "推荐两款产品。"},
@@ -542,10 +538,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         private_question = "怎么联系你们？private-question-marker"
         with self.assertLogs("ai_customer_support", level="INFO") as logs:
             response = self.post(private_question)
-        self.assert_ndjson(
-            response,
-            citations=(("联系我们", "https://www.shengborun.com/about/#contact"),),
-        )
+        self.assert_ndjson(response)
         message = logs.records[0].getMessage()
         for forbidden in (
             private_question,
