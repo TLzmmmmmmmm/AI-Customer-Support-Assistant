@@ -279,6 +279,15 @@ class Day3ManifestTests(unittest.TestCase):
         self.assertEqual(post.call_count, 1)
         sleep.assert_not_called()
 
+    def test_comparison_schedule_balances_pair_order(self):
+        schedule = runner._comparison_schedule(manifest_data())
+
+        baseline_first = sum(order[0] == "baseline" for _, order, _ in schedule)
+        after_first = sum(order[0] == "after" for _, order, _ in schedule)
+
+        self.assertEqual(baseline_first, 25)
+        self.assertEqual(after_first, 25)
+
     def test_comparison_runner_writes_paired_privacy_bounded_rows(self):
         manifest = manifest_data()
 
@@ -514,6 +523,20 @@ class Day3GateTests(unittest.TestCase):
         analysis = analyze_day3_phases(baseline, after)
 
         self.assertFalse(analysis["gates"]["client_metrics_complete"])
+        self.assertFalse(analysis["gates"]["all_pass"])
+
+    def test_client_total_regression_over_15_percent_prevents_conclusion_a(self):
+        baseline, after = passing_pairs()
+        for candidate in after:
+            if candidate["summary"]["route"] == "direct":
+                candidate["workload"]["client_total_latency_ms"] = 2933.0
+
+        analysis = analyze_day3_phases(baseline, after)
+
+        self.assertFalse(
+            analysis["gates"]
+            ["client_total_latency_p50_within_15_percent"]["direct"]
+        )
         self.assertFalse(analysis["gates"]["all_pass"])
 
 

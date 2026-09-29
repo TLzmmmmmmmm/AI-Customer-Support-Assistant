@@ -112,14 +112,16 @@ def _comparison_schedule(
     keys = list(by_phase["baseline"])
     randomizer = random.Random(int(manifest["seed"]))
     randomizer.shuffle(keys)
+    orders = [
+        ("baseline", "after")
+        if index % 2 == 0
+        else ("after", "baseline")
+        for index in range(len(keys))
+    ]
+    randomizer.shuffle(orders)
     schedule = []
-    for case_id, execution_index in keys:
+    for (case_id, execution_index), order in zip(keys, orders, strict=True):
         pair_id = f"{case_id}:{execution_index}"
-        order = (
-            ("baseline", "after")
-            if randomizer.randrange(2) == 0
-            else ("after", "baseline")
-        )
         schedule.append((pair_id, order, {
             phase: by_phase[phase][(case_id, execution_index)]
             for phase in ("baseline", "after")

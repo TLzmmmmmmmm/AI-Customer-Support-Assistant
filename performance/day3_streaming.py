@@ -461,6 +461,7 @@ def analyze_day3_phases(
         }
 
     total_gate = {}
+    client_total_gate = {}
     for route in DAY3_ROUTES:
         before = _p50(metrics["baseline"], route, "total_latency_ms")
         after = _p50(metrics["after"], route, "total_latency_ms")
@@ -469,7 +470,19 @@ def analyze_day3_phases(
             and after is not None
             and after <= before * 1.15
         )
+        client_before = _p50(
+            metrics["baseline"], route, "client_total_latency_ms"
+        )
+        client_after = _p50(
+            metrics["after"], route, "client_total_latency_ms"
+        )
+        client_total_gate[route] = (
+            client_before is not None
+            and client_after is not None
+            and client_after <= client_before * 1.15
+        )
     all_routes_total_gate = all(total_gate.values())
+    all_routes_client_total_gate = all(client_total_gate.values())
 
     all_pairs = [*baseline_pairs, *after_pairs]
     request_costs = []
@@ -515,6 +528,7 @@ def analyze_day3_phases(
         and all(item["pass"] for item in ttft.values())
         and all(item["pass"] for item in client_ttft.values())
         and all_routes_total_gate
+        and all_routes_client_total_gate
     )
     return {
         "schema_version": "1.0",
@@ -542,6 +556,10 @@ def analyze_day3_phases(
             "total_latency_p50_within_15_percent": total_gate,
             "all_routes_total_latency_p50_within_15_percent": (
                 all_routes_total_gate
+            ),
+            "client_total_latency_p50_within_15_percent": client_total_gate,
+            "all_routes_client_total_latency_p50_within_15_percent": (
+                all_routes_client_total_gate
             ),
             "all_pass": all_pass,
         },
@@ -609,6 +627,10 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
     lines.append(
         "- All routes total-latency P50 <=15% regression: "
         f"`{gates['all_routes_total_latency_p50_within_15_percent']}`"
+    )
+    lines.append(
+        "- All routes client total-latency P50 <=15% regression: "
+        f"`{gates['all_routes_client_total_latency_p50_within_15_percent']}`"
     )
     lines.extend((
         "",
