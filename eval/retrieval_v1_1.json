@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "suite_id": "shengborun-semantic-retrieval-v1.1",
-  "chunk_snapshot_sha256": "90e49b43a72ce697dc086b6de2b575eaf658246fccfa1beada8e198506015ce3",
+  "chunk_snapshot_sha256": "8d043da51bb83c03c1b340f060d7a8ee420ad5400c6accc8767ef335f0e6b35c",
   "default_top_k": 5,
   "cases": [
     {
