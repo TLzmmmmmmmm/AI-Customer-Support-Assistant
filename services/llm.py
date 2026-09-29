@@ -1,5 +1,5 @@
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 
 from openai import (
     APIConnectionError,
@@ -20,6 +20,7 @@ from config import (
 from trace_models import (
     add_request_duration,
     record_model_response,
+    record_model_usage,
 )
 
 
@@ -29,6 +30,10 @@ client = OpenAI(
     timeout=DEEPSEEK_TIMEOUT_SECONDS,
     max_retries=DEEPSEEK_MAX_RETRIES,
 )
+
+
+class IncompleteModelStreamError(RuntimeError):
+    pass
 
 
 def is_retryable_status(error: APIStatusError) -> bool:
@@ -83,6 +88,80 @@ def complete_chat(
             except APIStatusError as error:
                 if (
                     not is_retryable_status(error)
+                    or attempt >= LLM_APP_MAX_RETRIES
+                ):
+                    raise
+
+            attempt += 1
+            time.sleep(LLM_RETRY_DELAY_SECONDS)
+    finally:
+        add_request_duration(
+            "model_latency_ms",
+            (time.monotonic() - started_at) * 1000,
+        )
+
+
+def stream_chat(
+    messages: Sequence[Mapping[str, object]],
+) -> Iterator[str]:
+    started_at = time.monotonic()
+    provider_messages = _copy_messages(messages)
+    attempt = 0
+
+    try:
+        while True:
+            has_yielded_content = False
+            final_usage = None
+            finish_reason = None
+
+            try:
+                stream = client.chat.completions.create(
+                    model=DEEPSEEK_MODEL,
+                    messages=provider_messages,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                    extra_body={
+                        "thinking": {
+                            "type": "disabled",
+                        },
+                    },
+                )
+
+                try:
+                    for chunk in stream:
+                        usage = getattr(chunk, "usage", None)
+                        if usage is not None:
+                            final_usage = usage
+                        if not chunk.choices:
+                            continue
+
+                        choice = chunk.choices[0]
+                        content = choice.delta.content
+                        if content:
+                            has_yielded_content = True
+                            yield content
+                        if getattr(choice, "finish_reason", None) is not None:
+                            finish_reason = choice.finish_reason
+                finally:
+                    close = getattr(stream, "close", None)
+                    if close is not None:
+                        close()
+
+                record_model_usage(final_usage)
+                if finish_reason != "stop" and has_yielded_content:
+                    raise IncompleteModelStreamError(
+                        "provider stream ended without a complete answer"
+                    )
+                return
+            except APITimeoutError:
+                raise
+            except APIConnectionError:
+                if has_yielded_content or attempt >= LLM_APP_MAX_RETRIES:
+                    raise
+            except APIStatusError as error:
+                if (
+                    has_yielded_content
+                    or not is_retryable_status(error)
                     or attempt >= LLM_APP_MAX_RETRIES
                 ):
                     raise

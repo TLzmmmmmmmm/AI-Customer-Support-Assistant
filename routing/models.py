@@ -45,6 +45,8 @@ class RouteTrace:
     retrieval_latency_ms: float | None = None
     tool_latency_ms: float | None = None
     model_latency_ms: float | None = None
+    first_delta_latency_ms: float | None = None
+    buffering_saved_ms: float | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
     prompt_cache_hit_tokens: int | None = None

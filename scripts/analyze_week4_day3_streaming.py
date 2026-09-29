@@ -27,10 +27,12 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _phase(results: Path, summaries: Path, expected: str):
+def _phase(results: Path, summaries: Path, expected: str, expected_mode: str):
     header, attempts = load_workload_rows(results)
     if header.get("phase") != expected:
         raise ValueError(f"expected {expected} phase")
+    if header.get("mode") != expected_mode:
+        raise ValueError(f"expected {expected_mode} mode")
     summary_rows, issues = load_summaries(summaries)
     joined = join_attempts(attempts, summary_rows)
     if issues:
@@ -42,6 +44,10 @@ def _phase(results: Path, summaries: Path, expected: str):
         "attempts": len(attempts),
         "matched": len(joined["matched"]),
         "unrelated_summary_count": joined["unrelated_summary_count"],
+        "base_url": header.get("base_url"),
+        "model": header.get("model"),
+        "seed": header.get("seed"),
+        "repeat_count": header.get("repeat_count"),
     }
 
 
@@ -60,9 +66,22 @@ def _write(path: Path, text: str, *, overwrite: bool) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     baseline, baseline_join = _phase(
-        args.baseline_results, args.baseline_summaries, "baseline"
+        args.baseline_results,
+        args.baseline_summaries,
+        "baseline",
+        "buffered",
     )
-    after, after_join = _phase(args.after_results, args.after_summaries, "after")
+    after, after_join = _phase(
+        args.after_results,
+        args.after_summaries,
+        "after",
+        "streaming",
+    )
+    if baseline_join["base_url"] == after_join["base_url"]:
+        raise ValueError("baseline and after must use different endpoints")
+    for field in ("model", "seed", "repeat_count"):
+        if baseline_join[field] != after_join[field]:
+            raise ValueError(f"baseline and after {field} must match")
     analysis = analyze_day3_phases(baseline, after)
     analysis["telemetry_join"] = {
         "baseline": baseline_join,

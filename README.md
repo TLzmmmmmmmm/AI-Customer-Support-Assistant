@@ -22,7 +22,7 @@ A production AI customer-support system built for **Shengborun Communications**,
 | **Backend Verification** | **669/669 tests passed** |
 | **Frontend Verification** | **28/28 unit tests passed** |
 | **Security Evaluation** | **32 internal adversarial runs** across 12 attack families, with **0 reviewed boundary breaches** |
-| **Streaming Experiment** | Product-search TTFT improved **42.4%**, but total latency regressed **16.9%**, so the optimization was not shipped |
+| **Streaming Experiment** | Product-search TTFT improved **42.4%**, but total latency regressed **16.9%**; the original rollout was withheld and the current scoped restoration requires fresh benchmarking |
 
 > Performance results come from controlled representative production-path workloads, not organic customer traffic or production SLOs.
 
@@ -115,7 +115,7 @@ High-confidence requests are routed deterministically. Ambiguous requests may us
 | **Exact entity lookup** | Semantic search for every product query | Known identities should be resolved deterministically rather than ranked probabilistically |
 | **Hybrid routing** | LLM agent for every request | Reduces unnecessary model latency, token usage, and nondeterminism |
 | **Typed, read-only tools** | Free-form or write-capable tools | Current business scope did not justify authorization and mutation complexity |
-| **Buffered production response** | True token streaming | Streaming failed the predefined total-latency release guardrail |
+| **True token streaming for non-agentic final answers** | Stream agentic tool-selection turns | Tool calls remain buffered so only final answer text reaches clients |
 
 > **When identity is known, resolve identity. When relevance is unknown, rank semantically.**
 
@@ -204,7 +204,7 @@ The maximum allowed total-latency regression was **15%**.
 
 All correctness and finalization checks passed, but the performance guardrail did not.
 
-I therefore retained the buffered production path and removed the unused streaming implementation.
+I initially retained the buffered production path after that experiment. The current implementation restores token streaming for non-agentic final answers, while keeping agentic tool-selection turns buffered and filtering citation IDs before each delta is emitted.
 
 > **Ship against guardrails, not isolated numbers.**
 
@@ -234,7 +234,7 @@ This was an internal engineering assessment, not a penetration test or security 
 - **Small local index:** NumPy retrieval is appropriate for the current 74-vector corpus, but the project does not establish large-scale retrieval performance.
 - **Process-local controls:** rate limiting and concurrency state would require shared infrastructure for multi-instance deployment.
 - **Read-only tools:** the system cannot yet create support tickets, modify CRM records, check live inventory, or perform other external write actions.
-- **Buffered delivery:** token-level streaming was tested but intentionally withheld after failing the performance release guardrail.
+- **Streaming delivery:** non-agentic final answers stream token chunks over NDJSON; agentic tool-selection turns remain buffered, and citations are emitted after the final answer.
 
 ---
 

@@ -6,7 +6,6 @@ from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from agent import SAFE_AGENT_ANSWER
 from tests.test_day6_retrieval import ControlledQueryProvider, evaluation_case, real_retriever
 from tests.test_retrieval_evaluation import chunk, result
 
@@ -19,6 +18,17 @@ class ProviderCompletion:
             finish_reason=finish,
             message=SimpleNamespace(content=text, tool_calls=None),
         )]
+
+    def __iter__(self):
+        choice = self.choices[0]
+        yield SimpleNamespace(
+            model=self.model,
+            usage=None,
+            choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=choice.message.content),
+                finish_reason=choice.finish_reason,
+            )],
+        )
 
 
 class GenerationTests(unittest.TestCase):
@@ -82,8 +92,8 @@ class GenerationTests(unittest.TestCase):
         self.assertTrue(row["clean_hits"])
         self.assertEqual(row["provider_requests"][0], received[0])
         self.assertNotIn("max_tokens", received[0])
-        self.assertNotIn("stream_options", received[0])
-        self.assertFalse(received[0]["stream"])
+        self.assertEqual(received[0]["stream_options"], {"include_usage": True})
+        self.assertTrue(received[0]["stream"])
         self.assertEqual(received[0]["extra_body"], {"thinking": {"type": "disabled"}})
         payload = json.loads(received[0]["messages"][-1]["content"].split("BEGIN_RAG_DATA\n", 1)[1].rsplit("\nEND_RAG_DATA", 1)[0])
         self.assertEqual(payload["user_question"], case.question)
@@ -118,13 +128,13 @@ class GenerationTests(unittest.TestCase):
         self.assertIn("INJECT", json.dumps(received[0]["messages"]))
         self.assertEqual(row["clean_hits"][0]["content_hash"], row["effective_hits"][0]["content_hash"])
 
-    def test_length_finish_is_incomplete_even_with_done_event(self):
+    def test_length_finish_preserves_partial_stream_as_incomplete(self):
         case = evaluation_case("dev-cut", "alpha 参数", [chunk("alpha")])
         rows, summary, _, _ = self.run_cases(
             [case],
             [ProviderCompletion("部分回答", "length")],
         )
-        self.assertEqual(rows[0]["answer"], SAFE_AGENT_ANSWER)
+        self.assertEqual(rows[0]["answer"], "部分回答")
         self.assertEqual(rows[0]["status"], "incomplete")
         self.assertEqual(rows[0]["error_type"], "GenerationNotComplete")
         self.assertEqual(summary["completed_cases"], 0)

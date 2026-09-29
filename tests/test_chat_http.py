@@ -91,6 +91,21 @@ def text_completion(content, finish_reason="stop"):
     return TextCompletion(content, finish_reason)
 
 
+def text_stream(*parts, usage=None):
+    chunks = [
+        SimpleNamespace(
+            choices=[SimpleNamespace(
+                delta=SimpleNamespace(content=part),
+                finish_reason=("stop" if index == len(parts) - 1 else None),
+            )],
+            usage=None,
+        )
+        for index, part in enumerate(parts)
+    ]
+    chunks.append(SimpleNamespace(choices=[], usage=usage))
+    return chunks
+
+
 def tool_completion(call_id, name, arguments):
     call = SimpleNamespace(
         id=call_id,
@@ -133,7 +148,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         self.create = self.enterContext(patch.object(
             llm.client.chat.completions,
             "create",
-            side_effect=lambda **kwargs: text_completion("受控回答"),
+            side_effect=lambda **kwargs: (
+                text_stream("受控", "回答")
+                if kwargs.get("stream")
+                else text_completion("受控回答")
+            ),
         ))
         self.enterContext(patch.object(llm.time, "sleep"))
         self.client = self.enterContext(
@@ -146,9 +165,21 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
 
     def assert_ndjson(self, response, answer="受控回答", citations=()):
         self.assertEqual(response.status_code, 200)
-        events = [{"type": "delta", "content": answer}]
+        actual = [json.loads(line) for line in response.text.splitlines()]
+        self.assertEqual(
+            "".join(
+                event["content"]
+                for event in actual
+                if event["type"] == "delta"
+            ),
+            answer,
+        )
+        events = [
+            event for event in actual
+            if event["type"] != "delta"
+        ]
         if citations:
-            events.append({
+            self.assertEqual(events[0], {
                 "type": "citations",
                 "heading": "参考资料：",
                 "items": [
@@ -156,11 +187,8 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                     for title, url in citations
                 ],
             })
-        events.append({"type": "done"})
-        self.assertEqual(
-            [json.loads(line) for line in response.text.splitlines()],
-            events,
-        )
+            events = events[1:]
+        self.assertEqual(events, [{"type": "done"}])
 
     def assert_slot_available(self):
         acquired = self.slot.acquire(blocking=False)
@@ -204,10 +232,13 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             with self.subTest(question=question):
                 self.embedding.queries.clear()
                 self.create.reset_mock()
-                self.create.side_effect = lambda **kwargs: text_completion(
-                    "受控回答" + "".join(
-                        f"【{source_id(url)}】" for _, url in citations
-                    )
+                generated = "受控回答" + "".join(
+                    f"【{source_id(url)}】" for _, url in citations
+                )
+                self.create.side_effect = lambda **kwargs: (
+                    text_stream(generated)
+                    if kwargs.get("stream")
+                    else text_completion(generated)
                 )
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
                     response = self.post(question)
@@ -224,7 +255,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 self.assertIn(f"citation_count={len(citations)}", message)
                 self.assert_slot_available()
 
-    def test_production_defaults_eligible_routes_to_buffered_generation(self):
+    def test_production_streams_eligible_final_generation(self):
         usage = SimpleNamespace(
             prompt_tokens=12,
             completion_tokens=8,
@@ -254,11 +285,13 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
 
         for question, route, citations in cases:
             with self.subTest(route=route):
-                self.create.side_effect = lambda **kwargs: TextCompletion(
-                    "受控回答" + "".join(
-                        f"【{source_id(url)}】" for _, url in citations
-                    ),
-                    usage=usage,
+                answer_tail = "回答" + "".join(
+                    f"【{source_id(url)}】" for _, url in citations
+                )
+                self.create.side_effect = lambda **kwargs: (
+                    text_stream("受控", answer_tail, usage=usage)
+                    if kwargs.get("stream")
+                    else TextCompletion("受控回答", usage=usage)
                 )
                 with self.assertLogs("ai_customer_support", level="INFO") as logs:
                     response = self.post(question)
@@ -266,7 +299,10 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                 events = [json.loads(line) for line in response.text.splitlines()]
                 self.assertEqual(
                     [event for event in events if event["type"] == "delta"],
-                    [{"type": "delta", "content": "受控回答"}],
+                    [
+                        {"type": "delta", "content": "受控"},
+                        {"type": "delta", "content": "回答"},
+                    ],
                 )
                 if citations:
                     self.assertEqual(events[-2], {
@@ -278,10 +314,10 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
                         ],
                     })
                 self.assertEqual(events[-1], {"type": "done"})
-                self.assertFalse(self.create.call_args.kwargs["stream"])
-                self.assertNotIn(
-                    "stream_options",
-                    self.create.call_args.kwargs,
+                self.assertTrue(self.create.call_args.kwargs["stream"])
+                self.assertEqual(
+                    self.create.call_args.kwargs["stream_options"],
+                    {"include_usage": True},
                 )
 
                 self.assertEqual(len(logs.records), 1)
@@ -318,7 +354,11 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             prompt_cache_hit_tokens=8,
             prompt_cache_miss_tokens=3,
         )
-        self.create.side_effect = lambda **kwargs: completion
+        self.create.side_effect = lambda **kwargs: (
+            text_stream("受控回答", usage=completion.usage)
+            if kwargs.get("stream")
+            else completion
+        )
 
         with self.assertLogs("ai_customer_support", level="INFO") as logs:
             response = self.post("推荐几款对讲机")
@@ -346,7 +386,7 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
         question = "地下停车场几十个人通信，有什么建议？"
         self.create.side_effect = [
             text_completion("product_search"),
-            text_completion("候选产品，请联系专业技术人员确认选型。"),
+            text_stream("候选产品，请联系专业技术人员确认选型。"),
         ]
         with self.assertLogs("ai_customer_support", level="INFO") as logs:
             response = self.post(question)
@@ -367,12 +407,14 @@ class ChatHttpRoutingAcceptanceTests(unittest.TestCase):
             prompt_tokens=5,
             completion_tokens=1,
         )
-        answer_completion = text_completion("候选产品。")
-        answer_completion.usage = SimpleNamespace(
+        answer_usage = SimpleNamespace(
             prompt_tokens=13,
             completion_tokens=3,
         )
-        self.create.side_effect = [router_completion, answer_completion]
+        self.create.side_effect = [
+            router_completion,
+            text_stream("候选产品。", usage=answer_usage),
+        ]
 
         with self.assertLogs("ai_customer_support", level="INFO") as logs:
             response = self.post("地下停车场几十个人通信，有什么建议？")

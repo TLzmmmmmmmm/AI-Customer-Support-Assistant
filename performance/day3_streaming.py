@@ -12,9 +12,16 @@ from typing import Any
 from performance.analysis import estimate_request_cost_cny, numeric_stats
 
 
-DAY3_ROUTES = ("product_search", "knowledge", "direct")
-DAY3_TOTAL_REQUESTS = 36
-DAY3_PHASE_REQUESTS = 18
+DAY3_ROUTES = (
+    "product_search",
+    "knowledge",
+    "exact_product",
+    "contact",
+    "direct",
+)
+DAY3_ROUTE_REQUESTS = 10
+DAY3_PHASE_REQUESTS = 50
+DAY3_TOTAL_REQUESTS = 100
 DAY3_COST_CEILING_CNY = 0.50
 
 
@@ -133,16 +140,24 @@ def parse_success_ndjson(body: str) -> dict[str, object]:
     return {"answer": "".join(parts), "delta_count": len(parts)}
 
 
-def day2_budget_screening_projection(path: Path) -> float:
+def day2_budget_screening_projection(
+    path: Path,
+    manifest: Mapping[str, object],
+) -> float:
     analysis = json.loads(path.read_text(encoding="utf-8"))
     by_route = analysis["estimated_cost_cny"]["by_route"]
-    means = [by_route[route]["mean"] for route in DAY3_ROUTES]
+    means = [
+        by_route[case["target_route"]]["mean"]
+        for case in manifest["cases"]
+    ]
     if any(
         not isinstance(value, (int, float)) or isinstance(value, bool)
         for value in means
     ):
         raise ValueError("Day 2 route cost means are incomplete")
-    return 12 * sum(float(value) for value in means)
+    return 2 * int(manifest["repeat_count"]) * sum(
+        float(value) for value in means
+    )
 
 
 def _is_success(pair: Mapping[str, object]) -> bool:
@@ -165,6 +180,18 @@ def _numeric_summary(
         for pair in pairs
         if isinstance(pair["summary"].get(field), (int, float))
         and not isinstance(pair["summary"].get(field), bool)
+    ])
+
+
+def _workload_numeric_summary(
+    pairs: Sequence[Mapping[str, object]],
+    field: str,
+) -> dict[str, object]:
+    return numeric_stats([
+        float(pair["workload"][field])
+        for pair in pairs
+        if isinstance(pair["workload"].get(field), (int, float))
+        and not isinstance(pair["workload"].get(field), bool)
     ])
 
 
@@ -205,7 +232,74 @@ def _route_metrics(
                 route_pairs, "model_latency_ms"
             ),
             "output_tokens": _numeric_summary(route_pairs, "output_tokens"),
+            "client_first_delta_latency_ms": _workload_numeric_summary(
+                route_pairs, "client_first_delta_latency_ms"
+            ),
+            "client_total_latency_ms": _workload_numeric_summary(
+                route_pairs, "client_total_latency_ms"
+            ),
+            "answer_chars": _workload_numeric_summary(
+                route_pairs, "answer_chars"
+            ),
             "estimated_cost_cny": cost_stats,
+        }
+    return metrics
+
+
+def _paired_differences(
+    baseline_pairs: Sequence[Mapping[str, object]],
+    after_pairs: Sequence[Mapping[str, object]],
+) -> dict[str, dict[str, object]]:
+    baseline_by_id = {
+        pair["workload"].get("pair_id"): pair
+        for pair in baseline_pairs
+        if pair["workload"].get("pair_id")
+    }
+    after_by_id = {
+        pair["workload"].get("pair_id"): pair
+        for pair in after_pairs
+        if pair["workload"].get("pair_id")
+    }
+    metrics = {}
+    for route in DAY3_ROUTES:
+        pairs = [
+            (baseline_by_id[pair_id], after_by_id[pair_id])
+            for pair_id in baseline_by_id.keys() & after_by_id.keys()
+            if baseline_by_id[pair_id]["summary"].get("route") == route
+            and after_by_id[pair_id]["summary"].get("route") == route
+            and _is_success(baseline_by_id[pair_id])
+            and _is_success(after_by_id[pair_id])
+        ]
+
+        def differences(source: str, field: str, *, reverse: bool = False):
+            values = []
+            for baseline, after in pairs:
+                before = baseline[source].get(field)
+                current = after[source].get(field)
+                if (
+                    isinstance(before, (int, float))
+                    and not isinstance(before, bool)
+                    and isinstance(current, (int, float))
+                    and not isinstance(current, bool)
+                ):
+                    delta = float(current) - float(before)
+                    values.append(delta if reverse else -delta)
+            return numeric_stats(values)
+
+        metrics[route] = {
+            "matched": len(pairs),
+            "server_first_delta_reduction_ms": differences(
+                "summary", "first_delta_latency_ms"
+            ),
+            "client_first_delta_reduction_ms": differences(
+                "workload", "client_first_delta_latency_ms"
+            ),
+            "total_latency_change_ms": differences(
+                "summary", "total_latency_ms", reverse=True
+            ),
+            "output_tokens_change": differences(
+                "summary", "output_tokens", reverse=True
+            ),
         }
     return metrics
 
@@ -224,6 +318,7 @@ def analyze_day3_phases(
         phase: _route_metrics(pairs)
         for phase, pairs in phase_pairs.items()
     }
+    paired_differences = _paired_differences(baseline_pairs, after_pairs)
     successful = {
         phase: sum(_is_success(pair) for pair in pairs)
         for phase, pairs in phase_pairs.items()
@@ -247,20 +342,23 @@ def analyze_day3_phases(
     success_gate = (
         len(baseline_pairs) == DAY3_PHASE_REQUESTS
         and len(after_pairs) == DAY3_PHASE_REQUESTS
-        and successful == {"baseline": 18, "after": 18}
+        and successful == {
+            "baseline": DAY3_PHASE_REQUESTS,
+            "after": DAY3_PHASE_REQUESTS,
+        }
     )
     success_by_phase = {
-        "baseline_18_of_18": (
+        "baseline_50_of_50": (
             len(baseline_pairs) == DAY3_PHASE_REQUESTS
             and successful["baseline"] == DAY3_PHASE_REQUESTS
         ),
-        "after_18_of_18": (
+        "after_50_of_50": (
             len(after_pairs) == DAY3_PHASE_REQUESTS
             and successful["after"] == DAY3_PHASE_REQUESTS
         ),
     }
     route_counts_pass = all(
-        route_counts[phase][route] == 6
+        route_counts[phase][route] == DAY3_ROUTE_REQUESTS
         for phase in phase_pairs
         for route in DAY3_ROUTES
     )
@@ -269,8 +367,49 @@ def analyze_day3_phases(
         for pairs in phase_pairs.values()
         for pair in pairs
     )
+    baseline_pair_ids = {
+        pair["workload"].get("pair_id") for pair in baseline_pairs
+    }
+    after_pair_ids = {
+        pair["workload"].get("pair_id") for pair in after_pairs
+    }
+    pair_gate = (
+        None not in baseline_pair_ids
+        and baseline_pair_ids == after_pair_ids
+        and len(baseline_pair_ids) == DAY3_PHASE_REQUESTS
+    )
+    baseline_mode_gate = all(
+        pair["workload"].get("mode") == "buffered"
+        and pair["workload"].get("delta_count") == 1
+        for pair in baseline_pairs
+    )
+    after_mode_gate = all(
+        pair["workload"].get("mode") == "streaming"
+        and isinstance(pair["workload"].get("delta_count"), int)
+        and pair["workload"]["delta_count"] > 1
+        for pair in after_pairs
+    )
+    streaming_mode_gate = baseline_mode_gate and after_mode_gate
+    target_routes_match = all(
+        pair["summary"].get("route") == pair["workload"].get("target_route")
+        for pairs in phase_pairs.values()
+        for pair in pairs
+    )
+    client_metrics_complete = all(
+        all(
+            isinstance(pair["workload"].get(field), (int, float))
+            and not isinstance(pair["workload"].get(field), bool)
+            for field in (
+                "client_first_delta_latency_ms",
+                "client_total_latency_ms",
+            )
+        )
+        for pairs in phase_pairs.values()
+        for pair in pairs
+    )
 
     ttft: dict[str, dict[str, object]] = {}
+    client_ttft: dict[str, dict[str, object]] = {}
     for route in ("product_search", "knowledge"):
         before = _p50(metrics["baseline"], route, "first_delta_latency_ms")
         after = _p50(metrics["after"], route, "first_delta_latency_ms")
@@ -290,6 +429,34 @@ def analyze_day3_phases(
                 and relative is not None
                 and absolute >= 500
                 and relative >= 0.30
+            ),
+        }
+        client_before = _p50(
+            metrics["baseline"], route, "client_first_delta_latency_ms"
+        )
+        client_after = _p50(
+            metrics["after"], route, "client_first_delta_latency_ms"
+        )
+        client_absolute = (
+            None
+            if client_before is None or client_after is None
+            else client_before - client_after
+        )
+        client_relative = (
+            None
+            if client_absolute is None or client_before is None or client_before <= 0
+            else client_absolute / client_before
+        )
+        client_ttft[route] = {
+            "baseline_p50_ms": client_before,
+            "after_p50_ms": client_after,
+            "absolute_reduction_ms": client_absolute,
+            "relative_reduction": client_relative,
+            "pass": (
+                client_absolute is not None
+                and client_relative is not None
+                and client_absolute >= 500
+                and client_relative >= 0.30
             ),
         }
 
@@ -318,6 +485,8 @@ def analyze_day3_phases(
             "phase": workload.get("phase"),
             "case_id": workload.get("case_id"),
             "target_route": workload.get("target_route"),
+            "pair_id": workload.get("pair_id"),
+            "mode": workload.get("mode"),
             "route": summary.get("route"),
             "success": _is_success(pair),
             "terminal_done": workload.get("terminal_done") is True,
@@ -326,6 +495,12 @@ def analyze_day3_phases(
             "total_latency_ms": summary.get("total_latency_ms"),
             "model_latency_ms": summary.get("model_latency_ms"),
             "output_tokens": summary.get("output_tokens"),
+            "delta_count": workload.get("delta_count"),
+            "client_first_delta_latency_ms": workload.get(
+                "client_first_delta_latency_ms"
+            ),
+            "client_total_latency_ms": workload.get("client_total_latency_ms"),
+            "answer_chars": workload.get("answer_chars"),
             "estimated_cost_cny": cost,
         })
 
@@ -333,7 +508,12 @@ def analyze_day3_phases(
         success_gate
         and route_counts_pass
         and terminal_gate
+        and pair_gate
+        and streaming_mode_gate
+        and target_routes_match
+        and client_metrics_complete
         and all(item["pass"] for item in ttft.values())
+        and all(item["pass"] for item in client_ttft.values())
         and all_routes_total_gate
     )
     return {
@@ -347,17 +527,25 @@ def analyze_day3_phases(
         "by_phase_route": metrics,
         "gates": {
             "success_by_phase": success_by_phase,
-            "success_36_of_36": success_gate,
+            "success_100_of_100": success_gate,
             "route_counts": route_counts,
             "route_counts_pass": route_counts_pass,
             "terminal_and_finalization": terminal_gate,
+            "pairs_complete": pair_gate,
+            "baseline_mode_verified": baseline_mode_gate,
+            "after_mode_verified": after_mode_gate,
+            "streaming_mode_verified": streaming_mode_gate,
+            "target_routes_match": target_routes_match,
+            "client_metrics_complete": client_metrics_complete,
             "ttft": ttft,
+            "client_ttft": client_ttft,
             "total_latency_p50_within_15_percent": total_gate,
             "all_routes_total_latency_p50_within_15_percent": (
                 all_routes_total_gate
             ),
             "all_pass": all_pass,
         },
+        "paired_differences": paired_differences,
         "estimated_cost_cny": {
             "coverage": len(request_costs),
             "total": sum(request_costs),
@@ -385,22 +573,19 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
         (
             "Conclusion: **A**. Every required safety and performance gate passed."
             if analysis["conclusion"] == "A"
-            else "Conclusion: **B**. Streaming semantics are safe, but at least one performance gate failed."
-        ),
-        "",
-        (
-            "Production deployment: **true streaming enabled**."
-            if analysis["conclusion"] == "A"
-            else "Production deployment: **buffered**; the experimental "
-            "streaming implementation remains covered but is not injected."
+            else "Conclusion: **B**. At least one comparison gate failed."
         ),
         "",
         "## Explicit gates",
         "",
-        f"- 18/18 baseline success: `{gates['success_by_phase']['baseline_18_of_18']}`",
-        f"- 18/18 after success: `{gates['success_by_phase']['after_18_of_18']}`",
-        f"- 36/36 success: `{gates['success_36_of_36']}`",
+        f"- 50/50 baseline success: `{gates['success_by_phase']['baseline_50_of_50']}`",
+        f"- 50/50 after success: `{gates['success_by_phase']['after_50_of_50']}`",
+        f"- 100/100 success: `{gates['success_100_of_100']}`",
         f"- Exact route counts: `{gates['route_counts_pass']}`",
+        f"- Complete baseline/after pairs: `{gates['pairs_complete']}`",
+        f"- Streaming mode verified: `{gates['streaming_mode_verified']}`",
+        f"- Target routes match: `{gates['target_routes_match']}`",
+        f"- Client metrics complete: `{gates['client_metrics_complete']}`",
         "- Every measured success ended with `done` after the final render "
         f"invariant: `{gates['terminal_and_finalization']}`",
     ]
@@ -409,6 +594,12 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
         lines.append(
             f"- {route} TTFT >=30% and >=500 ms: `{item['pass']}` "
             f"({item['absolute_reduction_ms']} ms, {item['relative_reduction']})"
+        )
+        client = gates["client_ttft"][route]
+        lines.append(
+            f"- {route} client TTFT >=30% and >=500 ms: "
+            f"`{client['pass']}` ({client['absolute_reduction_ms']} ms, "
+            f"{client['relative_reduction']})"
         )
     for route in DAY3_ROUTES:
         lines.append(
@@ -423,14 +614,15 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
         "",
         "## Route metrics",
         "",
-        "| Phase | Route | Success | Failure | TTFT P50/P95 ms | Buffering saved P50/P95 ms | Total P50/P95 ms | Model P50/P95 ms | Output tokens P50/P95 | Estimated cost CNY |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Phase | Route | Success | Failure | Server TTFT P50/P95 ms | Client TTFT P50/P95 ms | Client total P50/P95 ms | Total P50/P95 ms | Model P50/P95 ms | Output tokens P50/P95 | Estimated cost CNY |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ))
     for phase in ("baseline", "after"):
         for route in DAY3_ROUTES:
             item = metrics[phase][route]
             first = item["first_delta_latency_ms"]
-            saved = item["buffering_saved_ms"]
+            client_first = item["client_first_delta_latency_ms"]
+            client_total = item["client_total_latency_ms"]
             total = item["total_latency_ms"]
             model = item["model_latency_ms"]
             output = item["output_tokens"]
@@ -439,12 +631,35 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
                 f"| {phase} | {route} | {item['successful']} | "
                 f"{item['failed']} | "
                 f"{first['p50']} / {first['p95']} | "
-                f"{saved['p50']} / {saved['p95']} | "
+                f"{client_first['p50']} / {client_first['p95']} | "
+                f"{client_total['p50']} / {client_total['p95']} | "
                 f"{total['p50']} / {total['p95']} | "
                 f"{model['p50']} / {model['p95']} | "
                 f"{output['p50']} / {output['p95']} | "
                 f"{cost['total']:.6f} |"
             )
+    lines.extend((
+        "",
+        "## Paired latency differences",
+        "",
+        "Positive reductions mean streaming was faster; positive total/token changes mean streaming was larger or slower.",
+        "",
+        "| Route | Matched | Server TTFT reduction P50/P95 ms | Client TTFT reduction P50/P95 ms | Total change P50/P95 ms | Output token change P50/P95 |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ))
+    for route in DAY3_ROUTES:
+        item = analysis["paired_differences"][route]
+        server = item["server_first_delta_reduction_ms"]
+        client = item["client_first_delta_reduction_ms"]
+        total = item["total_latency_change_ms"]
+        tokens = item["output_tokens_change"]
+        lines.append(
+            f"| {route} | {item['matched']} | "
+            f"{server['p50']} / {server['p95']} | "
+            f"{client['p50']} / {client['p95']} | "
+            f"{total['p50']} / {total['p95']} | "
+            f"{tokens['p50']} / {tokens['p95']} |"
+        )
     lines.extend((
         "",
         "## Estimated cost and limitations",
@@ -453,7 +668,7 @@ def render_day3_markdown(analysis: Mapping[str, object]) -> str:
         "",
         "Repeated test cases may increase prompt cache reuse; observed estimated cost reflects the measured cache behavior of this representative synthetic workload.",
         "",
-        "This is synthetic server-side TTFT, not browser rendering latency or a production SLO.",
+        "Client timing measures receipt of NDJSON events by this local HTTP test client; it is not browser rendering latency or a production SLO.",
         "",
     ))
     return "\n".join(lines)

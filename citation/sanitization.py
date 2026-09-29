@@ -361,6 +361,81 @@ class IncrementalAnswerSanitizer:
         return final_delta
 
 
+_CITATION_MARKER_LENGTH = len("【C_0123456789abcdef】")
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+
+def _could_be_citation_marker(text: str) -> bool:
+    if not text.startswith("【"):
+        return False
+    body = text[1:]
+    if len(body) <= 2:
+        return "C_".startswith(body)
+    if not body.startswith("C_"):
+        return False
+    suffix = body[2:]
+    hexadecimal = suffix[:16]
+    if any(character not in _HEX_DIGITS for character in hexadecimal):
+        return False
+    if len(suffix) <= 16:
+        return True
+    return len(suffix) == 17 and suffix[-1] == "】"
+
+
+class IncrementalCitationMarkerFilter:
+    """Remove complete citation markers without exposing split prefixes."""
+
+    def __init__(self) -> None:
+        self._buffer = ""
+        self._finished = False
+
+    def feed(self, text: str) -> tuple[str, ...]:
+        if self._finished:
+            raise RuntimeError("incremental citation filter is already finished")
+        self._buffer += text
+        visible: list[str] = []
+        while self._buffer:
+            marker_start = self._buffer.find("【")
+            if marker_start < 0:
+                visible.append(self._buffer)
+                self._buffer = ""
+                break
+            if marker_start:
+                visible.append(self._buffer[:marker_start])
+                self._buffer = self._buffer[marker_start:]
+
+            candidate = self._buffer[:_CITATION_MARKER_LENGTH]
+            if len(candidate) == _CITATION_MARKER_LENGTH:
+                if (
+                    candidate.startswith("【C_")
+                    and candidate.endswith("】")
+                    and all(
+                        character in _HEX_DIGITS
+                        for character in candidate[3:-1]
+                    )
+                ):
+                    self._buffer = self._buffer[_CITATION_MARKER_LENGTH:]
+                    continue
+                visible.append(self._buffer[0])
+                self._buffer = self._buffer[1:]
+                continue
+            if _could_be_citation_marker(candidate):
+                break
+            visible.append(self._buffer[0])
+            self._buffer = self._buffer[1:]
+
+        delta = "".join(visible)
+        return (delta,) if delta else ()
+
+    def finish(self) -> str:
+        if self._finished:
+            return ""
+        self._finished = True
+        tail = self._buffer
+        self._buffer = ""
+        return tail
+
+
 def sanitize_generated_answer(answer: str) -> str:
     sanitizer = IncrementalAnswerSanitizer()
     visible = list(sanitizer.feed(answer))

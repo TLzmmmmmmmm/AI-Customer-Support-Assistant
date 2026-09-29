@@ -39,7 +39,7 @@ The final system was evaluated separately across retrieval, routing, tool action
 | **Latency** | **P50 1.00 s · P95 3.156 s** in that workload |
 | **Regression Verification** | **669/669 backend tests** and **28/28 frontend unit tests** passed on the final audited checkout |
 | **Security Evaluation** | **32 internal adversarial runs** across 12 attack families · **0 reviewed boundary breaches** |
-| **Streaming Experiment** | Product-search TTFT improved **42.4%**, but total latency regressed **16.9% → not shipped** |
+| **Streaming Experiment** | Product-search TTFT improved **42.4%**, but total latency regressed **16.9%**; the original rollout was withheld and the current scoped restoration requires fresh benchmarking |
 
 ---
 
@@ -309,7 +309,7 @@ flowchart TD
 
 The production HTTP interface uses NDJSON records.
 
-The current production path buffers the completed answer and emits it as one final `delta`; token-level streaming is not currently shipped.
+The current path streams non-agentic final answers as NDJSON `delta` events. Agentic tool-selection turns remain buffered, and citations are emitted only after the final answer completes.
 
 ---
 
@@ -502,7 +502,7 @@ For example, a 74-vector corpus did not require distributed retrieval infrastruc
 - **Small local retrieval index:** NumPy retrieval is appropriate for the current 74-vector corpus, but the project does not establish performance at substantially larger scale.
 - **Process-local admission controls:** rate limiting and concurrency state would require shared infrastructure for multi-instance deployment.
 - **Read-only business capabilities:** current tools can search products, retrieve exact product details, and return contact information, but cannot create tickets, modify CRM records, check live inventory, place orders, or perform other write actions.
-- **Buffered final delivery:** the API uses an NDJSON transport contract, but production currently returns the completed answer as one buffered delta. True token streaming was intentionally withheld after failing the release guardrail.
+- **Scoped token streaming:** non-agentic final answers stream through the existing NDJSON contract. Agentic tool-selection turns remain buffered, and citation IDs are removed before deltas reach clients.
 
 Write-capable tools would require additional authorization, confirmation, idempotency, and audit controls.
 

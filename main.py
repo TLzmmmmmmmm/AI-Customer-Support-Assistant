@@ -14,7 +14,7 @@ from error_handling import (
     validation_exception_handler,
 )
 from services.retrieval import build_retriever
-from services.llm import complete_chat
+from services.llm import complete_chat, stream_chat
 from services.tools import build_deterministic_tools
 from support_tools import build_tool_registry
 from agent import ToolExecutor
@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
         executor=executor,
         retriever=retriever,
         complete_chat=complete_chat,
+        stream_chat=stream_chat,
     ))
     app.state.route_orchestrator = GraphRouteOrchestrator(
         graph,

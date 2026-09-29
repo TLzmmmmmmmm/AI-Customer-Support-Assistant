@@ -92,6 +92,59 @@ def run_generation_cases(cases, fixtures, emit, *, retriever_factory=None, reque
             active["provider_errors"].append(type(error).__name__)
             raise
 
+        if kwargs.get("stream"):
+            def observed_stream():
+                first_content_at = None
+                try:
+                    for chunk in completion:
+                        if active["provider_model"] is None:
+                            active["provider_model"] = getattr(
+                                chunk,
+                                "model",
+                                None,
+                            ) or getattr(completion, "model", None)
+                        for choice in chunk.choices:
+                            content = getattr(choice.delta, "content", None)
+                            if isinstance(content, str) and content:
+                                if first_content_at is None:
+                                    first_content_at = time.monotonic()
+                                    active["llm_ttft_seconds"] = round(
+                                        first_content_at - generation_started,
+                                        6,
+                                    )
+                                active["provider_partial_answer"] += content
+                            if choice.finish_reason:
+                                active["finish_reasons"].append(
+                                    choice.finish_reason
+                                )
+                        yield chunk
+                except Exception as error:
+                    active["provider_errors"].append(type(error).__name__)
+                    raise
+                finally:
+                    completed_at = time.monotonic()
+                    elapsed = round(completed_at - generation_started, 6)
+                    total = round(
+                        (active["llm_total_latency_seconds"] or 0.0)
+                        + elapsed,
+                        6,
+                    )
+                    active["generation_latency_seconds"] = total
+                    active["llm_total_latency_seconds"] = total
+                    if active["llm_ttft_seconds"] is None:
+                        active["llm_ttft_seconds"] = elapsed
+                    active["llm_streaming_latency_seconds"] = round(
+                        max(0.0, completed_at - (
+                            first_content_at or completed_at
+                        )),
+                        6,
+                    )
+                    close = getattr(completion, "close", None)
+                    if close is not None:
+                        close()
+
+            return observed_stream()
+
         elapsed = round(time.monotonic() - generation_started, 6)
         total = round((active["llm_total_latency_seconds"] or 0.0) + elapsed, 6)
         active["generation_latency_seconds"] = total

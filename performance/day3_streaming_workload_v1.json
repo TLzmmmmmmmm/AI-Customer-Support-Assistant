@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "seed": 20260914,
-  "repeat_count": 3,
+  "repeat_count": 5,
   "interval_seconds": 6.5,
   "cases": [
     {
@@ -33,6 +33,26 @@
       "case_id": "product-search-hotel",
       "target_route": "product_search",
       "messages": [{"role": "user", "content": "酒店安保团队有哪些对讲机型号可以选择？"}]
+    },
+    {
+      "case_id": "exact-product-hp780",
+      "target_route": "exact_product",
+      "messages": [{"role": "user", "content": "HP780 的防护等级是什么？"}]
+    },
+    {
+      "case_id": "exact-product-hr1060",
+      "target_route": "exact_product",
+      "messages": [{"role": "user", "content": "HR1060 的电源电压是多少？"}]
+    },
+    {
+      "case_id": "contact-phone",
+      "target_route": "contact",
+      "messages": [{"role": "user", "content": "请提供公司的值班电话。"}]
+    },
+    {
+      "case_id": "contact-email",
+      "target_route": "contact",
+      "messages": [{"role": "user", "content": "公司的电子邮箱是什么？"}]
     }
   ]
 }

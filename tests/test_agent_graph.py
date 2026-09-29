@@ -227,6 +227,7 @@ def _nodes(
     executor=None,
     retriever=None,
     complete_chat=None,
+    stream_chat=None,
     routing_failure=None,
 ):
     decision = decision or RouteDecision(Route.DIRECT)
@@ -259,10 +260,134 @@ def _nodes(
         executor=executor or RecordingGraphExecutor(visited),
         retriever=retriever or RecordingRetriever(visited=visited),
         complete_chat=complete_chat,
+        stream_chat=stream_chat,
     )
 
 
 class AgentGraphTests(unittest.TestCase):
+    def test_buffered_run_ignores_stream_provider_for_eligible_routes(self):
+        def forbidden_stream(messages):
+            raise AssertionError("buffered run must not use stream provider")
+
+        decisions = (
+            RouteDecision(Route.PRODUCT_SEARCH),
+            RouteDecision(Route.EXACT_PRODUCT, product_id="ly198"),
+            RouteDecision(Route.CONTACT),
+            RouteDecision(Route.KNOWLEDGE),
+            RouteDecision(Route.DIRECT),
+        )
+        for decision in decisions:
+            with self.subTest(route=decision.route):
+                complete = RecordingCompletion([_completion("buffered answer")])
+                graph = build_agent_graph(_nodes(
+                    [],
+                    decision=decision,
+                    complete_chat=complete,
+                    stream_chat=forbidden_stream,
+                ))
+
+                result = GraphRouteOrchestrator(graph).run(
+                    [ChatMessage(role="user", content="测试问题")],
+                    deadline=RecordingDeadline(),
+                )
+
+                self.assertEqual(result.answer, "buffered answer")
+                self.assertEqual(len(complete.calls), 1)
+
+    def test_streams_only_non_agentic_final_answer_content(self):
+        class RecordingStreamChat:
+            def __init__(self):
+                self.calls = []
+
+            def __call__(self, messages):
+                self.calls.append(deepcopy(messages))
+                return iter(("第一段", "第二段"))
+
+        def buffered_completion(*args, **kwargs):
+            raise AssertionError("eligible final generation was buffered")
+
+        decisions = (
+            RouteDecision(Route.PRODUCT_SEARCH),
+            RouteDecision(Route.EXACT_PRODUCT, product_id="ly198"),
+            RouteDecision(Route.CONTACT),
+            RouteDecision(Route.KNOWLEDGE),
+            RouteDecision(Route.DIRECT),
+        )
+        for decision in decisions:
+            route = decision.route
+            with self.subTest(route=route):
+                visited = []
+                stream_chat = RecordingStreamChat()
+                graph = build_agent_graph(_nodes(
+                    visited,
+                    decision=decision,
+                    complete_chat=buffered_completion,
+                    stream_chat=stream_chat,
+                ))
+                orchestrator = GraphRouteOrchestrator(graph)
+
+                items = list(orchestrator.stream(
+                    [ChatMessage(role="user", content="测试问题")],
+                    deadline=RecordingDeadline(),
+                ))
+
+                self.assertEqual(items[:-1], ["第一段", "第二段"])
+                self.assertEqual(items[-1].answer, "第一段第二段")
+                self.assertEqual(len(stream_chat.calls), 1)
+                for item in items[:-1]:
+                    for forbidden in (
+                        route.value,
+                        '{"ok":true}',
+                        "BEGIN_RAG_DATA",
+                        "system",
+                        "tool_call",
+                    ):
+                        self.assertNotIn(forbidden, item)
+
+    def test_streamed_chunks_hide_split_citation_markers(self):
+        marker = "【C_0123456789abcdef】"
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.DIRECT),
+            complete_chat=lambda *args, **kwargs: self.fail(
+                "eligible final generation was buffered"
+            ),
+            stream_chat=lambda messages: iter((
+                f"正文{marker[:8]}",
+                f"{marker[8:]}结尾",
+            )),
+        ))
+
+        items = list(GraphRouteOrchestrator(graph).stream(
+            [ChatMessage(role="user", content="测试问题")],
+            deadline=RecordingDeadline(),
+        ))
+
+        self.assertEqual("".join(items[:-1]), "正文结尾")
+        self.assertEqual(items[-1].answer, f"正文{marker}结尾")
+
+    def test_agentic_generation_remains_buffered(self):
+        def forbidden_stream(messages):
+            raise AssertionError("agent internals must not stream")
+
+        complete = RecordingCompletion([_completion("buffered answer")])
+        graph = build_agent_graph(_nodes(
+            [],
+            decision=RouteDecision(Route.CONTACT, agentic=True),
+            complete_chat=complete,
+            stream_chat=forbidden_stream,
+        ))
+
+        items = list(GraphRouteOrchestrator(graph).stream(
+            [ChatMessage(role="user", content="怎么联系？")],
+            deadline=RecordingDeadline(),
+        ))
+
+        self.assertEqual(len(items), 1)
+        self.assertIsInstance(items[0], RouteExecutionResult)
+        self.assertEqual(items[0].answer, "buffered answer")
+        self.assertEqual(len(complete.calls), 1)
+
     def test_rag_path_retrieves_before_generation_and_finalization(self):
         visited = []
         graph = build_agent_graph(_nodes(

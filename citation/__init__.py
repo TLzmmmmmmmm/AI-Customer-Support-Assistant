@@ -6,7 +6,11 @@ from .core import (
     render_answer,
     source_id,
 )
-from .sanitization import sanitize_generated_answer
+from .sanitization import (
+    IncrementalAnswerSanitizer,
+    IncrementalCitationMarkerFilter,
+    sanitize_generated_answer,
+)
 
 __all__ = [
     "CitationCollection",
@@ -15,5 +19,7 @@ __all__ = [
     "collect_sources",
     "render_answer",
     "source_id",
+    "IncrementalAnswerSanitizer",
+    "IncrementalCitationMarkerFilter",
     "sanitize_generated_answer",
 ]

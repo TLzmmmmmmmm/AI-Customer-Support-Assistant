@@ -67,5 +67,34 @@ class BufferedSanitizationCompatibilityTests(unittest.TestCase):
         for name, raw, expected in CASES:
             with self.subTest(name=name):
                 self.assertEqual(sanitize_generated_answer(raw), expected)
+
+
+class IncrementalCitationMarkerFilterTests(unittest.TestCase):
+    def test_removes_complete_markers_across_every_chunk_boundary(self):
+        from citation import IncrementalCitationMarkerFilter
+
+        marker = "【C_0123456789abcdef】"
+        raw = f"前文{marker}后文"
+        for split_at in range(len(raw) + 1):
+            with self.subTest(split_at=split_at):
+                marker_filter = IncrementalCitationMarkerFilter()
+                visible = [
+                    *marker_filter.feed(raw[:split_at]),
+                    *marker_filter.feed(raw[split_at:]),
+                    marker_filter.finish(),
+                ]
+                self.assertEqual("".join(visible), "前文后文")
+
+    def test_preserves_incomplete_or_invalid_markers(self):
+        from citation import IncrementalCitationMarkerFilter
+
+        for raw in ("正文【C_0123", "正文【C_0123456789abcdeg】结尾"):
+            with self.subTest(raw=raw):
+                marker_filter = IncrementalCitationMarkerFilter()
+                visible = [
+                    *marker_filter.feed(raw),
+                    marker_filter.finish(),
+                ]
+                self.assertEqual("".join(visible), raw)
 if __name__ == "__main__":
     unittest.main()
