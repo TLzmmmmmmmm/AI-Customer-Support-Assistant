@@ -7,8 +7,8 @@
     "频率定制",
     "无线图传"
   ],
-  "productFeatures": "Mesh-C车载台是新一代宽带无线自组网便携式产品，具备集成度高、小巧便携、接口丰富等特点，采用先进算法，抗干扰能力强。",
-  "technicalParameters": [
+  "product_Features": "Mesh-C车载台是新一代宽带无线自组网便携式产品，具备集成度高、小巧便携、接口丰富等特点，采用先进算法，抗干扰能力强。",
+  "technical_Parameters": [
     {
       "group": "系统参数",
       "items": [
